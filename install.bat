@@ -12,8 +12,8 @@ mkdir "%USERPROFILE%\.neurobase\persona" 2>nul
 mkdir "%LOCALAPPDATA%\hermes\plugins\sandglass" 2>nul
 
 :: 2. 复制核心脚本
-copy /Y "%~dp0vault.py" "%USERPROFILE%\.neurobase\scripts\sandglass_vault.py" >nul
-copy /Y "%~dp0think.py" "%USERPROFILE%\.neurobase\scripts\sandglass_think.py" >nul
+copy /Y "%~dp0sandglass_vault.py" "%USERPROFILE%\.neurobase\scripts\sandglass_vault.py" >nul
+copy /Y "%~dp0sandglass_think.py" "%USERPROFILE%\.neurobase\scripts\sandglass_think.py" >nul
 copy /Y "%~dp0nightwatch.py" "%USERPROFILE%\.neurobase\scripts\nightwatch.py" >nul
 copy /Y "%~dp0mcp_server.py" "%USERPROFILE%\.neurobase\scripts\sandglass_mcp.py" >nul
 copy /Y "%~dp0plugin.py" "%LOCALAPPDATA%\hermes\plugins\sandglass\__init__.py" >nul
