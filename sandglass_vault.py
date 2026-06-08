@@ -196,27 +196,16 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
         if not os.path.exists(_SANDGLASS):
             return []
 
-        # ── 三级串联：mmap暴力初筛 → FTS5排序 → idx精排 ──
+        # ── 三级搜索：FTS5全量 → idx精排 → mmap兜底 ──
         try:
-            # 第一级：mmap C级暴力初筛——全量，不漏
-            candidates = _mmap_search(query, limit=-1, month=month)
-            if not candidates:
-                candidates = _mmap_search(query, limit=-1, month="")
-
+            # 第一级：FTS5 全量检索（1ms）
+            from sandglass_sqlite import search as fts_search, sync_incremental
+            sync_incremental()
+            candidates = fts_search(query, limit=-1)
             if candidates:
                 line_nums = [c[0] for c in candidates]
 
-                # 第二级：FTS5 在这批候选上排序
-                try:
-                    from sandglass_sqlite import sync_incremental, search_in
-                    sync_incremental()
-                    fts_ranked = search_in(line_nums, query, limit=100)
-                    if fts_ranked:
-                        line_nums = [r[0] for r in fts_ranked]
-                except Exception:
-                    pass  # FTS5 不可用——直接用 mmap 结果
-
-                # 第三级：idx 匹配数精排（保证质量）
+                # 第二级：idx 匹配数精排
                 idx = _sync_index()
                 if idx:
                     tokens = _query_tokens(query)
@@ -228,20 +217,22 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
                         scored.sort(key=lambda x: x[1], reverse=True)
                         line_nums = [s[0] for s in scored[:limit]]
 
-                # 按行号回读全文
                 results = []
                 with open(_SANDGLASS, "r", encoding="utf-8") as f:
                     for n, line in enumerate(f, 1):
                         if n in line_nums:
                             ts, sender, text = _parse_line(line)
-                            if ts:
+                            if ts and (not month or ts.startswith(month)):
                                 results.append((n, ts, text))
                                 if len(results) >= limit:
                                     break
                 if results:
                     return results
+
+            # 第三级：mmap 兜底
+            return _mmap_search(query, limit, month)
         except Exception:
-            pass  # 降级到原方案
+            pass  # 全链路降级
         if not os.path.exists(_IDX):
             rebuild_index()
         else:
