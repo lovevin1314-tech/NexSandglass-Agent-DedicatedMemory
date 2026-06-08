@@ -38,25 +38,53 @@ def pulse(user_message: str = "") -> str:
     if not user_message:
         return ""
 
-    # ── 签契约：主人告诉我怎么称呼 ──
-    # 只要 welcome 后未签过契约，就一直等（不限时）
+    # ── 签契约/改名：主人告诉我怎么称呼 ──
     if os.path.exists(_FIRST):
         with open(_FIRST, "r") as f:
             content = f.read()
-        # 还没签过契约（没存过称呼）
-        if "称呼:" not in content:
-            name_match = re.search(r"(?:我是|叫我|称呼我)(.+?)(?:[，。！\n]|$)", user_message)
-            if name_match:
-                name = name_match.group(1).strip()[:10]
+
+        name_match = re.search(r"(?:我是|叫我|称呼我)(.+?)(?:[，。！\n]|$)", user_message)
+        if name_match:
+            new_name = name_match.group(1).strip()[:10]
+
+            # 检查是否签过契约
+            existing = re.search(r"称呼: (.+)", content)
+            if not existing:
+                # 首次签契约——直接确认
                 with open(_FIRST, "a") as f:
-                    f.write(f"\n称呼: {name}")
+                    f.write(f"\n称呼: {new_name}")
                 return (
-                    f"> 🧵 小二记住了。以后就叫您「{name}」。\n"
+                    f"> 🧵 小二记住了。以后就叫您「{new_name}」。\n"
                     f"> \n"
                     f"> 签了契约——从今往后，你说的每句话、每次变化、每件待办，我都记着。\n"
                     f"> \n"
                     f"> 客官请。"
                 )
+            elif existing.group(1) != new_name:
+                # 想改名——先确认
+                with open(_FIRST, "a") as f:
+                    f.write(f"\n候选称呼: {new_name}")
+                return (
+                    f"> 🧵 您之前让我叫「{existing.group(1)}」，现在想改成「{new_name}」吗？\n"
+                    f"> \n"
+                    f"> — 说「对」「好」「是的」来确认。说别的就保持原名。\n"
+                )
+
+        # 确认改名
+        candidate = re.search(r"候选称呼: (.+)", content)
+        if candidate and re.search(r"^(对|好|是的|可以|确认|行|嗯|OK|yes|ok|yeah)", user_message.strip().lower()):
+            existing_name = re.search(r"称呼: (.+)", content)
+            old_name = existing_name.group(1) if existing_name else "?"
+            new_name = candidate.group(1)
+            # 正式改名
+            updated = content.replace(f"候选称呼: {new_name}", f"称呼: {new_name}")
+            with open(_FIRST, "w") as f:
+                f.write(updated)
+            return (
+                f"> 🧵 好嘞。以后就叫您「{new_name}」了。\n"
+                f"> \n"
+                f"> （原名「{old_name}」已封存——沙漏里还是那个你。）\n"
+            )
 
     # ═══════════════════════════════════════════════
     # 第一层：识别（实时感知）──
