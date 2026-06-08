@@ -21,6 +21,7 @@ def _tokenize(text: str) -> str:
 def _get_db():
     os.makedirs(os.path.dirname(_DB), exist_ok=True)
     conn = sqlite3.connect(_DB)
+    conn.execute("PRAGMA journal_mode=WAL")  # 支持多进程并发
     conn.execute("CREATE TABLE IF NOT EXISTS sandglass (id INTEGER PRIMARY KEY, ts TEXT, sender TEXT, text TEXT)")
     conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS sandglass_fts USING fts5(tokens)")
     conn.commit()
