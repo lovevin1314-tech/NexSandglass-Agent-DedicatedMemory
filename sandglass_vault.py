@@ -272,16 +272,17 @@ def recent(n: int = 10) -> list:
     try:
         if n <= 0 or not os.path.exists(_SANDGLASS):
             return []
+        from collections import deque
+        # 只保留最后 N 行，不加载全文件
         with open(_SANDGLASS, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        total = len(lines)
-        n = min(n, total)
+            last_lines = deque(f, n)
+        total = sum(1 for _ in open(_SANDGLASS, "r", encoding="utf-8"))
         results = []
-        for i, line in enumerate(lines[-n:]):
+        for i, line in enumerate(last_lines):
             ts, sender, text = _parse_line(line)
             if not ts:
                 continue
-            ln = total - n + i + 1
+            ln = total - len(last_lines) + i + 1
             results.append((ln, ts, text))
         return results
     except Exception:
