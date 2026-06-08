@@ -1603,8 +1603,14 @@ def search_filter(query: str) -> dict:
         result["keywords"] = expanded
         result["weights"] = {kw: 1.5 if any(s in kw for s in (scenes or [])) else 1.0
                             for kw in expanded}
+        result["source"] = "LLM场景+阶段双感知"
+    else:
+        result["source"] = "关键词匹配"
 
-    return result
+    # ── 同时保留非LLM路径的关键词作为备选 ──
+    result["alt_keywords"] = _synonym_expand(query) if not expanded or len(expanded) <= 1 else []
+    if result["alt_keywords"]:
+        result["hint"] = f"或者你也可能在找：{'、'.join(result['alt_keywords'][:3])}"
 
 
 def _llm_expand_with_context(query: str, scene_ctx: str, stage_ctx: str) -> list:
