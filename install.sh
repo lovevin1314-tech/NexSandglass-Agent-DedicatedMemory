@@ -21,8 +21,8 @@ echo "✅ 目录已创建"
 
 # 复制脚本
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cp "$SCRIPT_DIR/vault.py" "$HOME/.neurobase/scripts/sandglass_vault.py"
-cp "$SCRIPT_DIR/think.py" "$HOME/.neurobase/scripts/sandglass_think.py"
+cp "$SCRIPT_DIR/sandglass_vault.py" "$HOME/.neurobase/scripts/sandglass_vault.py"
+cp "$SCRIPT_DIR/sandglass_think.py" "$HOME/.neurobase/scripts/sandglass_think.py"
 cp "$SCRIPT_DIR/nightwatch.py" "$HOME/.neurobase/scripts/nightwatch.py"
 cp "$SCRIPT_DIR/mcp_server.py" "$HOME/.neurobase/scripts/sandglass_mcp.py"
 echo "✅ 脚本已部署"
