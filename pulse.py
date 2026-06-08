@@ -142,9 +142,9 @@ def pulse(user_message: str = "") -> str:
 
         fresh = persona_freshness()
         if fresh.get("stale") and fresh.get("level", 0) >= 1:
-            signals.append(
-                f"📊 觉察：画像已滞后 {fresh.get('since_sands', '?')}条沙子，建议更新。"
-            )
+            count = fresh.get("since_sands", 0)
+            msg = f"📊 觉察：画像已滞后 {count}条沙子，建议更新。" if count > 0 else "📊 觉察：画像需要更新。"
+            signals.append(msg)
 
         # 对比今昔——搜过去相关的话题
         total = sv_count()

@@ -5,7 +5,7 @@ NexSandglass Demo — 贾斯汀·比伯 14年成长轨迹
 """
 
 import sys, os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 print("""
 ╔══════════════════════════════════════════════════════╗
