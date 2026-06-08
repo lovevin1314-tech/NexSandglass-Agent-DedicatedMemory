@@ -1,82 +1,113 @@
 """
-NexSandglass 情绪词库 — 动态学习
-================================
-初始内置词库 + 随用户使用自动扩展。
-与画像层联动：画像里的偏好/禁区帮助理解情绪。
+NexSandglass 情绪词库 — 七大情绪分类
+=====================================
+基于 Ekman + Plutchik 情绪理论。
+动态学习 + 主语判断 + 管家回应策略。
 """
 
-import json, os
-from datetime import datetime
+import json, os, re
 
 _VOCAB_FILE = os.path.join(os.path.expanduser("~"), ".neurobase", "emotion_vocab.json")
 
-# ── 内置初始词库（中英双语）──
+# ── 七大情绪分类 ──
+# 格式：{大类: {子类: [词], 管家策略: "xxx"}}
 _BUILTIN = {
-    "红牌": {
-        "zh": ["不管了", "随便", "放弃", "能用就行", "不纠结了", "就这样吧"],
-        "en": ["whatever", "give up", "i don't care", "fine, do what you want"],
+    "愤怒": {
+        "zh": ["气死", "恼火", "凭什么", "不公平", "过分", "太气人了", "火大", "无语",
+              "受不了", "真恶心", "怎么这样", "太糟糕了"],
+        "en": ["angry", "pissed off", "outrageous", "unfair", "ridiculous", "unacceptable"],
+        "策略": "缓提醒。先让情绪降下来，不提待办。",
+        "优先级": "高",
     },
-    "负面": {
-        "zh": ["烦死了", "好累", "压力好大", "真受不了", "没意思", "无聊透顶", "失望",
-              "我好焦虑", "不想干了", "太难受了", "崩溃", "不开心", "还是这样", "算了"],
-        "en": ["frustrated", "exhausted", "stressed out", "sick of this",
-              "disappointed", "anxious", "sad", "tired of"],
+    "悲伤": {
+        "zh": ["难过", "伤心", "好累", "不想动", "心累", "崩溃", "失望",
+              "没劲", "没意思", "提不起劲", "好难过"],
+        "en": ["sad", "depressed", "heartbroken", "disappointed", "exhausted", "drained"],
+        "策略": "缓提醒。状态不好的时候不催。",
+        "优先级": "高",
+    },
+    "焦虑": {
+        "zh": ["焦虑", "紧张", "压力好大", "害怕", "不安", "担心",
+              "怎么办", "万一", "会不会", "好怕"],
+        "en": ["anxious", "nervous", "stressed", "worried", "afraid", "scared"],
+        "策略": "不催。给安全感，不提额外负担。",
+        "优先级": "中",
+    },
+    "放弃": {
+        "zh": ["不管了", "随便", "放弃", "就这样吧", "不做了", "算了算了",
+              "不纠结了", "爱咋咋地", "无所谓", "能用就行"],
+        "en": ["whatever", "give up", "i don't care", "fine, do what you want", "i quit"],
+        "策略": "红牌。提醒全停，优先级=自我修正。",
+        "优先级": "最高",
+    },
+    "开心": {
+        "zh": ["开心", "太好了", "满意", "有意思", "值得", "兴奋", "好棒",
+              "哈哈", "nice", "真不错", "有成就感", "爽", "喜欢"],
+        "en": ["happy", "great", "excited", "awesome", "love it", "worth it", "amazing"],
+        "策略": "正常提醒。状态好可以多提醒。",
+        "优先级": "低",
     },
     "困惑": {
-        "zh": ["不懂", "不明白", "怎么回事", "啥意思", "搞不懂", "奇怪", "不对劲"],
+        "zh": ["不懂", "不明白", "怎么回事", "啥意思", "搞不懂", "奇怪",
+              "不对劲", "不太对", "有点奇怪", "没搞明白"],
         "en": ["confused", "don't understand", "what's going on", "doesn't make sense"],
+        "策略": "正常。帮助澄清，不影响提醒。",
+        "优先级": "低",
     },
-    "积极": {
-        "zh": ["开心", "太好了", "有意思", "满意", "值得", "期待", "兴奋", "好棒"],
-        "en": ["happy", "great", "excited", "awesome", "love it", "worth it"],
+    "意外": {
+        "zh": ["没想到", "竟然", "不是吧", "真的假的", "天哪",
+              "怎么回事这样", "原来是"],
+        "en": ["wow", "unexpected", "surprised", "really", "no way", "oh my"],
+        "策略": "正常。分享惊喜，不影响提醒。",
+        "优先级": "低",
     },
 }
 
-# ── 主语标记（判断情绪来源）──
-_SUBJECT_OTHERS = ["他", "她", "他们", "那个人", "别人", "he ", "she ", "they ", "that person", "someone"]
-_SUBJECT_IMPACT = ["他让", "她让", "他们让", "害得", "he makes", "she makes", "they make"]
+# ── 主语标记 ──
+_SUBJECT_OTHERS = ["他", "她", "他们", "那个人", "别人",
+                   "he ", "she ", "they ", "that person", "someone"]
+_SUBJECT_IMPACT = ["他让", "她让", "他们让", "害得",
+                   "he makes", "she makes", "they make"]
 
 
 def load_vocab() -> dict:
-    """加载情绪词库。首次使用从内置词库初始化。"""
+    """加载情绪词库。合并内置词库确保不丢失。"""
     if os.path.exists(_VOCAB_FILE):
         try:
             with open(_VOCAB_FILE, "r", encoding="utf-8") as f:
                 vocab = json.loads(f.read())
-            # 合并内置词库（确保内置词不丢失）
-            for mood, langs in _BUILTIN.items():
+            for mood, data in _BUILTIN.items():
                 if mood not in vocab:
                     vocab[mood] = {}
-                for lang, words in langs.items():
-                    existing = set(vocab[mood].get(lang, []))
-                    existing.update(words)
-                    vocab[mood][lang] = sorted(existing)
+                for key in ["zh", "en", "策略", "优先级"]:
+                    if key not in vocab[mood]:
+                        vocab[mood][key] = data.get(key, [])
+                    elif isinstance(data[key], list):
+                        existing = set(vocab[mood][key])
+                        existing.update(data[key])
+                        vocab[mood][key] = sorted(existing)
             return vocab
         except Exception:
             pass
 
-    # 首次初始化
-    vocab = {mood: {lang: sorted(words) for lang, words in langs.items()}
-             for mood, langs in _BUILTIN.items()}
+    vocab = {mood: {k: v for k, v in data.items()} for mood, data in _BUILTIN.items()}
     save_vocab(vocab)
     return vocab
 
 
 def save_vocab(vocab: dict):
-    """保存情绪词库到本地。"""
     os.makedirs(os.path.dirname(_VOCAB_FILE), exist_ok=True)
     with open(_VOCAB_FILE, "w", encoding="utf-8") as f:
         json.dump(vocab, f, ensure_ascii=False, indent=2)
 
 
-def learn(word: str, mood: str, lang: str = "zh"):
-    """学习新情绪词。用户表达了一个新的情绪词，收录进词库。"""
+def learn(word: str, mood: str, lang: str = "zh") -> bool:
+    """学习新情绪词。"""
     vocab = load_vocab()
     if mood not in vocab:
-        vocab[mood] = {}
+        return False
     if lang not in vocab[mood]:
         vocab[mood][lang] = []
-
     if word not in vocab[mood][lang]:
         vocab[mood][lang].append(word)
         vocab[mood][lang] = sorted(vocab[mood][lang])
@@ -86,18 +117,20 @@ def learn(word: str, mood: str, lang: str = "zh"):
 
 
 def detect(message: str) -> dict:
-    """检测一条消息的情绪。返回 {mood, emitter, keywords}。"""
+    """检测情绪：返回 {mood, emitter, keywords, strategy, priority}。"""
     vocab = load_vocab()
     msg_lower = message.lower()
 
-    for mood in ["红牌", "负面", "困惑", "积极"]:
+    # 按优先级排序检测：放弃 > 愤怒 > 悲伤 > 焦虑 > 其他
+    mood_order = ["放弃", "愤怒", "悲伤", "焦虑", "困惑", "意外", "开心"]
+
+    for mood in mood_order:
         all_words = vocab.get(mood, {}).get("zh", []) + vocab.get(mood, {}).get("en", [])
-        for word in sorted(all_words, key=len, reverse=True):  # 长词优先
+        for word in sorted(all_words, key=len, reverse=True):
             if word.lower() in msg_lower:
                 idx = msg_lower.find(word.lower())
                 ctx = message[max(0, idx-30):idx].lower()
 
-                # 主语判断
                 if any(w in ctx for w in _SUBJECT_OTHERS):
                     emitter = "他人"
                 elif any(w in ctx for w in _SUBJECT_IMPACT):
@@ -105,38 +138,38 @@ def detect(message: str) -> dict:
                 else:
                     emitter = "自我"
 
-                # 把新表达方式加入学习候选
-                # （如果是"负面"且emitter="自我"，这条消息可能包含新情绪词）
-                if emitter == "自我" and mood in ["负面", "积极"]:
-                    # 提取可能的情绪词（2-4字中文词）
-                    import re
-                    candidates = re.findall(r"[\u4e00-\u9fff]{2,4}", message)
-                    for c in candidates:
-                        if c not in all_words and len(c) >= 2:
-                            # 标记为候选——下次确认后正式收录
-                            pass
+                return {
+                    "mood": mood,
+                    "emitter": emitter,
+                    "keywords": [word],
+                    "strategy": vocab[mood].get("策略", ""),
+                    "priority": vocab[mood].get("优先级", "低"),
+                }
 
-                return {"mood": mood, "emitter": emitter, "keywords": [word]}
-
-    return {"mood": "", "emitter": "自我", "keywords": []}
+    return {"mood": "", "emitter": "自我", "keywords": [], "strategy": "", "priority": "低"}
 
 
 def mood_message(detection: dict) -> str:
-    """根据检测结果生成管家消息。"""
+    """管家回应。"""
     mood = detection["mood"]
     emitter = detection["emitter"]
     words = detection["keywords"][:2]
+    strat = detection.get("strategy", "")
 
     if not mood:
         return ""
 
-    msgs = {
-        ("红牌", "自我"): f"🔴 觉察：红牌信号——「{'、'.join(words)}」。优先级=自我修正。",
-        ("负面", "自我"): f"🟡 觉察：你看起来状态不太好——「{'、'.join(words)}」",
-        ("负面", "他人"): f"🟡 觉察：别人状态不太好——「{'、'.join(words)}」。不影响你的提醒。",
-        ("负面", "影响"): f"🟡 觉察：别人的情绪影响到你了——「{'、'.join(words)}」。提醒先缓一缓。",
-        ("困惑", "自我"): f"🟡 觉察：你好像有点困惑——「{'、'.join(words)}」",
-        ("积极", "自我"): f"🟢 觉察：状态不错——「{'、'.join(words)}」",
-        ("积极", "他人"): f"🟢 觉察：别人状态不错——「{'、'.join(words)}」",
+    emoji_map = {
+        "愤怒": "😡", "悲伤": "😢", "焦虑": "😰", "放弃": "🔴",
+        "开心": "😊", "困惑": "🤔", "意外": "😲",
     }
-    return msgs.get((mood, emitter), "")
+    emoji = emoji_map.get(mood, "🟡")
+
+    if emitter == "他人":
+        return f"{emoji} 觉察：别人{mood}——「{'、'.join(words)}」。不影响你的状态。"
+    elif emitter == "影响":
+        return f"{emoji} 觉察：别人的情绪影响到你了——「{'、'.join(words)}」。{strat}"
+    elif mood == "放弃":
+        return f"🔴 红牌——「{'、'.join(words)}」。优先级=自我修正。{strat}"
+    else:
+        return f"{emoji} 觉察：{mood}——「{'、'.join(words)}」。{strat}"

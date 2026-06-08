@@ -133,20 +133,31 @@ def pulse(user_message: str = "") -> str:
         pass
 
     if signals:
-        # ── 觉察情绪 → 评估 → 识别优先级 → 决定提醒策略 ──
-        has_redcard = any("红牌" in s for s in signals)
-        # 只有"自我"情绪才触发提醒降级，"他人"情绪不影响
-        has_self_negative = any("你看起来状态不太好" in s for s in signals)
-        has_impact = any("别人的情绪影响到你了" in s for s in signals)
+        # ── 情绪协调：根据优先级决定提醒策略 ──
+        try:
+            from emotion_vocab import detect as _ed
+            det = _ed(user_message)
+        except ImportError:
+            det = {"mood":"","emitter":"自我","priority":"低"}
         has_reminder = any("提醒" in s for s in signals)
+        priority = det.get("priority", "低")
+        emitter = det.get("emitter", "自我")
 
-        if has_redcard:
+        if det.get("mood") == "放弃":
+            # 红牌最高优先级
             signals = [s for s in signals if "提醒" not in s]
             signals.append("📋 提醒：现在最重要的事是改好自己。其他待办先放放。")
-
-        elif (has_self_negative or has_impact) and has_reminder:
+        elif priority == "高" and emitter in ("自我", "影响") and has_reminder:
+            # 愤怒/悲伤：延后提醒
             signals = [s for s in signals if "提醒" not in s]
-            signals.append("📋 提醒：待办可以先缓一缓，现在的状态最重要。")
+            signals.append("📋 提醒：待办先放放，状态比任务重要。")
+        elif priority == "中" and emitter in ("自我", "影响") and has_reminder:
+            # 焦虑：缓提醒
+            signals = [s for s in signals if "提醒" not in s]
+            signals.append("📋 提醒：不急的事可以先缓一缓。")
+        elif priority == "低":
+            # 开心/困惑/意外 → 正常提醒
+            pass
 
         return "\n".join(["> 🧵 管家："] + [f"> {s}" for s in signals])
 
