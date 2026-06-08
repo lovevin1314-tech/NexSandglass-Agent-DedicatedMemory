@@ -1,4 +1,4 @@
-# NexSandglass ⏳
+# NexSandglass-Hermes-Agent ⏳
 
 > 真正意义上的"越用越懂你"。
 
@@ -73,7 +73,7 @@ Windows ✅ DPAPI · macOS / Linux ⚠️ 本地权限保护
 
 ---
 
-**NexLSL** · Neuro + Loom + 用户
+**NexLSL**
 
 一个人，2320 行，一个理念。
 
