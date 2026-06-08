@@ -51,6 +51,8 @@ NexSandglass 用"阶段+偏移"解决这两个问题。
 
 ## 5 分钟上手
 
+> ⚠️ 注意：下载后**先运行 install 脚本**。脚本会自动将文件名从 `vault.py`/`think.py` 重命名为 `sandglass_vault.py`/`sandglass_think.py`。直接跑 `python think.py` 会因为 import 路径不匹配而报错。
+
 ```bash
 # 安装
 ./install.bat              # Windows
