@@ -188,7 +188,7 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
         try:
             from sandglass_sqlite import search as fts_search, sync_incremental
             sync_incremental()
-            candidates = fts_search(query, limit=200)  # FTS5 宽召回，不截断
+            candidates = fts_search(query, limit=-1)  # FTS5 全量召回，不截断
             if candidates:
                 # 用 idx 做匹配数精排
                 idx = _sync_index()
