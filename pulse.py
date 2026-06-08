@@ -24,7 +24,7 @@ def pulse(user_message: str = "") -> str:
         with open(_FIRST, "w") as f:
             f.write(datetime.now().strftime("%Y-%m-%d %H:%M"))
         return (
-            "> 🧵 欢迎使用 NexSandglass。从今天起，我是你的记忆管家。\n"
+            "> 🧵 欢迎使用 NexSandglass。从今天起，我是你的小二。\n"
             "> \n"
             "> 🔐 你说的每句话都会加密落沙。\n"
             "> 🧬 我会从沙子里提炼你的画像。你变了我比你先发现。\n"
@@ -159,7 +159,7 @@ def pulse(user_message: str = "") -> str:
             # 开心/困惑/意外 → 正常提醒
             pass
 
-        return "\n".join(["> 🧵 管家："] + [f"> {s}" for s in signals])
+        return "\n".join(["> 🧵 小二："] + [f"> {s}" for s in signals])
 
     return ""
 
