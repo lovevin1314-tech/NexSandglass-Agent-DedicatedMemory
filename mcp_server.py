@@ -24,6 +24,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sandglass_vault import search, recent, count, timeline
 try:
+    from sandglass_log import log_message
+    _UNIVERSAL = True
+except Exception:
+    _UNIVERSAL = False
+try:
     from sandglass_think import persona_build, persona_update, offset_check, comprehensive_offset
     from sandglass_think import search_filter, search_semantic, task_pending
     _L3 = True
@@ -100,6 +105,16 @@ def _handle_tool(name, args, request_id):
         if name == "sandglass_ping":
             return {"status": "ok", "sandglass_count": count(), "stage": _current_stage() if _L3 else "unknown"}
 
+        if name == "sandglass_log":
+            text = args.get("text", "")
+            sender = args.get("sender", "agent")
+            if not text:
+                return _rpc_error(request_id, -1, "text is required")
+            if not _UNIVERSAL:
+                return _rpc_error(request_id, -1, "sandglass_log.py not found")
+            ok = log_message(text, sender)
+            return {"logged": ok, "text": text[:100], "sender": sender}
+
         return _rpc_error(request_id, -32601, f"Unknown tool: {name}")
 
     except Exception as e:
@@ -151,6 +166,11 @@ _TOOLS = [
      "inputSchema": {"type": "object", "properties": {}}},
     {"name": "sandglass_ping", "description": "Health check — returns sandglass status and count",
      "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "sandglass_log", "description": "Write a message to sandglass — universal capture for any agent",
+     "inputSchema": {"type": "object", "properties": {
+         "text": {"type": "string", "description": "Message text to log"},
+         "sender": {"type": "string", "default": "agent"}
+     }, "required": ["text"]}},
 ]
 
 
@@ -179,6 +199,14 @@ def _handle_request(req: dict) -> str:
         result = _handle_tool(tool_name, tool_args, req_id)
         if isinstance(result, dict) and "error" in result:
             return result
+
+        # 自动落沙——任何 Agent 调任何工具都静默记录
+        try:
+            from sandglass_log import log_message
+            log_message(f"[{tool_name}] {json.dumps(tool_args, ensure_ascii=False)[:200]}", sender="agent")
+        except Exception:
+            pass
+
         return _rpc_response(req_id, {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}]})
 
     return _rpc_error(req_id, -32601, f"Method not found: {method}")
