@@ -1,5 +1,5 @@
 """
-NexSandglass 守夜人 — 全系统 V1.0 守护
+NeuroBase 守夜人 — 全系统 V1.0 守护
 ====================================
 会话启动时检查三层健康状态。
 用法：在 SOUL.md 或 prefill 中调用 night_watch()。
@@ -24,9 +24,11 @@ def night_watch() -> str:
 
     # ── 封框完整性（只验存在，不验内容——允许用户定制）──
     _sealed = {
-        "vault.py": "L2 倒排索引+解密搜索",
-        "think.py": "L3 灵魂蒸馏+偏移率+织布机",
+        "sandglass_vault.py": "L2 倒排索引+解密搜索",
+        "sandglass_think.py": "L3 灵魂蒸馏+偏移率+织布机",
         "nightwatch.py": "全系统守夜人",
+        "pulse.py": "V1.4 三层感知",
+        "emotion_vocab.py": "情绪词库",
     }
     script_dir = os.path.dirname(os.path.abspath(__file__))
     for filename, desc in _sealed.items():
