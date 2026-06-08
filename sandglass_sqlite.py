@@ -43,7 +43,7 @@ def sync_all() -> int:
                     for n, line in enumerate(f, 1):
                         ts, sender, text = _parse_line(line)
                         if ts:
-                            rows.append((n, ts, sender, text[:500]))
+                            rows.append((n, ts, sender, text))
                             fts.append((n, _tokenize(text)))
             conn.executemany("INSERT INTO sandglass VALUES(?,?,?,?)", rows)
             conn.executemany("INSERT INTO sandglass_fts(rowid, tokens) VALUES(?,?)", fts)
@@ -75,7 +75,7 @@ def sync_incremental() -> int:
                         if n <= max_id: continue
                         ts, sender, text = _parse_line(line)
                         if ts:
-                            rows.append((n, ts, sender, text[:500]))
+                            rows.append((n, ts, sender, text))
                             fts.append((n, _tokenize(text)))
                             added += 1
             if rows:
@@ -99,7 +99,7 @@ def search(query: str, limit: int = 10) -> list:
             if limit > 0:
                 sql += f" LIMIT {limit}"
             cur = conn.execute(sql, (tokens,))
-            return [(row[0], row[1], row[2][:200]) for row in cur.fetchall()]
+            return [(row[0], row[1], row[2]) for row in cur.fetchall()]
     except Exception:
         return []
 
