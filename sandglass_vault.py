@@ -147,6 +147,11 @@ def _sync_index() -> dict:
             _idx_cache = idx
             return idx
 
+        # idx 和沙漏不匹配——可能被手动修改过
+        if idx_max > 0 and total > 0 and idx_max > total:
+            logger.warning(f"sandglass: idx行号({idx_max})超过沙漏总行数({total})，可能是手动编辑了idx文件。自动重建中...")
+            return {}  # 返回空 → 触发 mmap 降级搜索。下次 rebuild_index() 会自动重建。
+
         # 增量：追加新行
         with open(_SANDGLASS, "r", encoding="utf-8") as f:
             for n, line in enumerate(f, 1):
