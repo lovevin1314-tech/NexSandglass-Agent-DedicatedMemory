@@ -128,8 +128,8 @@ def pulse(user_message: str = "") -> str:
             echo(user_message)
             # 提取决策粒子
             try:
-                from decision_particles import save as save_particles
-                save_particles(user_message, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                from decision_particles import log as log_particles
+                log_particles(user_message, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             except Exception:
                 pass
     except ImportError:
