@@ -31,11 +31,31 @@ def pulse(user_message: str = "") -> str:
             "> 📊 你纠结我追踪——偏移率帮你看见自己在往哪走。\n"
             "> 📋 你忘了我惦记——说过要做的事，下次准时提醒。\n"
             "> \n"
-            "> — 说句「我是XXX」，咱就正式开始。客官请。"
+            "> — 说句「我是XXX」，咱就正式开始。客官，你想小二以后怎么称呼您？\n"
+            "> （告诉我，这就签了契约——从今往后，我只记你的话。）\n"
         )
 
     if not user_message:
         return ""
+
+    # ── 签契约：主人告诉我怎么称呼 ──
+    # 只在首次 welcome 后的第一条消息触发
+    if os.path.exists(_FIRST):
+        mtime = os.path.getmtime(_FIRST)
+        if datetime.now().timestamp() - mtime < 60:  # 首次欢迎后60秒内
+            import re
+            name_match = re.search(r"(?:我是|叫我|称呼我)(.+?)(?:[，。！\n]|$)", user_message)
+            if name_match:
+                name = name_match.group(1).strip()[:10]
+                with open(_FIRST, "a") as f:
+                    f.write(f"\n称呼: {name}")
+                return (
+                    f"> 🧵 小二记住了。以后就叫您「{name}」。\n"
+                    f"> \n"
+                    f"> 签了契约——从今往后，你说的每句话、每次变化、每件待办，我都记着。\n"
+                    f"> \n"
+                    f"> 客官请。"
+                )
 
     # ═══════════════════════════════════════════════
     # 第一层：识别（实时感知）──
