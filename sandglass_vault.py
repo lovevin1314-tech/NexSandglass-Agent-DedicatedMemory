@@ -197,31 +197,52 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
         if not os.path.exists(_SANDGLASS):
             return []
 
-        # ── 优先 SQLite FTS5 粗筛 → idx 精排 ──
+        # ── 三级串联：mmap暴力初筛 → FTS5排序 → idx精排 ──
         try:
-            from sandglass_sqlite import search as fts_search, sync_incremental
-            sync_incremental()
-            candidates = fts_search(query, limit=-1)  # FTS5 全量召回，不截断
+            # 第一级：mmap C级暴力初筛——不漏，砍掉95%候选
+            candidates = _mmap_search(query, limit=500, month=month)
+            if not candidates:
+                candidates = _mmap_search(query, limit=500, month="")
+
             if candidates:
-                # 用 idx 做匹配数精排
+                line_nums = [c[0] for c in candidates]
+
+                # 第二级：FTS5 在这批候选上排序
+                try:
+                    from sandglass_sqlite import sync_incremental, search_in
+                    sync_incremental()
+                    fts_ranked = search_in(line_nums, query, limit=100)
+                    if fts_ranked:
+                        line_nums = [r[0] for r in fts_ranked]
+                except Exception:
+                    pass  # FTS5 不可用——直接用 mmap 结果
+
+                # 第三级：idx 匹配数精排（保证质量）
                 idx = _sync_index()
                 if idx:
                     tokens = _query_tokens(query)
                     if tokens:
                         scored = []
-                        for ln, ts, text in candidates:
+                        for ln in line_nums:
                             score = sum(1 for t in tokens if ln in idx.get(t, []))
-                            scored.append((ln, ts, text, score))
-                        scored.sort(key=lambda x: (x[3], x[0]), reverse=True)
-                        out = [(ln, ts, text) for ln, ts, text, s in scored if not month or ts.startswith(month)]
-                        if out:
-                            return out[:limit]
-                # idx不可用 → 直接返回FTS5结果
-                out = [(ln, ts, text) for ln, ts, text in candidates if not month or ts.startswith(month)]
-                if out:
-                    return out[:limit]
+                            scored.append((ln, score))
+                        scored.sort(key=lambda x: x[1], reverse=True)
+                        line_nums = [s[0] for s in scored[:limit]]
+
+                # 按行号回读全文
+                results = []
+                with open(_SANDGLASS, "r", encoding="utf-8") as f:
+                    for n, line in enumerate(f, 1):
+                        if n in line_nums:
+                            ts, sender, text = _parse_line(line)
+                            if ts:
+                                results.append((n, ts, text))
+                                if len(results) >= limit:
+                                    break
+                if results:
+                    return results
         except Exception:
-            pass  # FTS5降级
+            pass  # 降级到原方案
         if not os.path.exists(_IDX):
             rebuild_index()
         else:

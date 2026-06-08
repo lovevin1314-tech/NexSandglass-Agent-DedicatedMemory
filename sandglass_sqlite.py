@@ -87,6 +87,22 @@ def sync_incremental() -> int:
         return 0
 
 
+def search_in(line_ids: list, query: str, limit: int = 100) -> list:
+    """FTS5 在指定行号列表中搜索排序。用于 mmap 初筛后的精排。"""
+    try:
+        tokens = _tokenize(query)
+        if not tokens.strip() or not line_ids:
+            return []
+        ids_str = ",".join(str(i) for i in line_ids)
+        with _lock:
+            conn = _get_db()
+            sql = f"SELECT s.id, s.ts, s.text FROM sandglass_fts f JOIN sandglass s ON s.id=f.rowid WHERE s.id IN ({ids_str}) AND sandglass_fts MATCH ? ORDER BY rank LIMIT {limit}"
+            cur = conn.execute(sql, (tokens,))
+            return [(row[0], row[1], row[2]) for row in cur.fetchall()]
+    except Exception:
+        return []
+
+
 def search(query: str, limit: int = 10) -> list:
     """FTS5搜索。limit=-1 全量。返回[(行号,时间,明文),...]。"""
     try:
