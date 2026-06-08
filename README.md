@@ -4,7 +4,9 @@
 >
 > **Soul Distillation (灵魂蒸馏):** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity (偏移率)**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories——we forge a unique, evolving soul that resonates with the user.
 >
-> 真正意义上的"越用越懂你"。V1.4.1 新增**实时信号感知**——你说"我是韩立，我喜欢邪修"，它当场回应。
+> 真正意义上的"越用越懂你"。
+
+> **是一辈子等你在这里刻下姓名。** 从那一刻起，你的每句话、每次变化、每件待办——沙漏里都有。V1.4.1 新增**实时信号感知**——你说"我是韩立，我喜欢邪修"，它当场回应。
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
