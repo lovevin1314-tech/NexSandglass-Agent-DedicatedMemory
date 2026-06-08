@@ -19,12 +19,34 @@ _TAG_MAP = {
 }
 
 
-def _tag(choice: str) -> str:
+def _tag(choice: str, question: str = "") -> str:
+    """双模标签：本地关键词 → LLM提炼。"""
+    # 本地标签
     tags = []
     for pattern, tag_list in _TAG_MAP.items():
         if any(w in choice for w in pattern.split("|")):
             tags.extend(tag_list)
-    return ",".join(tags) if tags else "未分类"
+    if tags:
+        return ",".join(tags)  # 本地标签
+
+    # LLM 提炼标签
+    try:
+        import os as _os, urllib.request as _ur, json as _json
+        key = _os.environ.get("DEEPSEEK_API_KEY", "") or _os.environ.get("OPENROUTER_API_KEY", "")
+        if key:
+            body = _json.dumps({"model":"deepseek-chat","messages":[
+                {"role":"system","content":"你是决策分析器。用户做了一个选择，分析其深层动机和价值观。返回2-3个标签，逗号分隔。例如：成本观,独立性,技术审美。只返回标签。"},
+                {"role":"user","content": f"问题：{question}\n选择：{choice}"}
+            ],"max_tokens":50,"temperature":0.2}).encode()
+            req = _ur.Request("https://api.deepseek.com/v1/chat/completions", data=body,
+                headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"})
+            resp = _ur.urlopen(req, timeout=10)
+            result = _json.loads(resp.read())["choices"][0]["message"]["content"]
+            return result.strip()
+    except Exception:
+        pass
+
+    return "未分类"
 
 
 def _direction(choice: str) -> str:
@@ -41,7 +63,7 @@ def log(question: str, choice: str, ts: str = "") -> None:
     """落一粒决策。问题 + 最终选择 + 自动标签。"""
     if not ts:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    tags = _tag(choice)
+    tags = _tag(choice, question)
     direction = _direction(choice)
     os.makedirs(os.path.dirname(_PARTICLES), exist_ok=True)
     with open(_PARTICLES, "a", encoding="utf-8") as f:
