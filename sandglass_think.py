@@ -1597,6 +1597,18 @@ def search_filter(query: str) -> dict:
     except Exception:
         pass
 
+    # ── 偏移率主导权重（始终生效，不分有无LLM）──
+    try:
+        comp = comprehensive_offset()
+        if abs(comp["offset"]) >= 20:
+            result["offset_weight"] = {
+                "direction": comp["direction"],
+                "bias": 1.3 if comp["direction"] == "frugal" else 0.7,
+                "hint": "搜索偏免费/本地方案" if comp["direction"] == "frugal" else "搜索偏效率/工具方案"
+            }
+    except Exception:
+        pass
+
     # ── LLM 双维扩展（有 API Key 时）──
     expanded = _llm_expand_with_context(query, result["scene_context"], result["stage_context"])
     if expanded and len(expanded) > 1:
