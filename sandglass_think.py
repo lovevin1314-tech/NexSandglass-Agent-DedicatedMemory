@@ -1577,32 +1577,79 @@ def decision_snapshot(decision_text: str) -> dict:
 # ═══════════════════════════════════════════════
 # 搜索滤镜
 # ═══════════════════════════════════════════════
-
 def search_filter(query: str) -> dict:
-    """结合偏移率 + 人格画像，返回搜索引导参数。"""
-    # 先查偏移
-    offset = offset_guide(query)
-    # 再读人格画像（如果有的话）
-    persona_hints = []
-    if os.path.exists(_PERSONA):
-        with open(_PERSONA, "r", encoding="utf-8") as f:
-            persona_text = f.read()
-        if "性价比" in persona_text or "省钱" in persona_text:
-            persona_hints.append("主人画像：性价比优先型")
-        if "追根溯源" in persona_text:
-            persona_hints.append("主人画像：追根溯源，不接受'不管了'")
-        if "本地" in persona_text:
-            persona_hints.append("主人画像：偏好本地方案")
+    """场景+阶段双感知搜索滤镜。有 API 时 LLM 双维扩展。
+    返回 {keywords, weights, scene_context, stage_context}"""
+    result = {"keywords": [query], "weights": {}, "scene_context": "", "stage_context": ""}
 
-    return {
-        "offset": offset,
-        "persona": persona_hints,
-        "recommendation": (
-            "优先搜索免费/开源/本地方案"
-            if offset["bias"] == "frugal"
-            else "正常搜索"
-        ),
-    }
+    # ── 场景感知（当前语境）──
+    scenes = scene_current()
+    if not scenes:
+        scenes = scene_guess()
+    if scenes:
+        result["scene_context"] = f"当前场景：{'、'.join(scenes)}"
+
+    # ── 阶段感知（历史轨迹）──
+    try:
+        cross = cross_stage_offset(query)
+        if cross.get("evolution"):
+            result["stage_context"] = cross["evolution"]
+    except Exception:
+        pass
+
+    # ── LLM 双维扩展（有 API Key 时）──
+    expanded = _llm_expand_with_context(query, result["scene_context"], result["stage_context"])
+    if expanded and len(expanded) > 1:
+        result["keywords"] = expanded
+        result["weights"] = {kw: 1.5 if any(s in kw for s in (scenes or [])) else 1.0
+                            for kw in expanded}
+
+    return result
+
+
+def _llm_expand_with_context(query: str, scene_ctx: str, stage_ctx: str) -> list:
+    """LLM 结合场景和阶段上下文扩展关键词。"""
+    if not _LLM_KEY:
+        return []
+
+    system = """你是搜索关键词扩展器。根据用户的当前场景和历史阶段，扩展相关关键词。
+规则：
+1. 第一个词必须是用户原词
+2. 结合场景上下文，返回该场景下最可能相关的词
+3. 结合阶段轨迹，返回历史上该话题相关的词
+4. 返回 3-8 个关键词，一行一个，不要编号
+
+示例：
+查询：加密
+场景：NeuroBase开发
+阶段轨迹：2024年偏向省钱自研，2025年开始接受付费工具
+输出：
+加密
+DPAPI
+本地加密
+沙漏安全
+零依赖
+AES
+密钥管理"""
+
+    ctx = ""
+    if scene_ctx:
+        ctx += f"{scene_ctx}\n"
+    if stage_ctx:
+        ctx += f"阶段轨迹：{stage_ctx}\n"
+
+    user = f"{ctx}查询：{query}"
+    result = _llm(system, user, max_tokens=200)
+
+    if not result:
+        return []
+
+    keywords = []
+    for line in result.strip().split("\n"):
+        word = line.strip()
+        if word and word not in keywords:
+            keywords.append(word)
+    return keywords if keywords else []
 
 
 # ═══════════════════════════════════════════════
