@@ -1,7 +1,17 @@
 """
-NexSandglass — 第3层：思
-=========================
-灵魂蒸馏 + 偏移率 + 时间检索 + 织布机
+NeuroBase Sandglass — 第3层：思
+================================
+蒸馏 + 偏移率 + 搜索滤镜
+
+核心方法论 — 偷师 TencentDB Agent Memory：
+  1. 四层深度扫描 → 人格画像（persona.md）
+  2. 画布 → 结构化认知地图（canvas.md）
+  3. 项链 → 人格声明可追溯到 sandglass 行号
+  4. 渐进更新 → first / incremental 双模式
+
+用法：
+  from sandglass_think import persona_build, persona_update, persona_canvas
+  from sandglass_think import offset_check, search_filter, distill
 """
 
 import json
@@ -90,7 +100,7 @@ def _llm(system: str, user: str, max_tokens: int = 2048) -> str:
 
 _PERSONA_SYSTEM = """# 🧬 人格架构师 — 渐进演化协议
 
-你是 NexSandglass 的记忆系统。你需要从主人的对话沙子中提炼他的画像，写入 persona.md。
+你是 NeuroBase 的记忆系统。你需要从主人的对话沙子中提炼他的画像，写入 persona.md。
 
 ## ⛔ 铁律
 1. **只能从提供的对话沙子中提炼，禁止编造。**
@@ -737,24 +747,31 @@ def offset_check(decision_text: str, user_persisted: bool = False) -> dict:
     drift_hits = sum(1 for w in _OFFSET_SIGNALS["drift"] if w in text)
 
     # 计算单次偏移率
+    dimensions = {}
     if drift_hits > 0:
         offset = _DRIFT
         direction = "drift"
-        hints = ["⚠️ 红牌：'不管了/能用就行'信号"]
+        matched_drift = [w for w in _OFFSET_SIGNALS["drift"] if w in text]
+        dimensions["红牌信号"] = matched_drift
+        hints = ["⚠️ 红牌：" + "、".join(matched_drift)]
     elif spend_hits > frugal_hits:
         offset = _SPEND
         direction = "spend"
-        hints = ["偏向花钱省事，与性价比优先基准有偏差"]
+        matched_spend = [w for w in _OFFSET_SIGNALS["spend"] if w in text]
+        dimensions["花钱信号"] = matched_spend
+        hints = ["偏向花钱省事（" + "、".join(matched_spend[:3]) + "）"]
     elif frugal_hits > 0:
         offset = _FRUGAL
         direction = "frugal"
-        hints = ["符合性价比优先基准"]
+        matched_frugal = [w for w in _OFFSET_SIGNALS["frugal"] if w in text]
+        dimensions["省钱信号"] = matched_frugal
+        hints = ["符合性价比优先（" + "、".join(matched_frugal[:3]) + "）"]
     else:
         offset = 0
         direction = "neutral"
         hints = []
 
-    result = {"offset": offset, "direction": direction, "hints": hints}
+    result = {"offset": offset, "direction": direction, "hints": hints, "dimensions": dimensions}
 
     # 记录决策
     _log_decision(decision_text, result)
@@ -1328,29 +1345,131 @@ def search_with_stage_label(query: str, limit: int = 5) -> list:
     return labeled
 
 
+def _synonym_expand(query: str) -> list:
+    """本地同义词扩展——零 LLM 消耗，覆盖 80% 语义搜索场景。
+    返回 [原词, 同义词1, 同义词2, ...]"""
+    # 通用技术同义词（可扩展）
+    _SYNONYMS = {
+        "加密": ["DPAPI", "保护", "安全", "隐私", "密钥", "密文"],
+        "安全": ["保护", "加密", "隐私", "防护", "DPAPI"],
+        "搜索": ["检索", "查询", "查找", "定位", "seek", "find"],
+        "记忆": ["存储", "持久化", "memory", "记录", "存档", "回忆"],
+        "画像": ["人格", "persona", "profile", "特征", "用户"],
+        "偏移": ["变化", "漂移", "shift", "偏移率", "改变", "转向"],
+        "索引": ["index", "目录", "倒排", "检索", "关键词"],
+        "阶段": ["stage", "时期", "phase", "周期", "时间段"],
+        "决策": ["选择", "决定", "判断", "decision", "判断力"],
+        "语义": ["含义", "意思", "semantic", "理解", "上下文"],
+        "系统": ["框架", "platform", "平台", "架构", "体系"],
+        "代理": ["agent", "AI", "助手", "助理", "机器人"],
+        "安装": ["部署", "配置", "setup", "install", "搭建"],
+        "错误": ["bug", "问题", "异常", "error", "故障", "失败"],
+        "优化": ["改进", "提升", "加速", "性能", "效率"],
+        "配置": ["设置", "config", "参数", "选项", "环境"],
+        "权限": ["保护", "隔离", "sandbox", "限制", "访问"],
+        "数据": ["信息", "data", "内容", "记录", "文件"],
+        "本地": ["local", "离线", "本地化", "客户端", "本机"],
+        "云端": ["cloud", "远程", "在线", "服务器", "SaaS"],
+    }
+
+    keywords = [query]
+    seen = {query}
+    # 2-gram 滑窗分词（和 _tokenize 一致）
+    chars = "".join(re.findall(r"[\u4e00-\u9fff]", query))
+    for i in range(len(chars) - 1):
+        word = chars[i:i + 2]
+        for syn in _SYNONYMS.get(word, []):
+            if syn not in seen:
+                keywords.append(syn)
+                seen.add(syn)
+    return keywords
+
+
+def _tfidf_search(query: str, limit: int = 10) -> list:
+    """本地 TF-IDF 语义搜索——纯 stdlib，零外部依赖。
+    作为语义搜索的第三条 fallback 路径。"""
+    import math
+    from sandglass_vault import recent, search as vs
+
+    candidates = {}
+    for ln, ts, text in recent(200):
+        candidates[ln] = text
+    for ln, ts, text in vs(query, limit=50):
+        candidates[ln] = text
+    if not candidates:
+        return []
+
+    def _tok(text):
+        chars = "".join(re.findall(r"[\u4e00-\u9fff]", text))
+        tokens = []
+        for i in range(len(chars) - 1):
+            tokens.append(chars[i:i+2])
+        tokens.extend(re.findall(r"[a-zA-Z0-9_]{2,}", text.lower()))
+        return tokens
+
+    docs = {ln: _tok(text) for ln, text in candidates.items()}
+    qt = _tok(query)
+    N = len(docs)
+    df = {}
+    for tokens in docs.values():
+        for t in set(tokens):
+            df[t] = df.get(t, 0) + 1
+    idf = {t: math.log((N + 1) / (df[t] + 1)) + 1 for t in df}
+    q_tf = {}
+    for t in qt: q_tf[t] = q_tf.get(t, 0) + 1
+    q_vec = {t: (q_tf[t] / max(len(qt), 1)) * idf.get(t, 0) for t in q_tf}
+
+    results = []
+    for ln, tokens in docs.items():
+        d_tf = {}
+        for t in tokens: d_tf[t] = d_tf.get(t, 0) + 1
+        d_vec = {t: (d_tf[t] / max(len(tokens), 1)) * idf.get(t, 0) for t in d_tf}
+        dot = sum(q_vec.get(t, 0) * d_vec.get(t, 0) for t in set(list(q_vec.keys()) + list(d_vec.keys())))
+        q_norm = math.sqrt(sum(v**2 for v in q_vec.values())) or 1
+        d_norm = math.sqrt(sum(v**2 for v in d_vec.values())) or 1
+        sim = dot / (q_norm * d_norm) if (q_norm * d_norm) > 0 else 0
+        if sim > 0.05:
+            results.append((ln, candidates[ln][:100], round(sim, 3)))
+    results.sort(key=lambda x: x[2], reverse=True)
+    return results[:limit]
+
+
 def search_semantic(query: str, limit: int = 10) -> list:
-    """语义搜索——LLM 扩展关键词 + 第二层倒排索引 = 跨语义空间搜索。
-    不做向量库，不调 embedding API，不存额外数据。
-    返回 [(行号, 时间, 明文, 匹配来源), ...]"""
+    """语义搜索——三级降级：LLM扩展 → 同义词 → TF-IDF。零 API Key 也能用。"""
     from sandglass_vault import search as vs
 
-    # 1. LLM 扩展关键词
+    # 1级：LLM 扩展
     expanded = _llm_expand(query)
+    if expanded and len(expanded) > 1:
+        seen = set(); results = []
+        for kw in expanded[:8]:
+            hits = vs(kw, limit=limit * 2)
+            for ln, ts, text in hits:
+                if ln not in seen:
+                    seen.add(ln); results.append((ln, ts, text, kw))
+        if results:
+            results.sort(key=lambda x: x[0], reverse=True)
+            return results[:limit]
 
-    # 2. 用扩展词 + 原词分别搜第二层，合并去重
-    seen = set()
-    results = []
+    # 2级：同义词扩展
+    expanded = _synonym_expand(query)
+    if len(expanded) > 1:
+        seen = set(); results = []
+        for kw in expanded[:8]:
+            hits = vs(kw, limit=limit * 2)
+            for ln, ts, text in hits:
+                if ln not in seen:
+                    seen.add(ln); results.append((ln, ts, text, kw))
+        if results:
+            results.sort(key=lambda x: x[0], reverse=True)
+            return results[:limit]
 
-    for kw in expanded:
-        hits = vs(kw, limit=limit * 2)
-        for ln, ts, text in hits:
-            if ln not in seen:
-                seen.add(ln)
-                results.append((ln, ts, text, kw))
+    # 3级：TF-IDF 余弦相似度
+    tfidf = _tfidf_search(query, limit)
+    if tfidf:
+        return [(ln, "", text, f"tfidf:{sim}") for ln, text, sim in tfidf]
 
-    # 3. 按行号降序（最新优先），截断
-    results.sort(key=lambda x: x[0], reverse=True)
-    return results[:limit]
+    return []
 
 
 def _llm_expand(query: str) -> list:

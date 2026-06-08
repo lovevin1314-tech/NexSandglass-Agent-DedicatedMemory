@@ -97,6 +97,9 @@ def _handle_tool(name, args, request_id):
                 return _rpc_error(request_id, -1, "Layer 3 not available")
             return task_pending()
 
+        if name == "sandglass_ping":
+            return {"status": "ok", "sandglass_count": count(), "stage": _current_stage() if _L3 else "unknown"}
+
         return _rpc_error(request_id, -32601, f"Unknown tool: {name}")
 
     except Exception as e:
@@ -145,6 +148,8 @@ _TOOLS = [
          "query": {"type": "string"}
      }, "required": ["query"]}},
     {"name": "sandglass_pending_tasks", "description": "List pending cross-session deferred tasks",
+     "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "sandglass_ping", "description": "Health check — returns sandglass status and count",
      "inputSchema": {"type": "object", "properties": {}}},
 ]
 
