@@ -25,6 +25,7 @@ except ImportError:
 
 # ── idx 内存缓存（偷师 memory-os：O(1) 查 token）──
 _idx_cache: dict | None = None
+_idx_mtime: float = 0
 
 
 # ═══════════════════════════════════════════════
@@ -124,15 +125,22 @@ def _sync_index() -> dict:
         with open(_SANDGLASS, "r", encoding="utf-8") as f:
             total = sum(1 for _ in f)
 
-        # 缓存命中：缓存非空且 idx 文件未变（通过检查已有缓存的最大行号）
+        # 缓存命中：mtime未变 + 最大行号 ≥ 总行数
         if _idx_cache is not None:
-            cached_max = 0
-            for lines in _idx_cache.values():
-                if lines:
-                    cached_max = max(cached_max, max(lines))
-            # idx 文件最后一行号 ≥ total 且缓存覆盖了它 → 缓存有效
-            if cached_max >= total and total > 0:
-                return _idx_cache
+            try:
+                cur_mtime = os.path.getmtime(_SANDGLASS)
+                if cur_mtime != _idx_mtime:
+                    _idx_cache = None  # 文件被修改过，清缓存
+                    return {}  # 返回空，让调用方重建
+            except Exception:
+                pass  # mtime 不可用，沿用缓存
+            if _idx_cache is not None:
+                cached_max = 0
+                for lines in _idx_cache.values():
+                    if lines:
+                        cached_max = max(cached_max, max(lines))
+                if cached_max >= total and total > 0:
+                    return _idx_cache
 
         # 读 idx
         idx = {}
@@ -179,6 +187,8 @@ def _sync_index() -> dict:
         os.replace(tmp, _IDX)
 
         _idx_cache = idx
+        try: _idx_mtime = os.path.getmtime(_SANDGLASS)
+        except Exception: pass
         return idx
 
     except Exception:
