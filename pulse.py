@@ -61,58 +61,21 @@ def pulse(user_message: str = "") -> str:
     # 第二层：觉察（偏移 + 趋势 + 情绪感知 + 对比今昔）──
     # ═══════════════════════════════════════════════
 
-    # ── 情绪关键词库（本地识别，中英双语，不调LLM）──
-    _EMOTION_SIGNALS = {
-        "红牌": ["不管了", "随便", "放弃", "能用就行", "不纠结了", "就这样吧",
-                "whatever", "give up", "i don't care", "fine, do what you want"],
-        "负面": ["烦死了", "好累", "压力好大", "真受不了", "没意思", "无聊透顶", "失望",
-                "我好焦虑", "不想干了", "太难受了", "崩溃",
-                "frustrated", "exhausted", "stressed out", "sick of this", "disappointed", "anxious"],
-        "困惑": ["不懂", "不明白", "怎么回事", "啥意思", "搞不懂", "奇怪", "不对劲",
-                "confused", "don't understand", "what's going on", "doesn't make sense"],
-        "积极": ["开心", "太好了", "有意思", "满意", "值得", "期待", "兴奋", "好棒",
-                "happy", "great", "excited", "awesome", "love it", "worth it"],
-    }
-
-    for mood, keywords in _EMOTION_SIGNALS.items():
-        for kw in keywords:
-            if kw.lower() in user_message.lower():
-                # ── 主语判断：谁的情绪？ ──
-                idx = user_message.lower().find(kw.lower())
-                context_before = user_message[max(0, idx-30):idx].lower()
-
-                # 判断情绪来源
-                if any(w in context_before for w in ["他", "她", "他们", "那个人", "别人",
-                                                       "he ", "she ", "they ", "that person",
-                                                       "someone", "somebody"]):
-                    # 别人的情绪 → 记录但不触发提醒降级
-                    emitter = "他人"
-                elif any(w in context_before for w in ["他让", "她让", "他们让", "害得",
-                                                         "he makes", "she makes", "they make"]):
-                    # 别人的情绪影响了我 → 需要关注
-                    emitter = "影响"
-                else:
-                    # 默认是我的情绪
-                    emitter = "自我"
-
-                matched = [k for k in keywords if k in user_message][:2]
-                if mood == "红牌":
-                    signals.append(f"🔴 觉察：红牌信号——「{'、'.join(matched)}」。优先级=自我修正。")
-                elif mood == "负面":
-                    if emitter == "他人":
-                        signals.append(f"🟡 觉察：别人状态不太好——「{'、'.join(matched)}」。不影响你的提醒。")
-                    elif emitter == "影响":
-                        signals.append(f"🟡 觉察：别人的情绪影响到你了——「{'、'.join(matched)}」。提醒先缓一缓。")
-                    else:
-                        signals.append(f"🟡 觉察：你看起来状态不太好——「{'、'.join(matched)}」")
-                elif mood == "困惑":
-                    signals.append(f"🟡 觉察：你好像有点困惑——「{'、'.join(matched)}」")
-                elif mood == "积极":
-                    if emitter == "他人":
-                        signals.append(f"🟢 觉察：别人状态不错——「{'、'.join(matched)}」")
-                    else:
-                        signals.append(f"🟢 觉察：状态不错——「{'、'.join(matched)}」")
-                break  # 一个消息只匹配最强的情绪
+    # ── 情绪感知（动态词库 + 主语判断 + 自动学习）──
+    try:
+        from emotion_vocab import detect as emotion_detect, mood_message, learn as emotion_learn
+        det = emotion_detect(user_message)
+        if det["mood"]:
+            msg = mood_message(det)
+            if msg:
+                signals.append(msg)
+            # 如果是自我情绪，自动学习新表达
+            if det["emitter"] == "自我":
+                for kw in det["keywords"]:
+                    emotion_learn(kw, det["mood"], "zh" if any('\u4e00' <= c <= '\u9fff' for c in kw) else "en")
+    except ImportError:
+        # 降级：无动态词库时用内置逻辑
+        pass
 
     try:
         from sandglass_vault import search, count as sv_count
