@@ -199,10 +199,10 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
 
         # ── 三级串联：mmap暴力初筛 → FTS5排序 → idx精排 ──
         try:
-            # 第一级：mmap C级暴力初筛——不漏，砍掉95%候选
-            candidates = _mmap_search(query, limit=500, month=month)
+            # 第一级：mmap C级暴力初筛——全量，不漏
+            candidates = _mmap_search(query, limit=-1, month=month)
             if not candidates:
-                candidates = _mmap_search(query, limit=500, month="")
+                candidates = _mmap_search(query, limit=-1, month="")
 
             if candidates:
                 line_nums = [c[0] for c in candidates]
@@ -336,7 +336,7 @@ def _mmap_search(query: str, limit: int, month: str) -> list:
                     if ts and query.lower() in text.lower():
                         if not month or ts.startswith(month):
                             results.append((line_num, ts, text))
-                            if len(results) >= limit: break
+                            if limit > 0 and len(results) >= limit: break
                     line_start = line_end + 1
     except Exception:
         pass
