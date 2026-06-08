@@ -8,6 +8,7 @@ latest = sandglass_vault.recent(5)
 
 import base64
 import logging
+import mmap
 import os
 import re
 
@@ -199,24 +200,25 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
             pass  # SQLite 降级
         if not os.path.exists(_IDX):
             rebuild_index()
+        else:
+            _sync_index()
 
         tokens = _query_tokens(query)
         if not tokens:
             return []
 
-        # ── 增量同步 + 内存 idx（一次读盘，缓存命中零读盘）──
         idx = _sync_index()
         if not idx:
-            return []
+            # ── 三级降级：mmap 直接内存搜索 ──
+            return _mmap_search(query, limit, month)
 
-        # OR 语义：每个匹配 token 的行都加入，记录匹配 token 数用于排序
-        line_scores: dict = {}  # line_num → match_count
+        line_scores: dict = {}
         for token in tokens:
             for ln in idx.get(token, []):
                 line_scores[ln] = line_scores.get(ln, 0) + 1
 
         if not line_scores:
-            return []
+            return _mmap_search(query, limit, month)
 
         results = []
         with open(_SANDGLASS, "r", encoding="utf-8") as f:
@@ -270,6 +272,29 @@ def count() -> int:
     except Exception:
         logger.warning("sandglass: count() failed", exc_info=True)
         return 0
+
+
+def _mmap_search(query: str, limit: int, month: str) -> list:
+    """三级降级：mmap 直接内存搜索。"""
+    results = []
+    try:
+        with open(_SANDGLASS, "r+b") as f:
+            with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                line_start = 0; line_num = 0
+                while line_start < len(mm):
+                    line_end = mm.find(b"\n", line_start)
+                    if line_end == -1: line_end = len(mm)
+                    line_num += 1
+                    line = mm[line_start:line_end].decode("utf-8", errors="replace")
+                    if query.lower() in line.lower():
+                        ts, sender, text = _parse_line(line)
+                        if ts and (not month or ts.startswith(month)):
+                            results.append((line_num, ts, text))
+                            if len(results) >= limit: break
+                    line_start = line_end + 1
+    except Exception:
+        pass
+    return results
 
 
 # ═══════════════════════════════════════════════
