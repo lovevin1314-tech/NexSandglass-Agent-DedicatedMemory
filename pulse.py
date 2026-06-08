@@ -128,8 +128,10 @@ def pulse(user_message: str = "") -> str:
             echo(user_message)
             # 提取决策粒子
             try:
-                from decision_particles import log as log_particles
-                log_particles(user_message, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                from decision_particles import log as dp_log
+                # 检测是否包含决策关键词
+                if any(w in user_message for w in ["选","用","装","免费","花钱","不管了","就","还是"]):
+                    dp_log(user_message[:80], user_message[:40])
             except Exception:
                 pass
     except ImportError:
