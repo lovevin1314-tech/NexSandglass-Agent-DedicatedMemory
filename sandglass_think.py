@@ -1589,7 +1589,17 @@ def search_filter(query: str) -> dict:
     if scenes:
         result["scene_context"] = f"当前场景：{'、'.join(scenes)}"
 
-    # ── 阶段感知（历史轨迹）──
+    # ── 画像感知（始终生效）──
+    if os.path.exists(_PERSONA):
+        with open(_PERSONA, "r", encoding="utf-8") as f:
+            persona = f.read()
+        # 提取关键维度
+        for dim, keywords in [("认知内核", ["决策", "核心价值", "驱动力"]),
+                               ("偏好", ["喜欢", "偏好", "开源", "免费", "本地"]),
+                               ("工具", ["Python", "Hermes", "DPAPI"])]:
+            if any(kw in persona for kw in keywords):
+                result["persona_context"] = persona[:500]
+                break
     try:
         cross = cross_stage_offset(query)
         if cross.get("evolution"):
@@ -1610,8 +1620,11 @@ def search_filter(query: str) -> dict:
     except Exception:
         pass
 
-    # ── LLM 双维扩展（有 API Key 时）──
-    expanded = _llm_expand_with_context(query, result["scene_context"], result["stage_context"])
+    # ── LLM 三维扩展（有 API Key 时）──
+    expanded = _llm_expand_with_context(query, 
+        result.get("persona_context", ""),
+        result.get("scene_context", ""), 
+        result.get("stage_context", ""))
     if expanded and len(expanded) > 1:
         result["keywords"] = expanded
         result["weights"] = {kw: 1.5 if any(s in kw for s in (scenes or [])) else 1.0
@@ -1626,32 +1639,35 @@ def search_filter(query: str) -> dict:
         result["hint"] = f"或者你也可能在找：{'、'.join(result['alt_keywords'][:3])}"
 
 
-def _llm_expand_with_context(query: str, scene_ctx: str, stage_ctx: str) -> list:
-    """LLM 结合场景和阶段上下文扩展关键词。"""
+def _llm_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage_ctx: str) -> list:
+    """LLM 结合画像+场景+阶段三维上下文扩展关键词。"""
     if not _LLM_KEY:
         return []
 
-    system = """你是搜索关键词扩展器。根据用户的当前场景和历史阶段，扩展相关关键词。
+    system = """你是搜索关键词扩展器。根据用户的画像、当前场景和历史阶段，扩展相关关键词。
 规则：
 1. 第一个词必须是用户原词
-2. 结合场景上下文，返回该场景下最可能相关的词
-3. 结合阶段轨迹，返回历史上该话题相关的词
-4. 返回 3-8 个关键词，一行一个，不要编号
+2. 结合画像，返回符合用户偏好的词
+3. 结合场景上下文，返回该场景下最可能相关的词
+4. 结合阶段轨迹，返回历史上该话题相关的词
+5. 返回 3-8 个关键词，一行一个
 
 示例：
-查询：加密
+画像：性价比优先，偏好开源工具，关注本地加密
 场景：NeuroBase开发
 阶段轨迹：2024年偏向省钱自研，2025年开始接受付费工具
+查询：加密
 输出：
 加密
 DPAPI
 本地加密
 沙漏安全
 零依赖
-AES
-密钥管理"""
+AES"""
 
     ctx = ""
+    if persona_ctx:
+        ctx += f"画像：{persona_ctx[:200]}\n"
     if scene_ctx:
         ctx += f"{scene_ctx}\n"
     if stage_ctx:
