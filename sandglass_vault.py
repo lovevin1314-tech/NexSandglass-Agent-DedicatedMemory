@@ -177,10 +177,26 @@ def _sync_index() -> dict:
 # ═══════════════════════════════════════════════
 
 def search(query: str, limit: int = 10, month: str = "") -> list:
-    """搜索沙漏。返回 [(行号, 时间, 明文), ...]。month 可选 '2026-06'。"""
+    """搜索沙漏。返回 [(行号, 时间, 明文), ...]。month 可选 '2026-06'。
+    V1.4.4：优先 SQLite FTS5 加速，失败降级倒排索引。"""
     try:
         if not os.path.exists(_SANDGLASS):
             return []
+
+        # ── 优先 SQLite FTS5 ──
+        try:
+            from sandglass_sqlite import search as fts_search, sync_incremental
+            sync_incremental()
+            results = fts_search(query, limit=limit * 2)
+            if results:
+                out = []
+                for ln, ts, text in results:
+                    if month and not ts.startswith(month):
+                        continue
+                    out.append((ln, ts, text))
+                return out[:limit]
+        except Exception:
+            pass  # SQLite 降级
         if not os.path.exists(_IDX):
             rebuild_index()
 
