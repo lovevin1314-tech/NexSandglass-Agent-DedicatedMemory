@@ -220,27 +220,12 @@ def pulse(user_message: str = "") -> str:
     return ""
 
 
-def echo(user_message: str, assistant_response: str = "") -> str:
-    """对话后自动落沙 + 回响确认。用正则避免子串误报。"""
-    triggers = {
-        (r"我(?:是|叫|就是)(?!不)(.+?)(?:[，。！\n]|$)", "角色"),
-        (r"我(?:喜欢|偏好|爱|习惯)\s*(.{2,30})", "偏好"),
-        (r"我(?:讨厌|不喜欢|烦|受不了)\s*(.{2,30})", "禁区"),
-        (r"我(?:在用|装|配)\s*([A-Za-z].{1,20})", "工具"),
-    }
-    caught = []
-    for (pattern, category) in triggers:
-        if re.search(pattern, user_message):
-            caught.append(category)
-
-    if caught:
-        try:
-            from sandglass_log import log_message
-            log_message(user_message, "user")
-            if assistant_response:
-                log_message(assistant_response, "agent")
-        except Exception:
-            pass
-        return f"> 🧵 已感知：{'、'.join(caught)}信号已捕捉"
-
-    return ""
+def echo(user_message: str, assistant_response: str = "") -> None:
+    """对话后自动落沙。"""
+    try:
+        from sandglass_log import log_message
+        log_message(user_message, "user")
+        if assistant_response:
+            log_message(assistant_response, "agent")
+    except Exception:
+        pass
