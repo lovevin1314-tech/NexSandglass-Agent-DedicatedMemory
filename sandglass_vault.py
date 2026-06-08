@@ -226,10 +226,10 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
                         line_nums = [r[0] for r in ranked]
 
             else:
-                # 无LLM模式：FTS5全量 → idx精排（加500安全上限）
+                # 无LLM模式：FTS5全量 → idx精排
                 from sandglass_sqlite import search as fts_search, sync_incremental
                 sync_incremental()
-                candidates = fts_search(query, limit=500)
+                candidates = fts_search(query, limit=-1)
                 line_nums = set(c[0] for c in candidates) if candidates else set()
 
             # idx 精排（共用）
