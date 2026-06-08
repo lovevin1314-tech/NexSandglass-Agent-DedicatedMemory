@@ -75,17 +75,44 @@ def pulse(user_message: str = "") -> str:
     }
 
     for mood, keywords in _EMOTION_SIGNALS.items():
-        if any(kw in user_message for kw in keywords):
-            matched = [kw for kw in keywords if kw in user_message]
-            if mood == "红牌":
-                signals.append(f"🔴 觉察：红牌信号——「{'、'.join(matched[:2])}」。优先级=自我修正。")
-            elif mood == "负面":
-                signals.append(f"🟡 觉察：你看起来状态不太好——「{'、'.join(matched[:2])}」")
-            elif mood == "困惑":
-                signals.append(f"🟡 觉察：你好像有点困惑——「{'、'.join(matched[:2])}」")
-            elif mood == "积极":
-                signals.append(f"🟢 觉察：状态不错——「{'、'.join(matched[:2])}」")
-            break  # 一个消息只匹配最强的情绪
+        for kw in keywords:
+            if kw.lower() in user_message.lower():
+                # ── 主语判断：谁的情绪？ ──
+                idx = user_message.lower().find(kw.lower())
+                context_before = user_message[max(0, idx-30):idx].lower()
+
+                # 判断情绪来源
+                if any(w in context_before for w in ["他", "她", "他们", "那个人", "别人",
+                                                       "he ", "she ", "they ", "that person",
+                                                       "someone", "somebody"]):
+                    # 别人的情绪 → 记录但不触发提醒降级
+                    emitter = "他人"
+                elif any(w in context_before for w in ["他让", "她让", "他们让", "害得",
+                                                         "he makes", "she makes", "they make"]):
+                    # 别人的情绪影响了我 → 需要关注
+                    emitter = "影响"
+                else:
+                    # 默认是我的情绪
+                    emitter = "自我"
+
+                matched = [k for k in keywords if k in user_message][:2]
+                if mood == "红牌":
+                    signals.append(f"🔴 觉察：红牌信号——「{'、'.join(matched)}」。优先级=自我修正。")
+                elif mood == "负面":
+                    if emitter == "他人":
+                        signals.append(f"🟡 觉察：别人状态不太好——「{'、'.join(matched)}」。不影响你的提醒。")
+                    elif emitter == "影响":
+                        signals.append(f"🟡 觉察：别人的情绪影响到你了——「{'、'.join(matched)}」。提醒先缓一缓。")
+                    else:
+                        signals.append(f"🟡 觉察：你看起来状态不太好——「{'、'.join(matched)}」")
+                elif mood == "困惑":
+                    signals.append(f"🟡 觉察：你好像有点困惑——「{'、'.join(matched)}」")
+                elif mood == "积极":
+                    if emitter == "他人":
+                        signals.append(f"🟢 觉察：别人状态不错——「{'、'.join(matched)}」")
+                    else:
+                        signals.append(f"🟢 觉察：状态不错——「{'、'.join(matched)}」")
+                break  # 一个消息只匹配最强的情绪
 
     try:
         from sandglass_vault import search, count as sv_count
@@ -145,16 +172,16 @@ def pulse(user_message: str = "") -> str:
     if signals:
         # ── 觉察情绪 → 评估 → 识别优先级 → 决定提醒策略 ──
         has_redcard = any("红牌" in s for s in signals)
-        has_negative = any("觉察" in s and ("偏移" in s or "滞后" in s) for s in signals)
+        # 只有"自我"情绪才触发提醒降级，"他人"情绪不影响
+        has_self_negative = any("你看起来状态不太好" in s for s in signals)
+        has_impact = any("别人的情绪影响到你了" in s for s in signals)
         has_reminder = any("提醒" in s for s in signals)
 
         if has_redcard:
-            # 红牌：主人正在纠正我 → 优先级=自我修正，提醒全停
             signals = [s for s in signals if "提醒" not in s]
             signals.append("📋 提醒：现在最重要的事是改好自己。其他待办先放放。")
 
-        elif has_negative and has_reminder:
-            # 负面情绪+有待办 → 先共情，提醒缓一缓
+        elif (has_self_negative or has_impact) and has_reminder:
             signals = [s for s in signals if "提醒" not in s]
             signals.append("📋 提醒：待办可以先缓一缓，现在的状态最重要。")
 
