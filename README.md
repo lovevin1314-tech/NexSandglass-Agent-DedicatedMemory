@@ -1,15 +1,30 @@
-# NexSandglass 沙漏记忆系统⏳ V1.3
+# NexSandglass 沙漏记忆系统⏳ V1.4.1
 
-> **是记住。是理解。是懂你。是想你。**
+> **是记住。是理解。是懂你。是想你。现在——它真的在听。**
 >
 > **Soul Distillation (灵魂蒸馏):** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity (偏移率)**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories——we forge a unique, evolving soul that resonates with the user.
 >
-> 真正意义上的"越用越懂你"。
+> 真正意义上的"越用越懂你"。V1.4.1 新增**实时信号感知**——你说"我是韩立，我喜欢邪修"，它当场回应。
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Lines](https://img.shields.io/badge/Lines-2743-lightgrey)]()
-[![Size](https://img.shields.io/badge/Size-40KB-brightgreen)]()
+[![Lines](https://img.shields.io/badge/Lines-2857-lightgrey)]()
+[![Size](https://img.shields.io/badge/Size-43KB-brightgreen)]()
+
+---
+
+## 🧵 V1.4.1 新增：实时信号感知
+
+你说一句话，它立刻听懂。
+
+| 你说 | 它回应 |
+|------|--------|
+| "我是韩立，我喜欢邪修" | 🧬 角色信号 + 💚 偏好信号 已捕捉 |
+| "我讨厌废话多的人" | 🚫 禁区信号 已记录 |
+| "我在用Python写后端" | 🔧 工具信号 已感知 |
+| "更新画像" | 📝 立即触发 persona_update() |
+
+不仅是"记住"——是**当场让你知道它懂了**。
 
 ---
 
@@ -43,15 +58,15 @@ NexSandglass 用"阶段+偏移"解决这两个问题。
 | 依赖 | 向量数据库 + 多个包 | **零依赖，纯 stdlib** |
 | 加密 | 无 / 可选 | **本地 OS 密钥链加密** |
 | 阶段感知 | ❌ | ✅ **偏移率追踪 + 自动切阶段** |
-| 语义搜索 | 向量检索（需嵌入模型） | 关键词倒排 + 可选 LLM 扩展 |
+| 实时感知 | ❌ | ✅ **说话即回应** |
 | 画像 | 静态累积 | 自动切阶段 + 波浪吸收 |
-| 体积 | 上万行 + 服务栈 | **2743 行 · 40KB** |
+| 体积 | 上万行 + 服务栈 | **2857 行 · 43KB** |
 
 ---
 
 ## 5 分钟上手
 
-> ⚠️ 注意：下载后**先运行 install 脚本**。脚本会自动将文件名从 `vault.py`/`think.py` 重命名为 `sandglass_vault.py`/`sandglass_think.py`。直接跑 `python think.py` 会因为 import 路径不匹配而报错。
+> ⚠️ 下载后**先运行 install 脚本**。脚本会自动将文件名从 `vault.py`/`think.py` 重命名为 `sandglass_vault.py`/`sandglass_think.py`。
 
 ```bash
 # 安装
@@ -101,17 +116,6 @@ python demo/run_demo.py
 
 ---
 
-## V1.3 新增
-
-| 功能 | 说明 |
-|------|------|
-| 本地画像提取 | 零 LLM 也能生成画像——纯模式匹配 |
-| ASCII 偏移可视化 | `offset_chart()` 一秒钟看懂轨迹 |
-| 互链层 | 阶段间自动关联——过去封存，规律长进现在 |
-| 波浪自吸收 | 小波浪累积 ≥5 条或 ≥60% 偏移 → 自动重整画像 |
-
----
-
 ## 任何 Agent 都能用
 
 | 方式 | 适用 |
@@ -120,6 +124,7 @@ python demo/run_demo.py
 | TTY Wrapper | Mac / Linux 终端 Agent |
 | MCP 12 工具 | 任何 MCP Agent |
 | `sandglass_log.py` | 自定义脚本 |
+| **`pulse.py` 信号感知** | **任何对话流程** |
 
 ---
 
