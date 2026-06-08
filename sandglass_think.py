@@ -1619,6 +1619,7 @@ def weave_insight(topic: str) -> dict:
     result = {}
 
     # 蒸馏的线：这个话题在画像里怎么说的
+    result["persona_view"] = ["画像不存在"]
     if os.path.exists(_PERSONA):
         with open(_PERSONA, "r", encoding="utf-8") as f:
             persona_text = f.read()
