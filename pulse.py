@@ -195,15 +195,15 @@ def pulse(user_message: str = "") -> str:
 
         if det.get("mood") == "放弃":
             # 红牌最高优先级
-            signals = [s for s in signals if "提醒" not in s]
+            signals = [s for s in signals if not s.startswith("📋")]
             signals.append("📋 提醒：现在最重要的事是改好自己。其他待办先放放。")
         elif priority == "高" and emitter in ("自我", "影响") and has_reminder:
             # 愤怒/悲伤：延后提醒
-            signals = [s for s in signals if "提醒" not in s]
+            signals = [s for s in signals if not s.startswith("📋")]
             signals.append("📋 提醒：待办先放放，状态比任务重要。")
         elif priority == "中" and emitter in ("自我", "影响") and has_reminder:
             # 焦虑：缓提醒
-            signals = [s for s in signals if "提醒" not in s]
+            signals = [s for s in signals if not s.startswith("📋")]
             signals.append("📋 提醒：不急的事可以先缓一缓。")
         elif priority == "低":
             # 开心/困惑/意外 → 正常提醒
