@@ -61,6 +61,32 @@ def pulse(user_message: str = "") -> str:
     # 第二层：觉察（偏移 + 趋势 + 情绪感知 + 对比今昔）──
     # ═══════════════════════════════════════════════
 
+    # ── 情绪关键词库（本地识别，中英双语，不调LLM）──
+    _EMOTION_SIGNALS = {
+        "红牌": ["不管了", "随便", "放弃", "能用就行", "不纠结了", "就这样吧",
+                "whatever", "give up", "i don't care", "fine, do what you want"],
+        "负面": ["烦死了", "好累", "压力好大", "真受不了", "没意思", "无聊透顶", "失望",
+                "我好焦虑", "不想干了", "太难受了", "崩溃",
+                "frustrated", "exhausted", "stressed out", "sick of this", "disappointed", "anxious"],
+        "困惑": ["不懂", "不明白", "怎么回事", "啥意思", "搞不懂", "奇怪", "不对劲",
+                "confused", "don't understand", "what's going on", "doesn't make sense"],
+        "积极": ["开心", "太好了", "有意思", "满意", "值得", "期待", "兴奋", "好棒",
+                "happy", "great", "excited", "awesome", "love it", "worth it"],
+    }
+
+    for mood, keywords in _EMOTION_SIGNALS.items():
+        if any(kw in user_message for kw in keywords):
+            matched = [kw for kw in keywords if kw in user_message]
+            if mood == "红牌":
+                signals.append(f"🔴 觉察：红牌信号——「{'、'.join(matched[:2])}」。优先级=自我修正。")
+            elif mood == "负面":
+                signals.append(f"🟡 觉察：你看起来状态不太好——「{'、'.join(matched[:2])}」")
+            elif mood == "困惑":
+                signals.append(f"🟡 觉察：你好像有点困惑——「{'、'.join(matched[:2])}」")
+            elif mood == "积极":
+                signals.append(f"🟢 觉察：状态不错——「{'、'.join(matched[:2])}」")
+            break  # 一个消息只匹配最强的情绪
+
     try:
         from sandglass_vault import search, count as sv_count
         from sandglass_think import comprehensive_offset, persona_freshness
