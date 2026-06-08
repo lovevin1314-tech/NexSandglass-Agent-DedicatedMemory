@@ -27,23 +27,14 @@ def pulse(user_message: str = "") -> str:
         with open(_FIRST, "w") as f:
             f.write(datetime.now().strftime("%Y-%m-%d %H:%M"))
         return (
-            "> 🧵 中文请说「你好」/ English say \"hello\"\n"
+            "> 🧵 你好 / Hello\n"
             "> \n"
-            if not is_cn else ""
-        ) + (
-            "> 🧵 客官好，我是你的记忆服务员，小二。\n"
-            "> 🔐 你说话我记住——加密落沙，一粒不丢。\n"
-            "> 🧬 你变了我提醒——从沙子里捞画像。\n"
-            "> 📊 你纠结我追踪——偏移率帮你看见方向。\n"
-            "> 📋 你忘了我惦记——说过要做的事，准时提醒。\n"
-            "> — 说句「我是XXX」，咱就正式开始。\n"
-            if is_cn else
-            "> 🧵 Hi, I'm your memory keeper, Keeper.\n"
-            "> 🔐 I remember every word — encrypted, private.\n"
-            "> 🧬 I notice when you change — before you do.\n"
-            "> 📊 I track your decisions — show you your path.\n"
-            "> 📋 I remember what you said you'd do — remind you.\n"
-            "> — Say \"I am [name]\" to begin.\n"
+            "> 🔐 每句话加密落沙 / Every word encrypted\n"
+            "> 🧬 从沙子里捞画像 / Persona from the sand\n"
+            "> 📊 偏移率追踪变化 / Drift tracking\n"
+            "> 📋 跨会话待办提醒 / Cross-session reminders\n"
+            "> \n"
+            "> — 说句「我是XXX」/ Say \"I am [name]\"\n"
         )
 
     if not user_message:
