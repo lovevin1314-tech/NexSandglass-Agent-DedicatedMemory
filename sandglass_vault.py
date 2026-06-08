@@ -239,7 +239,7 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
                 # 无LLM模式：FTS5全量 → idx精排
                 from sandglass_sqlite import search as fts_search, sync_incremental
                 sync_incremental()
-                candidates = fts_search(query, limit=-1)
+                candidates = fts_search(query, limit=1000)  # 安全上限，个人使用够用
                 line_nums = set(c[0] for c in candidates) if candidates else set()
 
             # idx 精排（共用）
