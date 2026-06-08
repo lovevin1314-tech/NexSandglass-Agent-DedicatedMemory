@@ -54,7 +54,7 @@ def pulse(user_message: str = "") -> str:
         with open(_FIRST, "r") as f:
             content = f.read()
 
-        name_match = re.search(r"(?:我是|叫我|称呼我)(.+?)(?:[，。！\n]|$)", user_message)
+        name_match = re.search(r"(?:我是|叫我|称呼我)(?!不)(.+?)(?:[，。！\n]|$)", user_message)
         if name_match:
             new_name = name_match.group(1).strip()[:10]
 
@@ -186,10 +186,13 @@ def pulse(user_message: str = "") -> str:
             else:
                 signals.append(f"📋 提醒：{len(tasks)}项待办未完成")
 
-        # 里程碑
+        # 里程碑——仅首次命中时触发
         total = sv_count()
-        if total % 100 == 0 and total > 0:
-            signals.insert(0, f"🎉 里程碑：已有 {total} 条记忆。")
+        _MILESTONE_FLAG = os.path.join(os.path.expanduser("~"), ".neurobase", f".milestone_{total}")
+        if total % 100 == 0 and total > 0 and not os.path.exists(_MILESTONE_FLAG):
+            os.makedirs(os.path.dirname(_MILESTONE_FLAG), exist_ok=True)
+            with open(_MILESTONE_FLAG, "w") as f: f.write("ok")
+            signals.insert(0, f"🎉 {'里程碑' if is_cn else 'Milestone'}：{total} {'条记忆' if is_cn else 'memories'}。")
     except Exception:
         pass
 
