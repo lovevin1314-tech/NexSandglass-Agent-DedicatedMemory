@@ -1607,7 +1607,10 @@ def search_filter(query: str) -> dict:
     except Exception:
         pass
 
-    # ── 偏移率：≥40% 感知用户，<40% 静默加权 ──
+    # ── 时间范围感知 ──
+    time_hint = _parse_time_range(query)
+    if time_hint:
+        result["time_range"] = time_hint
     try:
         comp = comprehensive_offset()
         off = abs(comp["offset"])
@@ -1685,6 +1688,41 @@ AES"""
         if word and word not in keywords:
             keywords.append(word)
     return keywords if keywords else []
+
+
+def _parse_time_range(query: str) -> list:
+    """解析模糊时间表达式，返回年份列表。有LLM更准，无LLM关键词匹配。"""
+    now_year = datetime.now().year
+
+    # LLM模式
+    if _LLM_KEY:
+        result = _llm(
+            "你是时间解析器。返回JSON数组年份。'两三年前'→[2024,2023]，'去年'→[2025]，无时间→[]。只返回JSON。",
+            query, max_tokens=100
+        )
+        if result:
+            try:
+                m = re.search(r'\[[\d,\s]+\]', result)
+                if m:
+                    years = json.loads(m.group())
+                    if years:
+                        return [str(y) for y in range(min(years)-1, max(years)+2)]
+            except Exception:
+                pass
+
+    # 无LLM：关键词
+    patterns = [
+        (r"(两三|[一二三]?四?)年前", lambda m: [now_year-4, now_year-1]),
+        (r"大概(.+?)年前", lambda m: [now_year-int(m.group(1))-1, now_year-int(m.group(1))+1]),
+        (r"去年", lambda m: [now_year-1]),
+        (r"前年", lambda m: [now_year-2]),
+        (r"最近(.+?)年", lambda m: list(range(now_year-int(m.group(1)), now_year+1))),
+    ]
+    for pat, fn in patterns:
+        m = re.search(pat, query)
+        if m:
+            return [str(y) for y in fn(m)]
+    return []
 
 
 # ═══════════════════════════════════════════════

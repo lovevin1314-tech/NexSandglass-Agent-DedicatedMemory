@@ -205,7 +205,12 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
 
             # 默认搜近一年——缩小范围加速
             if not month:
-                month = datetime.now().strftime("%Y")
+                # 如果有时间范围感知，用第一个年份
+                time_range = filt.get("time_range", [])
+                if time_range:
+                    month = time_range[0]  # 用最早年份做前缀匹配
+                else:
+                    month = datetime.now().strftime("%Y")
 
             if has_llm and len(filt.get("keywords", [])) > 1:
                 # LLM模式：扩展关键词 → mmap全量初筛 → FTS5排序 → idx精排
