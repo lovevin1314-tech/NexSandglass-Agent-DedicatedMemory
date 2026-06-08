@@ -289,7 +289,7 @@ def _mmap_search(query: str, limit: int, month: str) -> list:
     """三级降级：mmap 直接内存搜索。"""
     results = []
     try:
-        with open(_SANDGLASS, "r+b") as f:
+        with open(_SANDGLASS, "rb") as f:
             with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                 line_start = 0; line_num = 0
                 while line_start < len(mm):
