@@ -103,6 +103,23 @@ def search_in(line_ids: list, query: str, limit: int = 100) -> list:
         return []
 
 
+def search_year(query: str, year: str, limit: int = -1) -> list:
+    """FTS5 按年份搜索。year='2026' 只搜该年。"""
+    try:
+        tokens = _tokenize(query)
+        if not tokens.strip():
+            return []
+        with _lock:
+            conn = _get_db()
+            sql = "SELECT s.id, s.ts, s.text FROM sandglass_fts f JOIN sandglass s ON s.id=f.rowid WHERE s.ts LIKE ? AND sandglass_fts MATCH ? ORDER BY rank"
+            if limit > 0:
+                sql += f" LIMIT {limit}"
+            cur = conn.execute(sql, (f"{year}%", tokens))
+            return [(row[0], row[1], row[2]) for row in cur.fetchall()]
+    except Exception:
+        return []
+
+
 def search(query: str, limit: int = 10) -> list:
     """FTS5搜索。limit=-1 全量。返回[(行号,时间,明文),...]。"""
     try:
