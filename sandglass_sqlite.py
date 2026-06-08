@@ -88,19 +88,17 @@ def sync_incremental() -> int:
 
 
 def search(query: str, limit: int = 10) -> list:
-    """FTS5搜索。返回[(行号,时间,明文),...]。失败返回[]。"""
+    """FTS5搜索。limit=-1 全量。返回[(行号,时间,明文),...]。"""
     try:
         tokens = _tokenize(query)
         if not tokens.strip():
             return []
         with _lock:
             conn = _get_db()
-            cur = conn.execute(
-                "SELECT s.id, s.ts, s.text FROM sandglass_fts f "
-                "JOIN sandglass s ON s.id = f.rowid "
-                "WHERE sandglass_fts MATCH ? ORDER BY rank LIMIT ?",
-                (tokens, limit)
-            )
+            sql = "SELECT s.id, s.ts, s.text FROM sandglass_fts f JOIN sandglass s ON s.id = f.rowid WHERE sandglass_fts MATCH ? ORDER BY rank"
+            if limit > 0:
+                sql += f" LIMIT {limit}"
+            cur = conn.execute(sql, (tokens,))
             return [(row[0], row[1], row[2][:200]) for row in cur.fetchall()]
     except Exception:
         return []
