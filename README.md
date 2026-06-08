@@ -2,6 +2,8 @@
 
 > **是记住。是理解。是懂你。是想你。**
 >
+> Soul Distillation (灵魂蒸馏)While traditional Dialogue Distillation extracts factual knowledge, Soul Distillation extracts the Agent's unique persona.Powered by the combination of Drift Velocity (偏移率), this mechanism captures the continuous deviations from the base model. By distilling these accumulated drifts, we don't just store memories; we forge a unique, evolving soul that resonates with the user.
+>
 > 真正意义上的"越用越懂你"。
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
