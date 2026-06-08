@@ -39,11 +39,12 @@ def pulse(user_message: str = "") -> str:
         return ""
 
     # ── 签契约：主人告诉我怎么称呼 ──
-    # 只在首次 welcome 后的第一条消息触发
+    # 只要 welcome 后未签过契约，就一直等（不限时）
     if os.path.exists(_FIRST):
-        mtime = os.path.getmtime(_FIRST)
-        if datetime.now().timestamp() - mtime < 60:  # 首次欢迎后60秒内
-            import re
+        with open(_FIRST, "r") as f:
+            content = f.read()
+        # 还没签过契约（没存过称呼）
+        if "称呼:" not in content:
             name_match = re.search(r"(?:我是|叫我|称呼我)(.+?)(?:[，。！\n]|$)", user_message)
             if name_match:
                 name = name_match.group(1).strip()[:10]
