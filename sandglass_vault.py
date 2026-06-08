@@ -196,27 +196,43 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
         if not os.path.exists(_SANDGLASS):
             return []
 
-        # ── 三级搜索：FTS5全量 → idx精排 → mmap兜底 ──
+        # ── 双模式搜索 ──
         try:
-            # 第一级：FTS5 全量检索（1ms）
-            from sandglass_sqlite import search as fts_search, sync_incremental
-            sync_incremental()
-            candidates = fts_search(query, limit=-1)
-            if candidates:
-                line_nums = [c[0] for c in candidates]
+            from sandglass_think import search_filter
+            filt = search_filter(query)
+            has_llm = filt.get("source", "").startswith("LLM")
 
-                # 第二级：idx 匹配数精排
+            if has_llm and len(filt.get("keywords", [])) > 1:
+                # LLM模式：扩展关键词 → mmap全量初筛 → FTS5排序 → idx精排
+                line_nums = set()
+                for kw in filt["keywords"][:8]:
+                    for ln, ts, text in _mmap_search(kw, limit=-1, month=""):
+                        line_nums.add(ln)
+                if line_nums:
+                    from sandglass_sqlite import search_in, sync_incremental
+                    sync_incremental()
+                    ranked = search_in(list(line_nums), query)
+                    if ranked:
+                        line_nums = [r[0] for r in ranked]
+
+            else:
+                # 无LLM模式：FTS5全量 → idx精排
+                from sandglass_sqlite import search as fts_search, sync_incremental
+                sync_incremental()
+                candidates = fts_search(query, limit=-1)
+                line_nums = set(c[0] for c in candidates) if candidates else set()
+
+            # idx 精排（共用）
+            if line_nums:
                 idx = _sync_index()
                 if idx:
                     tokens = _query_tokens(query)
                     if tokens:
-                        scored = []
-                        for ln in line_nums:
-                            score = sum(1 for t in tokens if ln in idx.get(t, []))
-                            scored.append((ln, score))
+                        scored = [(ln, sum(1 for t in tokens if ln in idx.get(t, []))) for ln in line_nums]
                         scored.sort(key=lambda x: x[1], reverse=True)
-                        line_nums = [s[0] for s in scored[:limit]]
+                        line_nums = set(s[0] for s in scored[:limit])
 
+                # 回读全文
                 results = []
                 with open(_SANDGLASS, "r", encoding="utf-8") as f:
                     for n, line in enumerate(f, 1):
@@ -224,15 +240,13 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
                             ts, sender, text = _parse_line(line)
                             if ts and (not month or ts.startswith(month)):
                                 results.append((n, ts, text))
-                                if len(results) >= limit:
-                                    break
+                                if len(results) >= limit: break
                 if results:
                     return results
 
-            # 第三级：mmap 兜底
             return _mmap_search(query, limit, month)
         except Exception:
-            pass  # 全链路降级
+            pass
         if not os.path.exists(_IDX):
             rebuild_index()
         else:
