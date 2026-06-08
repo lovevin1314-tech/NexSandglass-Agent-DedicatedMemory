@@ -126,6 +126,12 @@ def pulse(user_message: str = "") -> str:
                     emotion_learn(kw, det["mood"], "zh" if any('\u4e00' <= c <= '\u9fff' for c in kw) else "en")
             # 调用 echo 落沙
             echo(user_message)
+            # 提取决策粒子
+            try:
+                from decision_particles import save as save_particles
+                save_particles(user_message, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            except Exception:
+                pass
     except ImportError:
         pass
 

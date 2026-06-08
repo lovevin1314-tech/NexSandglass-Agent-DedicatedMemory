@@ -1,4 +1,4 @@
-"""NexSandglass Plugin — 全平台消息拦截落沙。"""
+"""NeuroBase Sandglass Plugin — 全平台消息拦截落沙。"""
 import base64
 import logging
 import os
@@ -19,7 +19,8 @@ def _on_message(event, **_kw) -> None:
     """pre_gateway_dispatch 钩子——所有平台消息到达时落沙。"""
     try:
         os.makedirs(os.path.dirname(_SANDGLASS), exist_ok=True)
-        sender = getattr(event.source, "user_id", "?") or "?"
+        sender = getattr(event.source, "user_id", "") or ""
+        if not sender: return  # 只记用户消息——AI回复不落沙
         text = getattr(event, "text", "") or ""
         raw = (text or "(media)").encode("utf-8")
         if CryptProtectData:
