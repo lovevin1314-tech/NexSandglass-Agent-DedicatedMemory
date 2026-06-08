@@ -11,6 +11,7 @@ import logging
 import mmap
 import os
 import re
+from datetime import datetime
 
 _SANDGLASS = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.txt")
 _IDX = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.idx")
@@ -201,6 +202,10 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
             from sandglass_think import search_filter
             filt = search_filter(query)
             has_llm = filt.get("source", "").startswith("LLM")
+
+            # 默认搜近一年——缩小范围加速
+            if not month:
+                month = datetime.now().strftime("%Y")
 
             if has_llm and len(filt.get("keywords", [])) > 1:
                 # LLM模式：扩展关键词 → mmap全量初筛 → FTS5排序 → idx精排
