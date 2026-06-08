@@ -13,11 +13,9 @@ _last_sync_mtime = 0  # 记录上次同步时的 sandglass.txt 修改时间
 
 
 def _tokenize(text: str) -> str:
-    """2-gram分词，空格分隔。和vault._tokenize一致。"""
-    chars = "".join(re.findall(r"[\u4e00-\u9fff]", text))
-    tokens = [chars[i:i+2] for i in range(len(chars)-1)]
-    tokens.extend(re.findall(r"[a-zA-Z0-9_]{2,}", text.lower()))
-    return " ".join(tokens)
+    """2-gram分词，空格分隔。统一使用 vault._tokenize 逻辑。"""
+    from sandglass_vault import _tokenize as _vt
+    return " ".join(sorted(_vt(text)))
 
 
 def _get_db():
