@@ -21,8 +21,10 @@ _BUILTIN = {
     },
     "悲伤": {
         "zh": ["难过", "伤心", "好累", "不想动", "心累", "崩溃", "失望",
-              "没劲", "没意思", "提不起劲", "好难过"],
-        "en": ["sad", "depressed", "heartbroken", "disappointed", "exhausted", "drained"],
+              "没劲", "没意思", "提不起劲", "好难过", "废物", "没用", 
+              "搞砸了", "又错了", "做不好", "失败", "不行了", "完蛋了"],
+        "en": ["sad", "depressed", "heartbroken", "disappointed", "exhausted", "drained",
+              "terrible", "failure", "useless", "messed up", "can't do this"],
         "策略": "缓提醒。状态不好的时候不催。",
         "优先级": "高",
     },
@@ -118,19 +120,28 @@ def learn(word: str, mood: str, lang: str = "zh") -> bool:
 
 def detect(message: str) -> dict:
     """检测情绪：返回 {mood, emitter, keywords, strategy, priority}。"""
+    # ── 否定词列表 ──
+    _NEGATION = ["不", "没", "不是", "不太", "并不", "并不太",
+                 "not ", "don't ", "doesn't ", "isn't ", "aren't ",
+                 "never ", "no ", "hardly "]
+
     vocab = load_vocab()
     msg_lower = message.lower()
 
-    # 按优先级排序检测：放弃 > 愤怒 > 悲伤 > 焦虑 > 其他
     mood_order = ["放弃", "愤怒", "悲伤", "焦虑", "困惑", "意外", "开心"]
 
     for mood in mood_order:
         all_words = vocab.get(mood, {}).get("zh", []) + vocab.get(mood, {}).get("en", [])
         for word in sorted(all_words, key=len, reverse=True):
-            if word.lower() in msg_lower:
-                idx = msg_lower.find(word.lower())
-                ctx = message[max(0, idx-30):idx].lower()
+            idx = msg_lower.find(word.lower())
+            if idx >= 0:
+                # ── 否定检查：开心词前面有否定 → 跳过 ──
+                if mood in ("开心", "积极"):
+                    ctx8 = msg_lower[max(0, idx-8):idx]
+                    if any(n in ctx8 for n in _NEGATION):
+                        continue
 
+                ctx = message[max(0, idx-30):idx].lower()
                 if any(w in ctx for w in _SUBJECT_OTHERS):
                     emitter = "他人"
                 elif any(w in ctx for w in _SUBJECT_IMPACT):
@@ -139,9 +150,7 @@ def detect(message: str) -> dict:
                     emitter = "自我"
 
                 return {
-                    "mood": mood,
-                    "emitter": emitter,
-                    "keywords": [word],
+                    "mood": mood, "emitter": emitter, "keywords": [word],
                     "strategy": vocab[mood].get("策略", ""),
                     "priority": vocab[mood].get("优先级", "低"),
                 }

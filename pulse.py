@@ -110,7 +110,7 @@ def pulse(user_message: str = "") -> str:
     # 第二层：觉察（偏移 + 趋势 + 情绪感知 + 对比今昔）──
     # ═══════════════════════════════════════════════
 
-    # ── 情绪感知（动态词库 + 主语判断 + 自动学习）──
+    # ── 情绪感知（动态词库 + 主语判断 + 否定检查 + 自动学习）──
     try:
         from emotion_vocab import detect as emotion_detect, mood_message, learn as emotion_learn
         det = emotion_detect(user_message)
@@ -122,8 +122,9 @@ def pulse(user_message: str = "") -> str:
             if det["emitter"] == "自我":
                 for kw in det["keywords"]:
                     emotion_learn(kw, det["mood"], "zh" if any('\u4e00' <= c <= '\u9fff' for c in kw) else "en")
+            # 调用 echo 落沙
+            echo(user_message)
     except ImportError:
-        # 降级：无动态词库时用内置逻辑
         pass
 
     try:
