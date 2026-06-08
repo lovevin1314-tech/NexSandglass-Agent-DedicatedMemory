@@ -1641,6 +1641,8 @@ def search_filter(query: str) -> dict:
     if result["alt_keywords"]:
         result["hint"] = f"或者你也可能在找：{'、'.join(result['alt_keywords'][:3])}"
 
+    return result
+
 
 def _llm_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage_ctx: str) -> list:
     """LLM 结合画像+场景+阶段三维上下文扩展关键词。"""
