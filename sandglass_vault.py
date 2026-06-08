@@ -97,6 +97,11 @@ def rebuild_index() -> int:
 
         tmp = _IDX + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
+            f.write("# NexSandglass 倒排索引 — 自动生成，请勿手动编辑\n")
+            f.write("# 格式：token:行号,行号,...\n")
+            f.write("# 如需重建，删除此文件后运行 rebuild_index()\n")
+            f.write("# Auto-generated. DO NOT EDIT.\n")
+            f.write("\n")
             for token in sorted(idx):
                 f.write(f"{token}:{','.join(map(str, sorted(set(idx[token]))))}\n")
         os.replace(tmp, _IDX)
@@ -166,6 +171,11 @@ def _sync_index() -> dict:
         # 原子写
         tmp = _IDX + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
+            f.write("# NexSandglass 倒排索引 — 自动生成，请勿手动编辑\n")
+            f.write("# 格式：token:行号,行号,...\n")
+            f.write("# 如需重建，删除此文件后运行 rebuild_index()\n")
+            f.write("# Auto-generated. DO NOT EDIT.\n")
+            f.write("\n")
             for token in sorted(idx):
                 f.write(f"{token}:{','.join(map(str, sorted(set(idx[token]))))}\n")
         os.replace(tmp, _IDX)
