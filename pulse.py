@@ -13,9 +13,12 @@ import sys; sys.path.insert(0, sys_path)
 
 
 def pulse(user_message: str = "") -> str:
-    """四层感知——逐层深化。"""
+    """四层感知——逐层深化。自动中英切换。"""
 
     signals = []
+
+    # 语言检测
+    is_cn = any('\u4e00' <= c <= '\u9fff' for c in user_message) if user_message else True
 
     # ── 第零条消息：欢迎仪式 ──
     _FIRST = os.path.join(os.path.expanduser("~"), ".neurobase", ".first_run")
@@ -24,15 +27,23 @@ def pulse(user_message: str = "") -> str:
         with open(_FIRST, "w") as f:
             f.write(datetime.now().strftime("%Y-%m-%d %H:%M"))
         return (
+            "> 🧵 中文请说「你好」/ English say \"hello\"\n"
+            "> \n"
+            if not is_cn else ""
+        ) + (
             "> 🧵 客官好，我是你的记忆服务员，小二。\n"
-            "> \n"
             "> 🔐 你说话我记住——加密落沙，一粒不丢。\n"
-            "> 🧬 你变了我提醒——从沙子里捞画像，比你自己先察觉。\n"
-            "> 📊 你纠结我追踪——偏移率帮你看见自己在往哪走。\n"
-            "> 📋 你忘了我惦记——说过要做的事，下次准时提醒。\n"
-            "> \n"
-            "> — 说句「我是XXX」，咱就正式开始。客官，你想小二以后怎么称呼您？\n"
-            "> （告诉我，这沙漏里就刻下你的姓名了。）\n"
+            "> 🧬 你变了我提醒——从沙子里捞画像。\n"
+            "> 📊 你纠结我追踪——偏移率帮你看见方向。\n"
+            "> 📋 你忘了我惦记——说过要做的事，准时提醒。\n"
+            "> — 说句「我是XXX」，咱就正式开始。\n"
+            if is_cn else
+            "> 🧵 Hi, I'm your memory keeper, Keeper.\n"
+            "> 🔐 I remember every word — encrypted, private.\n"
+            "> 🧬 I notice when you change — before you do.\n"
+            "> 📊 I track your decisions — show you your path.\n"
+            "> 📋 I remember what you said you'd do — remind you.\n"
+            "> — Say \"I am [name]\" to begin.\n"
         )
 
     if not user_message:
@@ -54,11 +65,11 @@ def pulse(user_message: str = "") -> str:
                 with open(_FIRST, "a") as f:
                     f.write(f"\n称呼: {new_name}")
                 return (
-                    f"> 🧵 小二记住了。以后就叫您「{new_name}」。\n"
+                    f"> 🧵 {'小二记住了。以后就叫您' if is_cn else 'Got it. I will call you'}「{new_name}」。\n"
                     f"> \n"
-                    f"> 沙漏里刻下了你的姓名——从今往后，你说的每句话、每次变化、每件待办，我都记着。\n"
+                    f"> {'沙漏里刻下了你的姓名——从今往后，你说的每句话、每次变化、每件待办，我都记着。' if is_cn else 'Your name is carved in the sandglass. Every word, every change, every task — I will remember.'}\n"
                     f"> \n"
-                    f"> 客官请。"
+                    f"> {'客官请。' if is_cn else 'Ready when you are.'}\n"
                 )
             elif existing.group(1) != new_name:
                 # 想改名——先确认
@@ -209,7 +220,8 @@ def pulse(user_message: str = "") -> str:
             # 开心/困惑/意外 → 正常提醒
             pass
 
-        return "\n".join(["> 🧵 小二："] + [f"> {s}" for s in signals])
+        header = "> 🧵 小二：" if is_cn else "> 🧵 Keeper:"
+        return "\n".join([header] + [f"> {s}" for s in signals])
 
     return ""
 
