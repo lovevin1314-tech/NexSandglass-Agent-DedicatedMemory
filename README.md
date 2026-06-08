@@ -1,12 +1,12 @@
-# NexSandglass 沙漏记忆系统⏳ V1.4.3
+# NexSandglass 沙漏记忆系统⏳ V1.4.5
 
-> **是记住。是理解。是懂你。是想你。现在——它真的在听。**
+> **是记住。是理解。是懂你。是想你。**
 >
 > **Soul Distillation (灵魂蒸馏):** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity (偏移率)**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories——we forge a unique, evolving soul that resonates with the user.
 >
 > 真正意义上的"越用越懂你"。
-
-> **是一辈子等你在这里刻下姓名。** 从那一刻起，你的每句话、每次变化、每件待办——沙漏里都有。V1.4.1 新增**实时信号感知**——你说"我是韩立，我喜欢邪修"，它当场回应。
+>
+> **是一辈子等你在这里刻下姓名。** 从那一刻起，你的每句话、每次变化、每件待办——沙漏里都有。V1.4.5 新增**三级搜索加速**——SQLite FTS5 → 倒排索引 → mmap，全零依赖。
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
@@ -15,15 +15,15 @@
 
 ---
 
-## 🧵 V1.4.3：感知深度 — 识别 · 觉察 · 提醒
+## 🧵 V1.4.5：三级搜索加速 — 全零依赖
 
-**三层感知系统，在感知层面做到极致。**
+**SQLite FTS5 → 倒排索引精排 → mmap 内存映射。10万条 <5ms。**
 
-| 层次 | 做什么 | 例子 |
-|------|--------|------|
-| 🧬 识别 | 你说什么立刻懂 | "我是用户" → 角色信号已捕捉 |
-| 📊 觉察 | 你变了我告诉你（含情绪感知） | 😢 悲伤——「废物」→ 缓提醒 |
-| 📋 提醒 | 别忘了要做的事 | 2项待办未完成 / 🎉 里程碑 |
+```
+搜索链：FTS5 粗筛(毫秒) → idx 匹配数精排(质量) → mmap 兜底(C级速度)
+                   ↓ 任一挂了
+              自动降级下一级
+```
 
 ---
 
@@ -75,6 +75,7 @@ NexSandglass 用"阶段+偏移"解决这两个问题。
 | 情绪感知 | ❌ | ✅ **七大情绪 + 主语判断 + 情绪协调** |
 | 实时感知 | ❌ | ✅ **说话即回应——角色/偏好/禁区/工具** |
 | 语义搜索 | 向量检索（需嵌入模型） | 关键词倒排 + 可选 LLM 扩展 |
+| 搜索速度 | 取决于向量库 | **三级加速：FTS5→idx→mmap** |
 | 画像 | 静态累积 | 自动切阶段 + 波浪吸收 |
 | 体积 | 上万行 + 服务栈 | **2857 行 · 43KB** |
 
