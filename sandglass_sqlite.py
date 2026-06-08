@@ -96,7 +96,7 @@ def search_in(line_ids: list, query: str, limit: int = 100) -> list:
         ids_str = ",".join(str(i) for i in line_ids)
         with _lock:
             conn = _get_db()
-            sql = f"SELECT s.id, s.ts, s.text FROM sandglass_fts f JOIN sandglass s ON s.id=f.rowid WHERE s.id IN ({ids_str}) AND sandglass_fts MATCH ? ORDER BY rank LIMIT {limit}"
+            sql = f"SELECT s.id, s.ts, s.text FROM sandglass_fts f JOIN sandglass s ON s.id=f.rowid WHERE s.id IN ({ids_str}) AND sandglass_fts MATCH ? ORDER BY rank"
             cur = conn.execute(sql, (tokens,))
             return [(row[0], row[1], row[2]) for row in cur.fetchall()]
     except Exception:
