@@ -54,9 +54,16 @@ def sync_all() -> int:
 
 
 def sync_incremental() -> int:
-    """增量同步。返回新增条数。"""
+    """增量同步。文件没变则跳过。返回新增条数。"""
+    global _last_sync_mtime
     try:
         from sandglass_vault import _SANDGLASS, _parse_line
+        # mtime检查——文件没变就跳过
+        if os.path.exists(_SANDGLASS):
+            mtime = os.path.getmtime(_SANDGLASS)
+            if mtime == _last_sync_mtime and _last_sync_mtime > 0:
+                return 0
+            _last_sync_mtime = mtime
         with _lock:
             conn = _get_db()
             cur = conn.execute("SELECT MAX(id) FROM sandglass")
