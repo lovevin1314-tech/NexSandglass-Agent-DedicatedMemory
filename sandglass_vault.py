@@ -248,7 +248,9 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
                 if idx:
                     tokens = _query_tokens(query)
                     if tokens:
-                        scored = [(ln, sum(1 for t in tokens if ln in idx.get(t, []))) for ln in line_nums]
+                        # 转 set 加速——O(1) 查找
+                        idx_set = {t: set(lns) for t, lns in idx.items() if t in tokens}
+                        scored = [(ln, sum(1 for t in tokens if ln in idx_set.get(t, set()))) for ln in line_nums]
                         scored.sort(key=lambda x: x[1], reverse=True)
                         line_nums = set(s[0] for s in scored[:limit])
 
