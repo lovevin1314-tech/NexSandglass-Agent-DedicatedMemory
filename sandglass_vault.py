@@ -49,9 +49,15 @@ def _query_tokens(text: str) -> set:
 
 
 def _decrypt(text: str) -> str:
-    """DPAPI 解密。失败返回原文。"""
+    """DPAPI 解密。失败尝试 base64 解码（非 Windows 降级存储）。"""
     text = text.strip()
     if not text.startswith("AQAA"):
+        if CryptUnprotectData is None:
+            # 非 Windows：base64 编码存储，尝试解码
+            try:
+                return base64.b64decode(text).decode("utf-8")
+            except Exception:
+                return text
         return text
     if not CryptUnprotectData:
         return text
