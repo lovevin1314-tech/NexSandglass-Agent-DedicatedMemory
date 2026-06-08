@@ -1,4 +1,4 @@
-# NexSandglass ⏳ V1.3
+# NexSandglass 沙漏记忆系统⏳ V1.3
 
 > **是记住。是理解。是懂你。是想你。**
 >
