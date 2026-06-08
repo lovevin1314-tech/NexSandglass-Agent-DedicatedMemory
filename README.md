@@ -1,6 +1,6 @@
-# NexSandglass 沙漏记忆系统⏳ V1.6
+# NexSandglass 沙漏记忆系统⏳ V1.6 — 双感知三维检索系统
 
-> **是记住。是理解。是懂你。是想你。中英双语。三维感知搜索。**
+> **是记住。是理解。是懂你。是想你。中英双语。双感知三维检索。**
 
 > **Soul Distillation (灵魂蒸馏):** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity (偏移率)**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories——we forge a unique, evolving soul that resonates with the user.
 >
@@ -25,7 +25,7 @@
 | 情绪感知 | ❌ | ✅ **七大情绪 + 主语判断 + 情绪协调** |
 | 实时感知 | ❌ | ✅ **说话即回应——角色/偏好/禁区/工具** |
 | 语义搜索 | 向量检索（需嵌入模型） | 关键词倒排 + 可选 LLM 扩展 |
-| 搜索感知 | ❌ 关键词匹配 | ✅ **画像+场景+阶段三维驱动搜索** |
+| 搜索感知 | ❌ 关键词匹配 | ✅ **双感知三维检索——画像+场景+阶段驱动** |
 | 搜索速度 | 取决于向量库 | **三级加速：FTS5 → idx → mmap** |
 | 画像 | 静态累积 | 自动切阶段 + 波浪吸收 |
 | 中英双语 | ❌ | ✅ **自动检测，全双语** |
