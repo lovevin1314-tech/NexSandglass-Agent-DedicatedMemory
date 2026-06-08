@@ -184,20 +184,31 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
         if not os.path.exists(_SANDGLASS):
             return []
 
-        # ── 优先 SQLite FTS5 ──
+        # ── 优先 SQLite FTS5 粗筛 → idx 精排 ──
         try:
             from sandglass_sqlite import search as fts_search, sync_incremental
             sync_incremental()
-            results = fts_search(query, limit=limit * 2)
-            if results:
-                out = []
-                for ln, ts, text in results:
-                    if month and not ts.startswith(month):
-                        continue
-                    out.append((ln, ts, text))
-                return out[:limit]
+            candidates = fts_search(query, limit=50)  # FTS5 宽召回
+            if candidates:
+                # 用 idx 做匹配数精排
+                idx = _sync_index()
+                if idx:
+                    tokens = _query_tokens(query)
+                    if tokens:
+                        scored = []
+                        for ln, ts, text in candidates:
+                            score = sum(1 for t in tokens if ln in idx.get(t, []))
+                            scored.append((ln, ts, text, score))
+                        scored.sort(key=lambda x: (x[3], x[0]), reverse=True)
+                        out = [(ln, ts, text) for ln, ts, text, s in scored if not month or ts.startswith(month)]
+                        if out:
+                            return out[:limit]
+                # idx不可用 → 直接返回FTS5结果
+                out = [(ln, ts, text) for ln, ts, text in candidates if not month or ts.startswith(month)]
+                if out:
+                    return out[:limit]
         except Exception:
-            pass  # SQLite 降级
+            pass  # FTS5降级
         if not os.path.exists(_IDX):
             rebuild_index()
         else:
