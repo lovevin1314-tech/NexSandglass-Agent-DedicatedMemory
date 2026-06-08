@@ -117,6 +117,15 @@ def pulse(user_message: str = "") -> str:
         pass
 
     if signals:
+        # ── 情绪协调：觉察到负面信号时，提醒自动降级 ──
+        has_warning = any("drift" in s or "红牌" in s for s in signals)
+        has_reminder = any("提醒" in s for s in signals)
+
+        if has_warning and has_reminder:
+            # 负面信号 + 提醒 → 只保留觉察，暂缓提醒
+            signals = [s for s in signals if "提醒" not in s]
+            signals.append("📋 提醒：待办先放一放，等你状态好再说。")
+
         return "\n".join(["> 🧵 管家："] + [f"> {s}" for s in signals])
 
     return ""
