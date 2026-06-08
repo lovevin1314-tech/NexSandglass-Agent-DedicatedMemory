@@ -1,12 +1,12 @@
-# NexSandglass 沙漏记忆系统⏳ V1.4.5
+# NexSandglass 沙漏记忆系统⏳ V1.5
 
-> **是记住。是理解。是懂你。是想你。**
->
+> **是记住。是理解。是懂你。是想你。中英双语。**
+
 > **Soul Distillation (灵魂蒸馏):** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity (偏移率)**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories——we forge a unique, evolving soul that resonates with the user.
 >
 > 真正意义上的"越用越懂你"。
 >
-> **是一辈子等你在这里刻下姓名。** 从那一刻起，你的每句话、每次变化、每件待办——沙漏里都有。V1.4.5 新增**三级搜索加速**——SQLite FTS5 → 倒排索引 → mmap，全零依赖。
+> **是一辈子等你在这里刻下姓名。** V1.5 中英双语——自动检测语言，中文叫小二，English calls Keeper。
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
@@ -15,7 +15,15 @@
 
 ---
 
-## 🧵 V1.4.5：三级搜索加速 — 全零依赖
+## 🧵 V1.5：中英双语 · 自动切换
+
+```
+"你好"  → 中文小二模式
+"hello" → English Keeper mode
+
+欢迎语、签约、情绪回应——全双语。
+检测到中文字符自动切中文，否则英文。
+```
 
 **SQLite FTS5 → 倒排索引精排 → mmap 内存映射。10万条 <5ms。**
 
