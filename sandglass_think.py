@@ -1895,6 +1895,33 @@ def weave_contradiction() -> dict:
             "evidence": "波动值高但斜率不足",
         })
 
+    # 矛盾4：3D 立体注解 vs 2D 偏移 —— 玻璃穿了，但看到的和记录的不一致
+    three_d = _latest_annotation()
+    if three_d and three_d.get("persona_type"):
+        comp = comprehensive_offset()
+        # 3D 说"成本敏感型"但最近在花 → 矛盾
+        if "成本" in three_d.get("persona_type", "") and comp["direction"] == "spend" and abs(comp["offset"]) >= 30:
+            conflicts.append({
+                "pillar_a": "3D 玻璃", "pillar_b": "2D 偏移",
+                "conflict": "3D 立体像说他是成本敏感型，但最近决策全部偏向花钱",
+                "evidence": f"3D: {three_d['persona_type']} | 偏移: {comp['offset']:+d}% {comp['direction']}",
+            })
+        # 3D 说"压力期"但画像没有放弃信号 → 内在矛盾
+        if "压力" in three_d.get("emotional_state", "") and comp["direction"] != "drift":
+            conflicts.append({
+                "pillar_a": "3D 玻璃", "pillar_b": "2D 偏移",
+                "conflict": "3D 感知到压力，但决策没出现放弃信号——可能在硬撑",
+                "evidence": f"3D: {three_d['emotional_state']} | 偏移: {comp['direction']}",
+            })
+        # 3D 提醒语气变了 → 画像偏移不一致
+        if three_d.get("reminder_tone") and three_d.get("prev_tone"):
+            if three_d["reminder_tone"] != three_d["prev_tone"]:
+                conflicts.append({
+                    "pillar_a": "3D 玻璃", "pillar_b": "3D 玻璃（上一阶段）",
+                    "conflict": f"提醒语气从「{three_d['prev_tone']}」变成了「{three_d['reminder_tone']}」——他变了",
+                    "evidence": f"当前阶段：{three_d.get('persona_type','?')}",
+                })
+
     return {"conflicts": conflicts, "suggestion": (
         "需要更新画像以消除认知偏差" if any("画像" in c["pillar_a"] for c in conflicts)
         else "无矛盾" if not conflicts
