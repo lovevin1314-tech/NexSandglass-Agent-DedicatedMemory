@@ -127,13 +127,16 @@ def pulse(user_message: str = "") -> str:
             # 调用 echo 落沙
             echo(user_message)
 
-            # 决策粒子自动触发——高精度版本
-            # _detect_chain() 抓全链条，传入 log() 避免二次检测丢失信息
+            # 决策粒子自动触发——三步过滤防闲话
+            # ① 语言检测：中英都有决策信号才进
+            # ② _is_decision()：粗筛——是决策才走 _detect_chain
+            # ③ _detect_chain()：精筛——真正的选择链条
             try:
-                from decision_particles import log as dp_log, _detect_chain
-                ch = _detect_chain(user_message)
-                if ch:
-                    dp_log(user_message, ch[-1], chain=ch)
+                from decision_particles import log as dp_log, _detect_chain, _is_decision
+                if _is_decision(user_message):
+                    ch = _detect_chain(user_message)
+                    if ch:
+                        dp_log(user_message, ch[-1], chain=ch)
             except Exception:
                 pass
 

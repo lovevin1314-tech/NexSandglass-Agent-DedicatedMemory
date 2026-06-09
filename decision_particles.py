@@ -60,6 +60,40 @@ def _extract_options(question: str) -> str:
     return "_".join(p[:20] for p in parts[:5] if p)
 
 
+def _is_decision(text: str) -> bool:
+    """
+    粗筛——快速判断消息是不是决策。
+    过滤条件：去掉纯指令、闲话、确认回复。
+    保留条件：包含选择信号（中英双语）。
+    """
+    import re
+    
+    # 纯指令/闲话——不是决策
+    noise = [
+        r"^(推|OK|好的|确认|删|发|等|继续|下一个)[吧了]?$",
+        r"^(还有|还有吗|有没有|在吗|好了吗)[？?]?$",
+        r"^[a-zA-Z]{1,3}$",  # 单字母/短英文
+    ]
+    for n in noise:
+        if re.match(n, text.strip()):
+            return False
+    
+    # 选择信号——是决策
+    signals = [
+        r"(?:还是|或者|or|either).{2,30}(?:还是|或者|or|either)?",  # A还是B
+        r"(?:选|用|装|换|搞|跑|试|买|做)(?:择|了|这个|哪个)?\s*[。！，\n]?",
+        r"(?:就用|就选|就搞|决定|定了|确定)\s*.{1,20}",
+        r"(?:go with|choose|pick|decide|switch to|use)\s+.{1,30}",
+        r"(?:不管了|放弃|算了|随便|就那样|能用就行)",
+        r"(?:give up|whatever|never mind|fine|let's just)",
+    ]
+    for s in signals:
+        if re.search(s, text, re.IGNORECASE):
+            return True
+    
+    return False
+
+
 def _detect_chain(text: str) -> list[str]:
     """
     决策链条检测——不判对错，记录全过程。
