@@ -631,6 +631,13 @@ _FRUGAL = 60   # 省钱信号正在变实（累计+）
 _SPEND = -60   # 花钱轮廓正在成形（累计-）
 _DRIFT = -80   # 放弃倾向的影子（累计--）
 
+# 镜子敏感度——叠多少条才说"轮廓成形了"（不判对错，只描述）
+_OFFSET_SENSITIVITY = {
+    "frugal": 50,  # 省钱影子叠 50 条 → 开始照见轮廓
+    "spend":  50,  # 花钱影子叠 50 条 → 轮廓渐清
+    "drift":  30,  # 放弃更敏感：30 条就开始留意
+}
+
 
 def _log_decision(decision_text: str, offset_result: dict) -> None:
     """写决策日志。自动附加场景和阶段。"""
@@ -2428,7 +2435,11 @@ def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str
         d = direction_cn.get(comp["direction"], "")
         if not d:
             return ""
-        desc = f"最近{comp['sample']}条决策里——{d}的影子比较深（{comp['offset']:+d}%）"
+        sensitivity = _OFFSET_SENSITIVITY.get(comp["direction"], 50)
+        if comp["sample"] >= sensitivity:
+            desc = f"最近{comp['sample']}条决策里——{d}的影子叠了{comp['sample']}层，轮廓已经成形了"
+        else:
+            desc = f"最近{comp['sample']}条决策里——{d}的影子正在叠加（{comp['sample']}/{sensitivity}）"
         return f"🫧 玻璃：{desc}"
     except Exception:
         return ""
