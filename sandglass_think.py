@@ -2255,9 +2255,9 @@ def weave_links() -> dict:
 # 镜子决策 — 织布机照见主人的过去
 # ═══════════════════════════════════════════════
 
-def mirror_decision(question: str) -> dict:
+def entropy_mirror(question: str) -> dict:
     """
-    织布机新入口——主人面临选择，镜子照见过去的影子。
+    熵镜决策——主人面临选择，织布机照见过去的影子。
     
     流程：
     ① 拆问题为关键词 → 搜沙子 → 找匹配的决策粒子
