@@ -171,7 +171,13 @@ _TOOLS = [
          "text": {"type": "string", "description": "Message text to log"},
          "sender": {"type": "string", "default": "agent"}
      }, "required": ["text"]}},
+    {"name": "sandglass_entropy_ghost", "description": "Ghost decision", "inputSchema": {"type": "object", "properties": {"question": {"type": "string"}}, "required": ["question"]}},
+    {"name": "sandglass_entropy_mirror", "description": "Entropy mirror", "inputSchema": {"type": "object", "properties": {"question": {"type": "string"}}, "required": ["question"]}},
+    {"name": "sandglass_memo_mode", "description": "Memory flashback", "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "sandglass_migrate", "description": "Export memory as tar.gz", "inputSchema": {"type": "object", "properties": {"output_path": {"type": "string"}}}},
+    {"name": "sandglass_entropy_chart", "description": "Entropy chart", "inputSchema": {"type": "object", "properties": {"recent_n": {"type": "integer", "default": 10}}}},
 ]
+
 
 
 def _handle_request(req: dict) -> str:
