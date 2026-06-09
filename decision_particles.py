@@ -389,12 +389,15 @@ def _infer_resolution(chain: list[str]) -> str:
 # 落粒子
 # ═══════════════════════════════════════════════
 
-def log(question: str, choice: str, ts: str = "") -> None:
+def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
     """
     落一粒决策。记录全链条，LLM 推断倾向。
     
     格式：早饭_午饭 | A → B → A  回到A(成本敏感) | furgal | 成本观,习惯偏好
               ↑选项     ↑决策链条+推断                   ↑方向  ↑标签
+    
+    chain: 调用方已检测的决策链条（如 pulse.py 从全量消息检测）。
+           若未提供，内部从 question+choice 重新检测。
     """
     if not ts:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -403,8 +406,9 @@ def log(question: str, choice: str, ts: str = "") -> None:
     tags = _tag(question, choice)
     direction = _direction(choice)
     
-    # 链条 + LLM 推断
-    chain = _detect_chain(question + " " + choice)
+    # 链条——优先用调用方传入的（无截断信息丢失）
+    if chain is None:
+        chain = _detect_chain(question + " " + choice)
     if chain:
         summary = _chain_summary(chain)
         inference = _infer_resolution(chain) if _has_llm() else ""

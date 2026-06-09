@@ -1608,7 +1608,7 @@ def search_filter(query: str) -> dict:
 
     # ── 决策粒子权重注入（主人说的：记忆库学得好→拿着决策粒子和偏移率去强化搜索滤镜）──
     try:
-        wf = os.path.join(_NB, "search_weights.txt")
+        wf = os.path.join(_VAULT, "search_weights.txt")
         if os.path.exists(wf):
             weights = {}
             with open(wf, "r", encoding="utf-8") as f:
@@ -1625,7 +1625,7 @@ def search_filter(query: str) -> dict:
         pass
 
     # ── 决策粒子全量喂入 LLM 扩展（让 LLM 吃决策历史推断搜索意图）──
-    dp_path = os.path.join(_NB, "decision_particles.txt")
+    dp_path = os.path.join(_VAULT, "decision_particles.txt")
     dp_context = ""
     if os.path.exists(dp_path):
         try:
