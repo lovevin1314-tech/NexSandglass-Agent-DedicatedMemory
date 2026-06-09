@@ -45,6 +45,20 @@ def night_watch() -> str:
         size = os.path.getsize(_SANDGLASS)
         ok.append(f"✅ 沙漏存在（{size // 1024}KB）")
 
+    # ── L0 会话层监控：compaction 告警 ──
+    _LAST_COUNT = os.path.join(_VAULT, ".last_sandglass_count")
+    current_lines = sum(1 for _ in open(_SANDGLASS, "rb")) if os.path.exists(_SANDGLASS) else 0
+    prev_lines = 0
+    if os.path.exists(_LAST_COUNT):
+        with open(_LAST_COUNT, "r") as f:
+            try: prev_lines = int(f.read().strip())
+            except: pass
+    if prev_lines and current_lines < prev_lines - 10:
+        lost = prev_lines - current_lines
+        alerts.append(f"🔴 L0 告急！沙漏从 {prev_lines} 条降到 {current_lines} 条（疑似 compaction 吞了 {lost} 条沙子）。L1 沙漏未受影响，但会话层（L0）可能丢失了对话。")
+    with open(_LAST_COUNT, "w") as f:
+        f.write(str(current_lines))
+
     if os.path.exists(_ERROR):
         with open(_ERROR, "r") as f:
             ts = f.read().strip()
