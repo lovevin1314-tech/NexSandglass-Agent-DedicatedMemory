@@ -732,15 +732,30 @@ def comprehensive_offset(scene: str = "") -> dict:
                     elif arrows:
                         chain_stats["total_decisions"] += 1
         
-        chain_len = len([l for l in dp_lines if _re.search(r"→", l)])
-        if chain_len:
-            chain_stats["avg_chain_len"] = round(chain_stats["total_decisions"] / chain_len, 1)
+        # ═══════════════════════════════════════════════
+        # 波浪自吸收：小波浪累积够了 → 自动汇聚成大波浪
+        # 策略：固定 EMA 权重（不随时间衰减）+ 连续同向合并
+        # ═══════════════════════════════════════════════
 
-    for i, e in enumerate(entries):
-        weight = i + 1
-        total += e["offset"] * weight
-        weight_sum += weight
-        directions[e["direction"]] += 1
+        EMA_ALPHA = 0.7
+        merged = []
+        for e in entries:
+            if merged and e["direction"] == merged[-1]["direction"] and e["direction"] != "neutral":
+                # 同向 → 合并进大波浪
+                merged[-1]["offset"] = int(merged[-1]["offset"] * EMA_ALPHA + e["offset"] * (1 - EMA_ALPHA))
+                merged[-1]["count"] = merged[-1].get("count", 1) + 1
+            else:
+                merged.append(dict(e, count=1))
+
+        total = 0
+        weight_sum = 0
+        directions = {"frugal": 0, "spend": 0, "drift": 0, "neutral": 0}
+
+        for i, e in enumerate(merged):
+            weight = e.get("count", 1)
+            total += e["offset"] * weight
+            weight_sum += weight
+            directions[e["direction"]] += weight
 
     avg = round(total / weight_sum)
 
