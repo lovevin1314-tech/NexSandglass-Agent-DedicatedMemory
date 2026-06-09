@@ -2176,6 +2176,71 @@ def mirror_decision(question: str) -> dict:
     return result
 
 
+def stage_brief() -> str:
+    """
+    织布机——阶段简报。阶段切换时生成更新日志。
+    不自动推送，主人手动调用。
+    
+    格式：阶段名、触发原因、偏移率、高权重标签、关键决策
+    """
+    from sandglass_vault import count as sv_count
+    
+    lines = []
+    total = sv_count()
+
+    # 阶段信息
+    try:
+        sw = stage_switch_prediction()
+        lines.append(f"🧬 阶段简报 — {datetime.now():%Y-%m-%d}")
+        lines.append("─" * 40)
+        if sw.get("current_stage"):
+            lines.append(f"当前阶段: {sw['current_stage']}")
+        if sw.get("predicted") and sw.get("next_stage"):
+            lines.append(f"预切换: {sw['current_stage']} → {sw['next_stage']}")
+            lines.append(f"原因: {sw.get('reason', '连续偏移超阈值')}")
+    except Exception:
+        lines.append(f"🧬 阶段简报 — {datetime.now():%Y-%m-%d}")
+
+    # 偏移率
+    try:
+        comp = comprehensive_offset()
+        if comp["sample"] >= 2:
+            direction_cn = {"frugal": "省钱", "spend": "愿意投入", "drift": "放弃倾向"}
+            d = direction_cn.get(comp["direction"], comp["direction"])
+            lines.append(f"\n📊 偏移率: {comp['offset']:+d}%（{d}），{comp['sample']}次决策")
+    except Exception:
+        pass
+
+    # 高权重标签
+    try:
+        wf = os.path.join(os.path.expanduser("~"), ".neurobase", "search_weights.txt")
+        if os.path.exists(wf):
+            with open(wf, "r", encoding="utf-8") as f:
+                top = [line.strip() for line in f.readlines()[:5] if line.strip()]
+            if top:
+                lines.append(f"\n🔑 高权重标签: {', '.join(top)}")
+    except Exception:
+        pass
+
+    # 最近 3 条决策
+    try:
+        dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+        if os.path.exists(dp_path):
+            with open(dp_path, "r", encoding="utf-8") as f:
+                recent = f.readlines()[-3:]
+            if recent:
+                lines.append(f"\n📝 最近决策:")
+                for r in recent:
+                    parts = r.strip().split(" | ")
+                    if len(parts) >= 4:
+                        lines.append(f"  {parts[0][:10]} {parts[1][:30]} → {parts[2][:30]} ({parts[3]})")
+    except Exception:
+        pass
+
+    lines.append(f"\n沙漏: {total}条")
+    return "\n".join(lines)
+
+
 # ═══════════════════════════════════════════════
 # 蒸馏 — LLM 驱动的结构化提取
 # ═══════════════════════════════════════════════
