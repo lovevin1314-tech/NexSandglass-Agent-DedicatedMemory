@@ -115,6 +115,37 @@ def _handle_tool(name, args, request_id):
             ok = log_message(text, sender)
             return {"logged": ok, "text": text[:100], "sender": sender}
 
+        if name == "sandglass_entropy_ghost":
+            if not _L3:
+                return _rpc_error(request_id, -1, "Layer 3 not available")
+            from sandglass_think import entropy_ghost
+            return entropy_ghost(args.get("question", ""))
+
+        if name == "sandglass_entropy_mirror":
+            if not _L3:
+                return _rpc_error(request_id, -1, "Layer 3 not available")
+            from sandglass_think import entropy_mirror
+            return entropy_mirror(args.get("question", ""))
+
+        if name == "sandglass_memo_mode":
+            if not _L3:
+                return _rpc_error(request_id, -1, "Layer 3 not available")
+            from sandglass_think import memo_mode
+            return {"memo": memo_mode()}
+
+        if name == "sandglass_migrate":
+            if not _L3:
+                return _rpc_error(request_id, -1, "Layer 3 not available")
+            from sandglass_think import memory_migrate
+            output = args.get("output_path", "") or os.path.join(os.path.expanduser("~"), "neurobase_memory.tar.gz")
+            return {"result": memory_migrate(output)}
+
+        if name == "sandglass_entropy_chart":
+            if not _L3:
+                return _rpc_error(request_id, -1, "Layer 3 not available")
+            from sandglass_think import entropy_chart
+            return {"chart": entropy_chart(args.get("recent_n", 10))}
+
         return _rpc_error(request_id, -32601, f"Unknown tool: {name}")
 
     except Exception as e:
