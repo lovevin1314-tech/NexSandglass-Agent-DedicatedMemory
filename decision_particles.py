@@ -73,7 +73,6 @@ def _detect_chain(text: str) -> list[str]:
     import re
     
     chain = []
-    seen = set()
     
     # ① 显式选择 —— 中英双语
     choice_patterns = [

@@ -622,17 +622,14 @@ _OFFSET_SIGNALS = {
     "drift": ["不管了", "能用就行", "不纠结", "随便", "放弃"],
 }
 
-# 阶段切换阈值
+# 阶段切换——小波浪累积触发
 _STAGE_THRESHOLD = 60  # ±60% 综合偏移率触发阶段切换信号
 _STAGE_CONSECUTIVE = 2  # 连续 2 次高偏移 → 静默切阶段
 
-# 可调偏移阈值（主人自定义）
-_CUSTOM_OFFSET_WARN = None  # None=使用系统默认。例: _CUSTOM_OFFSET_WARN=80 表示偏移超80%才提醒
-
-# 偏移值常量
-_FRUGAL = 60   # 性价比优先
-_SPEND = -60   # 偏向花钱
-_DRIFT = -80   # 红牌漂移
+# 偏移方向常量——不判对错
+_FRUGAL = 60   # 省钱信号正在变实（累计+）
+_SPEND = -60   # 花钱轮廓正在成形（累计-）
+_DRIFT = -80   # 放弃倾向的影子（累计--）
 
 
 def _log_decision(decision_text: str, offset_result: dict) -> None:
@@ -800,26 +797,26 @@ def offset_check(decision_text: str, user_persisted: bool = False) -> dict:
     spend_hits = sum(1 for w in _OFFSET_SIGNALS["spend"] if w in text)
     drift_hits = sum(1 for w in _OFFSET_SIGNALS["drift"] if w in text)
 
-    # 计算单次偏移率
+    # 玻璃——曲面有倒影，不清晰但3D。沙够多，轮廓自然立体
     dimensions = {}
     if drift_hits > 0:
         offset = 100
         direction = "drift"
         matched_drift = [w for w in _OFFSET_SIGNALS["drift"] if w in text]
-        dimensions["红牌信号"] = matched_drift
-        hints = [f"主人好像累了？{', '.join(matched_drift[:2])}——打破规矩没关系，清醒后记得回来看看"]
+        dimensions["放弃倾向的影子"] = matched_drift
+        hints = ["放弃信号浮起来了——" + "、".join(matched_drift[:2]) + "。影子不用怕，留着观察"]
     elif spend_hits > frugal_hits:
         offset = abs(spend_hits - frugal_hits) * 20
         direction = "spend"
         matched_spend = [w for w in _OFFSET_SIGNALS["spend"] if w in text]
-        dimensions["花钱信号"] = matched_spend
-        hints = ["主人最近愿意投入（" + "、".join(matched_spend[:3]) + "），效率和体验更重要"]
+        dimensions["花钱的轮廓"] = matched_spend
+        hints = ["愿意投入的轮廓正在成形（" + "、".join(matched_spend[:3]) + "）"]
     elif frugal_hits > 0:
         offset = frugal_hits * 15
         direction = "frugal"
         matched_frugal = [w for w in _OFFSET_SIGNALS["frugal"] if w in text]
-        dimensions["省钱信号"] = matched_frugal
-        hints = ["主人是精打细算派（" + "、".join(matched_frugal[:3]) + "），每一分钱都值"]
+        dimensions["省钱的轮廓"] = matched_frugal
+        hints = ["省钱的轮廓正在变深（" + "、".join(matched_frugal[:3]) + "）"]
     else:
         offset = 0
         direction = "neutral"
@@ -1015,7 +1012,7 @@ def persona_freshness() -> dict:
         return {"stale": "mild", "since_sands": sands, "since_days": 0,
                 "warning": f"画像已滞后 {sands} 条沙子，建议近期更新"}
     return {"stale": True, "since_sands": sands, "since_days": 0,
-            "warning": f"⚠️ 画像严重滞后：{sands} 条新沙子未纳入。偏移率可能不准。"}
+            "warning": f"画像已积累 {sands} 条新沙子，轮廓正在生长——可以更新一下"}
 
 
 def scene_dominance() -> dict:
@@ -1081,7 +1078,7 @@ def scene_dominance() -> dict:
         insight = "；".join(parts)
 
         if any(abs(s["delta"]) >= 30 for s in shifts):
-            insight += "。⚠️ 注意力发生了显著转移——核心身份可能已变化。"
+            insight += "。注意力的影子往新方向移了——核心身份可能在生长"
 
     return {"current": latest, "shift": shifts, "insight": insight}
 
@@ -1941,7 +1938,7 @@ def weave_links() -> dict:
                 total_drift += abs(t.get("offset", 0))
 
         sim_trend = "上升" if last["similarity"] > first["similarity"] else "下降"
-        summary = "长期趋势稳定" if total_drift < 30 * len(links) else f"累积偏移 {total_drift}%——已达到大波浪阈值"
+        summary = "波动如常——小波浪在累积" if total_drift < 30 * len(links) else f"累积偏移 {total_drift}%——影子已经很深了，轮廓快成形了"
         insight = (
             f"跨 {len(stages)} 个阶段，画像相似度{sim_trend}"
             f"（{first['similarity']:.0%}→{last['similarity']:.0%}）。{summary}。"
@@ -1998,10 +1995,10 @@ def distill(topic: str = "", save: bool = False) -> str:
 - [决策内容] (L行号)
 
 ## 💡 新发现/学习
-- [学到了什么]
+- [如果影子往某个方向移动了，写下方向+幅度]
 
-## ⚠️ 偏移信号
-- [如果有偏离基准的决策]
+## 偏移的轮廓
+- [省钱/花钱/放弃的轮廓——哪个正在变深]
 ```
 
 要求：
@@ -2091,6 +2088,150 @@ def session_context(n: int = 5) -> str:
     for ln, ts, text in latest:
         lines.append(f"- [{ts}] {text[:100]}")
     return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════
+# 3D 玻璃——LLM 合成立体画像 + 动态语气
+# ═══════════════════════════════════════════════
+# 2D 离线 = 玻璃曲面，沙自然累积 → 轮廓渐清
+# 3D 在线 = LLM 吃进所有 2D 影子 → 合成立体像 → 决定怎么提醒
+
+
+def _synthesize_3d() -> dict:
+    """
+    LLM 吃进全部第三层数据，合成立体画像。
+    不接 LLM 返回空 dict，上游自动走 2D 玻璃模式。
+
+    返回 {
+        "persona_type": "ENTP 成本敏感型",
+        "emotional_state": "压力期",
+        "decision_pattern": "平时省但焦虑时花",
+        "reminder_tone": "好奇式提问比关心式更有效",
+        "reminder_example": "你以前遇到类似选择都会花，这次为什么省了？",
+        "contour_depth": "左偏 67% 深 / 右偏 23% 浅 / 放弃 10% 淡",
+    }
+    """
+    if not _LLM_KEY:
+        return {}
+
+    try:
+        from sandglass_vault import count as sv_count
+
+        # 1. 画像
+        persona_text = ""
+        if os.path.exists(_PERSONA):
+            with open(_PERSONA, "r", encoding="utf-8") as f:
+                persona_text = f.read()[:3000]
+
+        # 2. 偏移率 + 粒子
+        comp = comprehensive_offset()
+        particles = _read_decision_log(20)
+        particle_text = "\n".join(
+            f"{e['ts'][:10]} | {e['direction']:6s} | {e.get('tags','')}"
+            for e in particles[-20:]
+        ) if particles else "无决策粒子"
+
+        # 3. 织布机矛盾
+        weave_text = ""
+        weave_path = os.path.join(os.path.expanduser("~"), ".neurobase", "weave_alerts.txt")
+        if os.path.exists(weave_path):
+            with open(weave_path, "r", encoding="utf-8") as f:
+                weave_text = f.read()[-500:]
+
+        # 4. 搜索权重
+        weight_text = ""
+        wf = os.path.join(os.path.expanduser("~"), ".neurobase", "search_weights.txt")
+        if os.path.exists(wf):
+            with open(wf, "r", encoding="utf-8") as f:
+                weight_text = f.read()[:500]
+
+        system = (
+            "你是深层人格分析师。你拥有用户的完整画像、决策历史、偏移趋势、"
+            "织布机矛盾检测和搜索权重。基于这些数据，回答四个问题：\n\n"
+            "1. 这是什么类型的人？（一句话，20字以内）\n"
+            "2. 他最近的情绪状态？（一句话）\n"
+            "3. 他的决策模式特征？（平时怎样，什么情况下会变）\n"
+            "4. 对这种人，什么样的提醒语气最有效？"
+            "（好奇式提问/分享式观察/鼓励式陪伴/数据式汇报/安静不打扰）\n"
+            "5. 给一个具体的提醒例句（30字以内，体现你最推荐的那个语气）\n\n"
+            "输出 JSON 格式：\n"
+            '{"persona_type":"","emotional_state":"","decision_pattern":"","reminder_tone":"","reminder_example":""}\n\n'
+            "不要用「你」称呼用户，用「他」。只输出 JSON。"
+        )
+
+        user_prompt = (
+            f"## 画像\n{persona_text}\n\n"
+            f"## 偏移率\n方向：{comp['direction']}  幅度：{comp['offset']}%  "
+            f"样本：{comp['sample']}条  趋势：{comp.get('trend','?')}\n\n"
+            f"## 决策粒子（最近20条）\n{particle_text}\n\n"
+            f"## 织布机矛盾\n{weave_text or '无矛盾'}\n\n"
+            f"## 搜索权重（热门话题）\n{weight_text or '无数据'}"
+        )
+
+        result = _llm(system, user_prompt, max_tokens=300)
+        if not result:
+            return {}
+
+        # 尝试解析 JSON
+        m = re.search(r"\{.*\}", result, re.DOTALL)
+        if m:
+            data = json.loads(m.group())
+            data["source"] = "3D 玻璃合成"
+            data["timestamp"] = datetime.now().isoformat()
+            data["offset"] = comp
+            data["depth"] = {
+                "frugal": comp.get("frugal_pct", comp["offset"] if comp["direction"] == "frugal" else 0),
+                "spend": comp.get("spend_pct", abs(comp["offset"]) if comp["direction"] == "spend" else 0),
+                "drift": comp.get("drift_pct", 100 if comp["direction"] == "drift" else 0),
+            }
+            return data
+
+        return {"raw": result, "source": "3D 玻璃合成（非JSON）"}
+
+    except Exception:
+        return {}
+
+
+def glass_reminder(user_message: str = "") -> str:
+    """
+    玻璃提醒——3D LLM 优先，无 LLM 回退 2D 玻璃。
+    
+    - 有 LLM → _synthesize_3d() 推断人格 → 动态语气 → 提醒
+    - 无 LLM → 只描述轮廓方向（省钱/花钱/放弃哪边正在变深）
+    
+    不判对错，不说"该怎样"。
+    """
+    # 尝试 3D
+    syn = _synthesize_3d()
+    if syn and "reminder_example" in syn:
+        # LLM 自己决定了语气和内容
+        direction_cn = {"frugal": "省钱", "spend": "愿意投入", "drift": "放弃倾向"}
+        d = syn.get("offset", {}).get("direction", "")
+        contour = f"影子偏向{direction_cn.get(d, d)}（{syn.get('offset',{}).get('offset',0):+d}%）"
+        if syn.get("persona_type"):
+            contour += f"，{syn['persona_type']}"
+        return "\n".join([
+            f"🫧 玻璃：{contour}",
+            f"> {syn['reminder_example']}",
+        ])
+    
+    # 回退 2D 玻璃——纯描述方向
+    try:
+        from sandglass_vault import count
+        total = count()
+        if total < 5:
+            return ""  # 沙子太少，轮廓还没成形
+        comp = comprehensive_offset()
+        if comp["sample"] < 2:
+            return ""
+        direction_cn = {"frugal": "省钱", "spend": "愿意投入", "drift": "放弃倾向", "neutral": ""}
+        d = direction_cn.get(comp["direction"], "")
+        if not d:
+            return ""
+        desc = f"最近{comp['sample']}条决策里——{d}的影子比较深（{comp['offset']:+d}%）"
+        return f"🫧 玻璃：{desc}"
+    except Exception:
+        return ""
 
 
 # ═══════════════════════════════════════════════
