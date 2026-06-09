@@ -50,6 +50,31 @@ def night_watch() -> str:
             ts = f.read().strip()
         alerts.append(f"🔴 沙漏告急！上次写入失败于 {ts}。需重启 Gateway 或检查磁盘")
 
+    # ── 第1层崩溃恢复：末行损坏检测 ──
+    if os.path.exists(_SANDGLASS):
+        try:
+            with open(_SANDGLASS, "rb") as f:
+                # 读最后 256 字节
+                f.seek(max(0, os.path.getsize(_SANDGLASS) - 256))
+                tail = f.read()
+            # 找最后一行
+            last_line = tail.split(b"\n")[-1].decode("utf-8", errors="ignore").strip()
+            if last_line:
+                # 有效行：timestamp | sender | ...
+                parts = last_line.split(" | ")
+                if len(parts) < 3 or not parts[0][:4].isdigit():
+                    # 末行损坏 → 自动切除
+                    with open(_SANDGLASS, "rb") as f:
+                        all_data = f.read()
+                    # 找最后一个完整行
+                    clean_end = all_data.rstrip(b"\n").rsplit(b"\n", 1)[0] + b"\n"
+                    with open(_SANDGLASS, "wb") as f:
+                        f.write(clean_end)
+                    alerts.append(f"🟡 沙漏末行损坏（断点写入），守夜人已修复。原行内容：{last_line[:60]}...")
+                    ok.append("✅ 沙漏末行已修复")
+        except Exception as e:
+            alerts.append(f"🔴 沙漏崩溃恢复失败：{e}")
+
     # ── 第2层：索引健康 ──
     if not os.path.exists(_IDX):
         alerts.append("🟡 米粒索引缺失，搜索不可用（下次搜索时自动重建）")

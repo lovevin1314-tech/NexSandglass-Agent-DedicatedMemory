@@ -75,29 +75,40 @@ def _detect_chain(text: str) -> list[str]:
     chain = []
     seen = set()
     
-    # ① 显式选择
+    # ① 显式选择 —— 中英双语
     choice_patterns = [
+        # 中文
         r"(?:我?选|就|还是|决定|定了|要)(?:择|用|搞|弄)?\s*[「『\"]?(.{1,30}?)[」『\"]?(?:吧|了|的|好|行|可以)",
         r"还是\s*(.{1,15})\s*(?:吧|好|了)",
         r"(?:那就|就|那)\s*[「『\"]?(.{1,20}?)[」『\"]?\s*(?:吧|了)",
         r"我?(?:决定|打算|准备)\s*(.{1,30})",
         r"(?:最后|最终|定了|确定了|拍板)\s*(?:还?是|就|搞|选|用|要)?\s*[「『\"]?(.{1,30}?)[」『\"]?\s*(?:吧|了|的|好|行)",
+        # 英文
+        r"(?:I'?ll\s+)?go\s+with\s+(.{1,30})",
+        r"choose\s+(.{1,30})",
+        r"(?:let'?s|I'?ll)\s+(?:do|try|use|take|pick)\s+(.{1,30})",
+        r"(?:decided|going\s+with|picking)\s+(.{1,30})",
+        r"(?:actually|scratch\s+that|on\s+second\s+thought|never\s+mind)[,.\s]*(?:let'?s\s+)?(?:do|go\s+with|try|use|take)\s+(.{1,30})",
     ]
     for pattern in choice_patterns:
         for m in re.finditer(pattern, text):
             choice = m.group(1).strip()
-            if len(choice) >= 1 and choice not in ("还是", "就是", "不是"):
+            if len(choice) >= 1 and choice.lower() not in ("还是", "就是", "不是", "just", "not", "or", "maybe", "either"):
                 chain.append(choice)
     
-    # ② 命令式拍板
-    action_pattern = r"(?:用|装|上|搞|跑|开|关|删|加|换|切)\s*[「『\"]?(.{1,20}?)[」『\"]?\s*(?:吧|了|的|掉)"
-    for m in re.finditer(action_pattern, text):
-        choice = m.group(1).strip()
-        if len(choice) >= 2:
-            chain.append(choice)
+    # ② 命令式拍板 —— 中英双语
+    action_patterns = [
+        r"(?:用|装|上|搞|跑|开|关|删|加|换|切)\s*[「『\"]?(.{1,20}?)[」『\"]?\s*(?:吧|了|的|掉)",
+        r"(?:do|run|use|install|start|stop|delete|add|switch)\s+(.{1,20})",
+    ]
+    for pattern in action_patterns:
+        for m in re.finditer(pattern, text):
+            choice = m.group(1).strip()
+            if len(choice) >= 2:
+                chain.append(choice)
     
-    # ③ 放弃信号
-    give_up = ["不管了", "随便", "就那样", "算了", "不搞了", "放弃"]
+    # ③ 放弃信号 —— 中英双语
+    give_up = ["不管了", "随便", "就那样", "算了", "不搞了", "放弃", "whatever", "never mind", "fine", "give up", "I'm done"]
     for g in give_up:
         if g in text:
             chain.append(g)

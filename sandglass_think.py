@@ -25,6 +25,8 @@ import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
+from sandglass_vault import _tokenize
+
 _VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")
 _PERSONA_DIR = os.path.join(_VAULT, "persona")
 _PERSONA = os.path.join(_PERSONA_DIR, "persona.md")        # 当前阶段画像
@@ -38,18 +40,23 @@ _INSIGHTS = os.path.join(_VAULT, "memory", "insights.md")
 logger = logging.getLogger(__name__)
 
 # ── LLM 配置 ──
-_LLM_KEY = (
-    os.environ.get("DEEPSEEK_API_KEY", "")
-    or os.environ.get("OPENROUTER_API_KEY", "")
-)
-_LLM_ENDPOINT = "https://api.deepseek.com/v1/chat/completions" if os.environ.get(
-    "DEEPSEEK_API_KEY"
-) else "https://openrouter.ai/api/v1/chat/completions"
-_LLM_MODEL = (
-    "deepseek-chat"
-    if os.environ.get("DEEPSEEK_API_KEY")
-    else "deepseek/deepseek-v4-flash"
-)
+_LLM_KEY = os.environ.get("DEEPSEEK_API_KEY", "") or os.environ.get("OPENROUTER_API_KEY", "")
+_deepseek_key = bool(os.environ.get("DEEPSEEK_API_KEY"))
+_LLM_ENDPOINT = "https://api.deepseek.com/v1/chat/completions" if _deepseek_key else "https://openrouter.ai/api/v1/chat/completions"
+_LLM_MODEL = "deepseek-chat" if _deepseek_key else "deepseek/deepseek-v4-flash"
+
+
+def _extract_md_section(content, section_name):
+    """从 markdown 内容中提取指定 section 的文本。"""
+    start_tag = f"## {section_name}"
+    start = content.find(start_tag)
+    if start < 0:
+        return ""
+    end = content.find("\n## ", start + len(start_tag))
+    if end < 0:
+        return content[start:]
+    return content[start:end]
+
 
 # ── fail-open 装饰器 ──
 def _fail_open(default):
@@ -197,11 +204,18 @@ def persona_build() -> str:
 
     if result:
         os.makedirs(os.path.dirname(_PERSONA), exist_ok=True)
-        # 提取 markdown 代码块内容
         m = re.search(r"```(?:markdown)?\s*\n(.*?)```", result, re.DOTALL)
         content = m.group(1).strip() if m else result.strip()
         with open(_PERSONA, "w", encoding="utf-8") as f:
             f.write(content)
+        return _PERSONA
+
+    # LLM 不可用 → 本地关键词提取兜底（V1.3 自生长能力）
+    local = _local_persona_extract()
+    if local and local != "数据不足":
+        os.makedirs(os.path.dirname(_PERSONA), exist_ok=True)
+        with open(_PERSONA, "w", encoding="utf-8") as f:
+            f.write(local)
         return _PERSONA
     return ""
 
@@ -1401,33 +1415,34 @@ def search_with_stage_label(query: str, limit: int = 5) -> list:
     return labeled
 
 
+# 通用技术同义词（模块级常量，避免每次调用 _synonym_expand() 时重建）
+_SYNONYMS = {
+    "加密": ["DPAPI", "保护", "安全", "隐私", "密钥", "密文"],
+    "安全": ["保护", "加密", "隐私", "防护", "DPAPI"],
+    "搜索": ["检索", "查询", "查找", "定位", "seek", "find"],
+    "记忆": ["存储", "持久化", "memory", "记录", "存档", "回忆"],
+    "画像": ["人格", "persona", "profile", "特征", "用户"],
+    "偏移": ["变化", "漂移", "shift", "偏移率", "改变", "转向"],
+    "索引": ["index", "目录", "倒排", "检索", "关键词"],
+    "阶段": ["stage", "时期", "phase", "周期", "时间段"],
+    "决策": ["选择", "决定", "判断", "decision", "判断力"],
+    "语义": ["含义", "意思", "semantic", "理解", "上下文"],
+    "系统": ["框架", "platform", "平台", "架构", "体系"],
+    "代理": ["agent", "AI", "助手", "助理", "机器人"],
+    "安装": ["部署", "配置", "setup", "install", "搭建"],
+    "错误": ["bug", "问题", "异常", "error", "故障", "失败"],
+    "优化": ["改进", "提升", "加速", "性能", "效率"],
+    "配置": ["设置", "config", "参数", "选项", "环境"],
+    "权限": ["保护", "隔离", "sandbox", "限制", "访问"],
+    "数据": ["信息", "data", "内容", "记录", "文件"],
+    "本地": ["local", "离线", "本地化", "客户端", "本机"],
+    "云端": ["cloud", "远程", "在线", "服务器", "SaaS"],
+}
+
+
 def _synonym_expand(query: str) -> list:
     """本地同义词扩展——零 LLM 消耗，覆盖 80% 语义搜索场景。
     返回 [原词, 同义词1, 同义词2, ...]"""
-    # 通用技术同义词（可扩展）
-    _SYNONYMS = {
-        "加密": ["DPAPI", "保护", "安全", "隐私", "密钥", "密文"],
-        "安全": ["保护", "加密", "隐私", "防护", "DPAPI"],
-        "搜索": ["检索", "查询", "查找", "定位", "seek", "find"],
-        "记忆": ["存储", "持久化", "memory", "记录", "存档", "回忆"],
-        "画像": ["人格", "persona", "profile", "特征", "用户"],
-        "偏移": ["变化", "漂移", "shift", "偏移率", "改变", "转向"],
-        "索引": ["index", "目录", "倒排", "检索", "关键词"],
-        "阶段": ["stage", "时期", "phase", "周期", "时间段"],
-        "决策": ["选择", "决定", "判断", "decision", "判断力"],
-        "语义": ["含义", "意思", "semantic", "理解", "上下文"],
-        "系统": ["框架", "platform", "平台", "架构", "体系"],
-        "代理": ["agent", "AI", "助手", "助理", "机器人"],
-        "安装": ["部署", "配置", "setup", "install", "搭建"],
-        "错误": ["bug", "问题", "异常", "error", "故障", "失败"],
-        "优化": ["改进", "提升", "加速", "性能", "效率"],
-        "配置": ["设置", "config", "参数", "选项", "环境"],
-        "权限": ["保护", "隔离", "sandbox", "限制", "访问"],
-        "数据": ["信息", "data", "内容", "记录", "文件"],
-        "本地": ["local", "离线", "本地化", "客户端", "本机"],
-        "云端": ["cloud", "远程", "在线", "服务器", "SaaS"],
-    }
-
     keywords = [query]
     seen = {query}
     # 2-gram 滑窗分词（和 _tokenize 一致）
@@ -1455,16 +1470,8 @@ def _tfidf_search(query: str, limit: int = 10) -> list:
     if not candidates:
         return []
 
-    def _tok(text):
-        chars = "".join(re.findall(r"[\u4e00-\u9fff]", text))
-        tokens = []
-        for i in range(len(chars) - 1):
-            tokens.append(chars[i:i+2])
-        tokens.extend(re.findall(r"[a-zA-Z0-9_]{2,}", text.lower()))
-        return tokens
-
-    docs = {ln: _tok(text) for ln, text in candidates.items()}
-    qt = _tok(query)
+    docs = {ln: _tokenize(text) for ln, text in candidates.items()}
+    qt = _tokenize(query)
     N = len(docs)
     df = {}
     for tokens in docs.values():
@@ -1490,6 +1497,22 @@ def _tfidf_search(query: str, limit: int = 10) -> list:
     return results[:limit]
 
 
+def _search_with_fallback(expanded, vs, limit=10):
+    """用扩展关键词搜索，去重排序。"""
+    seen = set()
+    results = []
+    for kw in expanded[:8]:
+        hits = vs(kw, limit=limit * 2)
+        for ln, ts, text in hits:
+            if ln not in seen:
+                seen.add(ln)
+                results.append((ln, ts, text, kw))
+    if results:
+        results.sort(key=lambda x: x[0], reverse=True)
+        return results[:limit]
+    return []
+
+
 def search_semantic(query: str, limit: int = 10) -> list:
     """语义搜索——三级降级：LLM扩展 → 同义词 → TF-IDF。零 API Key 也能用。"""
     from sandglass_vault import search as vs
@@ -1497,28 +1520,16 @@ def search_semantic(query: str, limit: int = 10) -> list:
     # 1级：LLM 扩展
     expanded = _llm_expand(query)
     if expanded and len(expanded) > 1:
-        seen = set(); results = []
-        for kw in expanded[:8]:
-            hits = vs(kw, limit=limit * 2)
-            for ln, ts, text in hits:
-                if ln not in seen:
-                    seen.add(ln); results.append((ln, ts, text, kw))
+        results = _search_with_fallback(expanded, vs, limit)
         if results:
-            results.sort(key=lambda x: x[0], reverse=True)
-            return results[:limit]
+            return results
 
     # 2级：同义词扩展
     expanded = _synonym_expand(query)
     if len(expanded) > 1:
-        seen = set(); results = []
-        for kw in expanded[:8]:
-            hits = vs(kw, limit=limit * 2)
-            for ln, ts, text in hits:
-                if ln not in seen:
-                    seen.add(ln); results.append((ln, ts, text, kw))
+        results = _search_with_fallback(expanded, vs, limit)
         if results:
-            results.sort(key=lambda x: x[0], reverse=True)
-            return results[:limit]
+            return results
 
     # 3级：TF-IDF 余弦相似度
     tfidf = _tfidf_search(query, limit)
