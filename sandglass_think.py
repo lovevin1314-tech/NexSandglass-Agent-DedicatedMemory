@@ -626,6 +626,9 @@ _OFFSET_SIGNALS = {
 _STAGE_THRESHOLD = 60  # ±60% 综合偏移率触发阶段切换信号
 _STAGE_CONSECUTIVE = 2  # 连续 2 次高偏移 → 静默切阶段
 
+# 可调偏移阈值（主人自定义）
+_CUSTOM_OFFSET_WARN = None  # None=使用系统默认。例: _CUSTOM_OFFSET_WARN=80 表示偏移超80%才提醒
+
 # 偏移值常量
 _FRUGAL = 60   # 性价比优先
 _SPEND = -60   # 偏向花钱
@@ -800,23 +803,23 @@ def offset_check(decision_text: str, user_persisted: bool = False) -> dict:
     # 计算单次偏移率
     dimensions = {}
     if drift_hits > 0:
-        offset = _DRIFT
+        offset = 100
         direction = "drift"
         matched_drift = [w for w in _OFFSET_SIGNALS["drift"] if w in text]
         dimensions["红牌信号"] = matched_drift
-        hints = ["⚠️ 红牌：" + "、".join(matched_drift)]
+        hints = [f"主人好像累了？{', '.join(matched_drift[:2])}——打破规矩没关系，清醒后记得回来看看"]
     elif spend_hits > frugal_hits:
-        offset = _SPEND
+        offset = abs(spend_hits - frugal_hits) * 20
         direction = "spend"
         matched_spend = [w for w in _OFFSET_SIGNALS["spend"] if w in text]
         dimensions["花钱信号"] = matched_spend
-        hints = ["偏向花钱省事（" + "、".join(matched_spend[:3]) + "）"]
+        hints = ["主人最近愿意投入（" + "、".join(matched_spend[:3]) + "），效率和体验更重要"]
     elif frugal_hits > 0:
-        offset = _FRUGAL
+        offset = frugal_hits * 15
         direction = "frugal"
         matched_frugal = [w for w in _OFFSET_SIGNALS["frugal"] if w in text]
         dimensions["省钱信号"] = matched_frugal
-        hints = ["符合性价比优先（" + "、".join(matched_frugal[:3]) + "）"]
+        hints = ["主人是精打细算派（" + "、".join(matched_frugal[:3]) + "），每一分钱都值"]
     else:
         offset = 0
         direction = "neutral"

@@ -14,7 +14,9 @@ _VOCAB_FILE = os.path.join(os.path.expanduser("~"), ".neurobase", "emotion_vocab
 _BUILTIN = {
     "愤怒": {
         "zh": ["气死", "恼火", "凭什么", "不公平", "过分", "太气人了", "火大", "无语",
-              "受不了", "真恶心", "怎么这样", "太糟糕了"],
+              "受不了", "真恶心", "怎么这样", "太糟糕了",
+              "烦死了", "气死我了", "烦死", "气炸", "真烦", "真火大", "要气死",
+              "被气到", "好生气"],
         "en": ["angry", "pissed off", "outrageous", "unfair", "ridiculous", "unacceptable"],
         "策略": "缓提醒。先让情绪降下来，不提待办。",
         "优先级": "高",
