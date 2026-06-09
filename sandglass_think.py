@@ -2317,7 +2317,7 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
             "2. 他最近的情绪状态？（一句话）\n"
             "3. 他的决策模式特征？（平时怎样，什么情况下会变）\n"
             "4. 对这种人，什么样的提醒语气最有效？"
-            "（好奇式提问/分享式观察/鼓励式陪伴/数据式汇报/安静不打扰）\n"
+            "（小二式热情/好奇式提问/分享式观察/数据式汇报/安静不打扰）\n"
             "5. 给一个具体的提醒例句（30字以内，体现你最推荐的那个语气）\n\n"
             "输出 JSON 格式：\n"
             '{"persona_type":"","emotional_state":"","decision_pattern":"","reminder_tone":"","reminder_example":""}\n\n'
