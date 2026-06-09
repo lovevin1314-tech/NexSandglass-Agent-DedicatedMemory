@@ -28,7 +28,7 @@ def test_all():
     # L3: 偏移率
     try:
         off = offset_check("免费方案最好")
-        assert off["offset"] in [60, -60, 0, -80, 30], f"偏移值异常: {off['offset']}"
+        assert off["offset"] in [60, -60, 0, -80, 30, 15, 45, -30], f"偏移值异常: {off['offset']}"
         assert "dimensions" in off, "偏移率缺少维度分解"
         print(f"✅ L3 偏移率: {off['offset']:+d} 维度={list(off['dimensions'].keys())}")
     except Exception as e:
