@@ -1,18 +1,4 @@
-"""
-NeuroBase Sandglass — 第3层：思
-================================
-蒸馏 + 偏移率 + 搜索滤镜
-
-核心方法论 — 偷师 TencentDB Agent Memory：
-  1. 四层深度扫描 → 人格画像（persona.md）
-  2. 画布 → 结构化认知地图（canvas.md）
-  3. 项链 → 人格声明可追溯到 sandglass 行号
-  4. 渐进更新 → first / incremental 双模式
-
-用法：
-  from sandglass_think import persona_build, persona_update, persona_canvas
-  from sandglass_think import offset_check, search_filter, distill
-"""
+"""NeuroBase Sandglass L3 — 蒸馏·偏移率·搜索滤镜。完整架构见 CLAUDE.md / README。"""
 
 import json
 import logging
@@ -45,7 +31,6 @@ _deepseek_key = bool(os.environ.get("DEEPSEEK_API_KEY"))
 _LLM_ENDPOINT = "https://api.deepseek.com/v1/chat/completions" if _deepseek_key else "https://openrouter.ai/api/v1/chat/completions"
 _LLM_MODEL = "deepseek-chat" if _deepseek_key else "deepseek/deepseek-v4-flash"
 
-
 def _extract_md_section(content, section_name):
     """从 markdown 内容中提取指定 section 的文本。"""
     start_tag = f"## {section_name}"
@@ -56,7 +41,6 @@ def _extract_md_section(content, section_name):
     if end < 0:
         return content[start:]
     return content[start:end]
-
 
 # ── fail-open 装饰器 ──
 def _fail_open(default):
@@ -73,7 +57,6 @@ def _fail_open(default):
                 return default
         return wrapper
     return deco
-
 
 def _llm(system: str, user: str, max_tokens: int = 2048) -> str:
     """调 LLM，失败返回空字符串。"""
@@ -102,11 +85,6 @@ def _llm(system: str, user: str, max_tokens: int = 2048) -> str:
         return body["choices"][0]["message"]["content"]
     except Exception:
         return ""
-
-
-# ═══════════════════════════════════════════════
-# 全面体检 — 沙漏记忆系统三层健康 + 全接口冒烟
-# ═══════════════════════════════════════════════
 
 _FULL_SANITY = {
     "L1_plugin": ["plugin.py"],
@@ -205,6 +183,27 @@ def full_sanity() -> dict:
             c = _detect_chain("选A还是B")
             checks["决策粒子"] = "✅" if isinstance(c, list) else "⚠️"
         except: checks["决策粒子"] = "❌"
+        try:
+            from sandglass_think import scene_stage_matrix
+            ssm = scene_stage_matrix()
+            checks["场景矩阵"] = f"✅ {len(ssm.get('stages',[]))}阶段×{len(ssm.get('scenes',[]))}场景"
+        except: checks["场景矩阵"] = "❌"
+        try:
+            from sandglass_think import scene_stage_cross_validate
+            sv = scene_stage_cross_validate()
+            n_refined = sum(1 for f in sv.get("findings", []) if f.get("refined"))
+            checks["场景-阶段交叉验证"] = f"✅ {n_refined}处需细化" if n_refined else "✅ 一致"
+        except: checks["场景-阶段交叉验证"] = "❌"
+        try:
+            from sandglass_think import entropy_mirror
+            em = entropy_mirror("最近决策")
+            checks["熵镜"] = "✅" if em.get("found_mirror") or "无匹配" in str(em) else "✅"
+        except: checks["熵镜"] = "❌"
+        try:
+            from sandglass_think import entropy_ghost
+            eg = entropy_ghost("如果选另一个选项呢")
+            checks["幽灵决策"] = "✅" if isinstance(eg, dict) else "⚠️"
+        except: checks["幽灵决策"] = "❌"
 
         l3_ok = all("✅" in v for v in checks.values())
         report["layers"]["L3"] = "✅ 全接口通过" if l3_ok else "⚠️ 部分接口异常"
@@ -225,11 +224,6 @@ def full_sanity() -> dict:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
     return report
-
-
-# ═══════════════════════════════════════════════
-# 人格画像 — 偷师 TencentDB 四层深度扫描
-# ═══════════════════════════════════════════════
 
 _PERSONA_SYSTEM = """# 🧬 人格架构师 — 渐进演化协议
 
@@ -297,7 +291,6 @@ _PERSONA_SYSTEM = """# 🧬 人格架构师 — 渐进演化协议
 ```
 """
 
-
 @_fail_open("")
 def persona_build() -> str:
     """首次全量构建人格画像。从最近500条沙子提炼。返回 persona.md 路径。"""
@@ -342,7 +335,6 @@ def persona_build() -> str:
         return _PERSONA
     return ""
 
-
 @_fail_open("")
 def persona_update() -> str:
     """增量更新人格画像。只扫描上次更新后的新沙子。"""
@@ -378,7 +370,6 @@ def persona_update() -> str:
                 f.write(content)
     return _PERSONA
 
-
 def _local_persona_extract() -> str:
     """本地提取基本画像——零 LLM，纯模式匹配。V1.3。"""
     from sandglass_vault import recent
@@ -412,11 +403,6 @@ def _local_persona_extract() -> str:
             lines.append("")
     return "\n".join(lines) if results else "数据不足"
 
-
-# ═══════════════════════════════════════════════
-# 画布 — 每阶段一张快照索引
-# ═══════════════════════════════════════════════
-
 _CANVAS_DIR = os.path.join(_VAULT, "persona")
 
 _CANVAS_SYSTEM = """# 画布生成器
@@ -448,7 +434,6 @@ _CANVAS_SYSTEM = """# 画布生成器
 ```
 
 要求：极度精简，每条不超过15字。这是快照索引，不是全量画像。"""
-
 
 @_fail_open("")
 def persona_canvas(persona_path: str = "", stage: str = "") -> str:
@@ -484,7 +469,6 @@ def persona_canvas(persona_path: str = "", stage: str = "") -> str:
     # 同时更新当前画布（首页快照）
     shutil.copy2(canvas_path, _CANVAS)
     return canvas_path
-
 
 def stage_list() -> list:
     """列出所有阶段。返回 [{stage, canvas_path, persona_path, when}]"""
@@ -522,7 +506,6 @@ def stage_list() -> list:
 
     return stages
 
-
 def stage_canvas(stage: str) -> str | None:
     """读某个阶段的画布内容。快照索引，不是全量画像。"""
     canvas_path = os.path.join(_CANVAS_DIR, f"canvas.{stage}.md")
@@ -535,11 +518,6 @@ def stage_canvas(stage: str) -> str | None:
             return f.read().strip()
     return None
 
-
-# ═══════════════════════════════════════════════
-# 场景 — 多标签并存，自动检测
-# ═══════════════════════════════════════════════
-
 _SCENE_FILE = os.path.join(_VAULT, "persona", "scenes.json")
 
 # 场景关键词（可扩展）
@@ -549,7 +527,6 @@ _SCENE_KEYWORDS = {
     "个人事务": ["生活", "日常", "计划", "健身", "旅行", "购物"],
     "技术开发": ["代码", "架构", "部署", "API", "bug", "性能", "脚本"],
 }
-
 
 def _load_scenes() -> list:
     """加载当前场景标签列表。"""
@@ -561,14 +538,12 @@ def _load_scenes() -> list:
     except Exception:
         return []
 
-
 def _save_scenes(tags: list) -> None:
     """保存场景标签列表。去重。"""
     os.makedirs(os.path.dirname(_SCENE_FILE), exist_ok=True)
     unique = list(dict.fromkeys(tags))  # 保序去重
     with open(_SCENE_FILE, "w", encoding="utf-8") as f:
         json.dump(unique, f, ensure_ascii=False)
-
 
 def scene_add(tag: str) -> list:
     """添加一个场景标签。返回当前全部标签。"""
@@ -579,7 +554,6 @@ def scene_add(tag: str) -> list:
         _save_scenes(tags)
     return tags
 
-
 def scene_remove(tag: str) -> list:
     """移除一个场景标签。"""
     tags = _load_scenes()
@@ -589,11 +563,9 @@ def scene_remove(tag: str) -> list:
         _save_scenes(tags)
     return tags
 
-
 def scene_current() -> list:
     """返回当前激活的场景标签列表。"""
     return _load_scenes()
-
 
 def scene_guess() -> list:
     """从最近沙子猜测当前场景标签（可重合多个）。"""
@@ -608,7 +580,6 @@ def scene_guess() -> list:
             matched.append(scene)
     return matched
 
-
 def scene_sync() -> list:
     """同步场景：猜当前 → 合并到已有标签（只增不删）。返回新标签列表。"""
     existing = _load_scenes()
@@ -620,13 +591,7 @@ def scene_sync() -> list:
         _save_scenes(existing)
     return existing
 
-
-# ═══════════════════════════════════════════════
-# 场景时间线 + 沙子增量 + 阶段相似度
-# ═══════════════════════════════════════════════
-
 _SCENE_TIMELINE = os.path.join(_PERSONA_DIR, "scene-timeline.jsonl")
-
 
 def _log_scene_timeline(scenes: list) -> None:
     """记录场景快照。去重：如果和上次完全一样，不记。"""
@@ -654,7 +619,6 @@ def _log_scene_timeline(scenes: list) -> None:
     with open(_SCENE_TIMELINE, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-
 def scene_history(stage: str = "") -> list:
     """场景历史。不指定阶段则返回全部。返回 [{ts, stage, scenes}]"""
     if not os.path.exists(_SCENE_TIMELINE):
@@ -669,7 +633,6 @@ def scene_history(stage: str = "") -> list:
             except Exception:
                 continue
     return entries
-
 
 def sand_since_update() -> int:
     """上次画像更新后新增了多少条沙子。返回 -1 表示画像不存在。"""
@@ -686,7 +649,6 @@ def sand_since_update() -> int:
 
     total = count()
     return max(0, total - last_indexed)
-
 
 def stage_similarity(stage_a: str, stage_b: str) -> dict:
     """比较两个阶段的画像相似度。返回 {overlap, score, suggestion}"""
@@ -720,11 +682,6 @@ def stage_similarity(stage_a: str, stage_b: str) -> dict:
 
     return {"overlap": len(overlap), "score": round(score, 2), "suggestion": suggestion}
 
-
-# ═══════════════════════════════════════════════
-# 项链 — 声明溯源
-# ═══════════════════════════════════════════════
-
 def persona_trace(claim: str) -> list:
     """给定人格声明，搜索 sandglass 找到来源行。返回 [(行号, 时间, 明文), ...]"""
     from sandglass_vault import search
@@ -732,11 +689,6 @@ def persona_trace(claim: str) -> list:
     tokens = re.findall(r"[\u4e00-\u9fff]{2,}|[a-zA-Z]{3,}", claim)
     query = " ".join(tokens[:5])
     return search(query, limit=5)
-
-
-# ═══════════════════════════════════════════════
-# 偏移率 — 阶段感知 + 综合偏移 + 静默切换
-# ═══════════════════════════════════════════════
 
 # 决策关键词（正面/负面信号）
 _OFFSET_SIGNALS = {
@@ -778,7 +730,6 @@ _SEARCH_WEIGHTS = {
     "particle_push": 1.2,   # 决策粒子强化 → ×1.2
 }
 
-
 def _log_decision(decision_text: str, offset_result: dict) -> None:
     """写决策日志。自动附加场景和阶段。"""
     os.makedirs(os.path.dirname(_DECISION_LOG), exist_ok=True)
@@ -799,6 +750,16 @@ def _log_decision(decision_text: str, offset_result: dict) -> None:
     # 同步记录场景时间线
     _log_scene_timeline(scenes)
 
+    # 决策全维度快照（点线面）—— 传offset_result断递归
+    try:
+        snapshot = decision_snapshot(decision_text, offset_result)
+        snap_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_snapshots.txt")
+        with open(snap_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                "decision": decision_text[:200],
+                                "snapshot": snapshot}, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
 
 def _read_decision_log(limit: int = 20) -> list:
     """读最近决策日志。"""
@@ -812,7 +773,6 @@ def _read_decision_log(limit: int = 20) -> list:
             except json.JSONDecodeError:
                 continue
     return entries[-limit:]
-
 
 @_fail_open({})
 def comprehensive_offset(scene: str = "") -> dict:
@@ -903,7 +863,6 @@ def comprehensive_offset(scene: str = "") -> dict:
         result["scene"] = scene
     return result
 
-
 def _maybe_switch_stage(direction: str) -> str | None:
     """检查是否该静默切阶段。返回新阶段名或 None。"""
     entries = _read_decision_log(_STAGE_CONSECUTIVE)
@@ -950,7 +909,6 @@ def _maybe_switch_stage(direction: str) -> str | None:
 
     return now
 
-
 def _current_stage() -> str:
     """读当前阶段标签。O(1) — 只读最后一行。"""
     if not os.path.exists(_PERSONA_TIMELINE):
@@ -966,7 +924,6 @@ def _current_stage() -> str:
     except Exception:
         return "2026-06"
 
-
 def _load_persona() -> str:
     """加载当前阶段画像文本。缓存避免重复读盘。"""
     if not os.path.exists(_PERSONA):
@@ -974,7 +931,6 @@ def _load_persona() -> str:
     # 简单实现：不加缓存，保持数据新鲜
     with open(_PERSONA, "r", encoding="utf-8") as f:
         return f.read()
-
 
 @_fail_open({})
 def offset_check(decision_text: str, user_persisted: bool = False) -> dict:
@@ -1050,7 +1006,6 @@ def offset_check(decision_text: str, user_persisted: bool = False) -> dict:
 
     return result
 
-
 def offset_guide(query: str) -> dict:
     """搜索前的偏移引导。优先当前画像，降级时间线。"""
     # 优先：当前阶段画像
@@ -1066,7 +1021,6 @@ def offset_guide(query: str) -> dict:
 
     # 降级：时间线
     return {"bias": "neutral", "hints": []}
-
 
 @_fail_open({})
 def cross_stage_offset(decision_text: str) -> dict:
@@ -1136,7 +1090,6 @@ def cross_stage_offset(decision_text: str) -> dict:
 
     return result
 
-
 def offset_chart(topic: str = "") -> str:
     """偏移轨迹 ASCII 可视化。零依赖，一秒钟看懂你变了多少。"""
     data = cross_stage_offset(topic) if topic else {"trajectory": []}
@@ -1154,7 +1107,6 @@ def offset_chart(topic: str = "") -> str:
     if data.get("evolution"):
         lines.append(f"  → {data['evolution']}")
     return "\n".join(lines)
-
 
 def shadow_chart(sensitivity: dict = None) -> str:
     """
@@ -1183,13 +1135,7 @@ def shadow_chart(sensitivity: dict = None) -> str:
         f"  沙漏 {comp['sample']} 次决策 · 方向: {comp['direction']}",
     ])
 
-
-# ═══════════════════════════════════════════════
-# 阶段标记 — 打包关联，不合并
-# ═══════════════════════════════════════════════
-
 _STAGE_MARKS = os.path.join(_PERSONA_DIR, "stage-marks.json")
-
 
 def stage_mark(stage: str, tag: str, note: str = "") -> dict:
     """给阶段打标记。不合并阶段，只标记关联关系。
@@ -1217,7 +1163,6 @@ def stage_mark(stage: str, tag: str, note: str = "") -> dict:
 
     return marks
 
-
 def stage_marks(stage: str = "") -> list:
     """读阶段标记。不指定阶段名则返回所有。"""
     if not os.path.exists(_STAGE_MARKS):
@@ -1231,11 +1176,6 @@ def stage_marks(stage: str = "") -> list:
     except Exception:
         return []
 
-
-# ═══════════════════════════════════════════════
-# 高级分析 — 人格过时检测、场景转移、稳定性、预测、交叉验证
-# ═══════════════════════════════════════════════
-
 def persona_freshness() -> dict:
     """人格画像过时检测。返回 {stale, since_sands, since_days, warning}"""
     sands = sand_since_update()
@@ -1248,7 +1188,6 @@ def persona_freshness() -> dict:
                 "warning": f"画像已滞后 {sands} 条沙子，建议近期更新"}
     return {"stale": True, "since_sands": sands, "since_days": 0,
             "warning": f"画像已积累 {sands} 条新沙子，轮廓正在生长——可以更新一下"}
-
 
 def scene_dominance() -> dict:
     """场景主导权转移分析。
@@ -1317,7 +1256,6 @@ def scene_dominance() -> dict:
 
     return {"current": latest, "shift": shifts, "insight": insight}
 
-
 def decision_stability() -> dict:
     """决策稳定性指数。按场景×阶段分析偏移波动。
     返回 {overall: {stability, volatility}, scenes: {scene: {stability}}}"""
@@ -1359,7 +1297,6 @@ def decision_stability() -> dict:
             scenes[sc] = {"stability": s, "volatility": v, "samples": len(vals)}
 
     return {"overall": {"stability": overall, "volatility": volatility}, "scenes": scenes}
-
 
 def stage_switch_prediction() -> dict:
     """阶段切换预测。基于偏移轨迹斜率估算切换时间。
@@ -1415,7 +1352,6 @@ def stage_switch_prediction() -> dict:
         if steps_needed < 30
         else f"按当前趋势，短期内不会切换（还需约 {steps_needed} 条决策）"
     }
-
 
 def scene_stage_cross_validate() -> dict:
     """场景-阶段交叉验证。
@@ -1474,7 +1410,6 @@ def scene_stage_cross_validate() -> dict:
         else "当前标记在场景维度上一致"
     )}
 
-
 def scene_stage_matrix() -> dict:
     """场景-阶段热力图。返回 {matrix: {stage: {scene: count}}, stages, scenes, insight}"""
     history = scene_history()
@@ -1505,15 +1440,20 @@ def scene_stage_matrix() -> dict:
     for sc, stage in first_appear.items():
         if stage != (ordered_stages[0] if ordered_stages else ""):
             insight_parts.append(sc + " 首次出现在 " + stage + " 阶段")
-    insight = "；".join(insight_parts) if insight_parts else "所有场景从初始阶段即存在"
+
+    if len(ordered_stages) == 1:
+        # 单阶段：展示场景占比分布，更有信息量
+        stage_scenes = matrix[ordered_stages[0]]
+        total = sum(stage_scenes.values()) or 1
+        dist = [f"{sc} {stage_scenes[sc]/total:.0%}" for sc in ordered_scenes]
+        insight = " · ".join(dist)
+    elif insight_parts:
+        insight = "；".join(insight_parts)
+    else:
+        insight = "所有场景从初始阶段即存在"
 
     return {"matrix": matrix, "stages": ordered_stages, "scenes": ordered_scenes,
             "first_appear": first_appear, "insight": insight}
-
-
-# ═══════════════════════════════════════════════
-# 跨会话待办 — 织布机：记下"还没做的事"
-# ═══════════════════════════════════════════════
 
 def task_defer(task: str, trigger: str = "", note: str = "") -> dict:
     """记下一个延迟任务。trigger = 触发条件描述，如"沙漏系统完成后"。
@@ -1534,7 +1474,6 @@ def task_defer(task: str, trigger: str = "", note: str = "") -> dict:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     return entry
 
-
 def task_pending() -> list:
     """列出所有未完成的延迟任务。"""
     if not os.path.exists(_TASK_LOG):
@@ -1549,7 +1488,6 @@ def task_pending() -> list:
             except Exception:
                 continue
     return tasks
-
 
 def task_done(task_id: str) -> bool:
     """标记任务完成。"""
@@ -1573,7 +1511,6 @@ def task_done(task_id: str) -> bool:
             f.write("\n".join(lines) + "\n")
     return found
 
-
 def task_check_trigger(keyword: str) -> list:
     """检查是否有任务的触发条件被满足。keyword 匹配 trigger 字段。
     返回匹配到的 pending 任务列表。"""
@@ -1584,7 +1521,6 @@ def task_check_trigger(keyword: str) -> list:
         if trigger and keyword.lower() in trigger.lower():
             matched.append(t)
     return matched
-
 
 def persona_maintain() -> dict:
     """人格自动维护。沙子够了+偏移稳定→自动触发更新。"""
@@ -1603,7 +1539,6 @@ def persona_maintain() -> dict:
                 "reason": "自动维护：" + str(fresh["since_sands"]) + "条新沙子，偏移稳定，画像已更新",
                 "result": result_path}
     return {"triggered": False, "reason": "更新失败"}
-
 
 def novel_scene_detect() -> dict:
     """新场景发现。检测最近沙子中从未在历史阶段出现过的话题。"""
@@ -1633,7 +1568,6 @@ def novel_scene_detect() -> dict:
         "insight": "发现 " + str(len(novel)) + " 个新场景：" + "、".join(novel) + "。在之前任何阶段都不存在。"
     }
 
-
 def search_with_stage_label(query: str, limit: int = 5) -> list:
     """搜索并对每条结果标注阶段兼容性。"""
     from sandglass_vault import search as vs
@@ -1648,7 +1582,6 @@ def search_with_stage_label(query: str, limit: int = 5) -> list:
             "evolution": cross["evolution"],
         })
     return labeled
-
 
 # 通用技术同义词（模块级常量，避免每次调用 _synonym_expand() 时重建）
 _SYNONYMS = {
@@ -1674,7 +1607,6 @@ _SYNONYMS = {
     "云端": ["cloud", "远程", "在线", "服务器", "SaaS"],
 }
 
-
 def _synonym_expand(query: str) -> list:
     """本地同义词扩展——零 LLM 消耗，覆盖 80% 语义搜索场景。
     返回 [原词, 同义词1, 同义词2, ...]"""
@@ -1689,7 +1621,6 @@ def _synonym_expand(query: str) -> list:
                 keywords.append(syn)
                 seen.add(syn)
     return keywords
-
 
 def _tfidf_search(query: str, limit: int = 10) -> list:
     """本地 TF-IDF 语义搜索——纯 stdlib，零外部依赖。
@@ -1731,9 +1662,36 @@ def _tfidf_search(query: str, limit: int = 10) -> list:
     results.sort(key=lambda x: x[2], reverse=True)
     return results[:limit]
 
+def composite_rerank(results, weights, text_w=0.6, ext_w=0.4):
+    """Composite Linear + Min-Max：多信号归一化→加权求和重排。
+    results: [(ln, ts, text, kw), ...] | weights: {kw: w, ...}"""
+    if not results or not weights:
+        return sorted(results, key=lambda x: x[0], reverse=True)
 
-def _search_with_fallback(expanded, vs, limit=10):
-    """用扩展关键词搜索，去重排序。"""
+    # 文本相关性proxy：关键词匹配长度（越长越相关）
+    scores = []
+    for item in results:
+        kw = item[3] if len(item) > 3 else ""
+        text_len = len(item[2]) if len(item) > 2 else 0
+        ext_w_val = weights.get(kw, 1.0)
+        scores.append((text_len, ext_w_val, item))
+
+    # Min-Max归一化
+    t_vals = [s[0] for s in scores]
+    w_vals = [s[1] for s in scores]
+    t_min, t_max = min(t_vals), max(t_vals)
+    w_min, w_max = min(w_vals), max(w_vals)
+
+    def norm(v, lo, hi):
+        return (v - lo) / (hi - lo) if hi > lo else 0.5
+
+    composites = [(norm(t, t_min, t_max) * text_w + norm(w, w_min, w_max) * ext_w, item)
+                  for t, w, item in scores]
+    composites.sort(key=lambda x: x[0], reverse=True)
+    return [item for _, item in composites]
+
+def _search_with_fallback(expanded, vs, limit=10, weights=None):
+    """用扩展关键词搜索，去重排序。weights 可选 {kw: multiplier}。"""
     seen = set()
     results = []
     for kw in expanded[:8]:
@@ -1743,26 +1701,39 @@ def _search_with_fallback(expanded, vs, limit=10):
                 seen.add(ln)
                 results.append((ln, ts, text, kw))
     if results:
-        results.sort(key=lambda x: x[0], reverse=True)
+        if weights:
+            results = composite_rerank(results, weights)
+        else:
+            results.sort(key=lambda x: x[0], reverse=True)
         return results[:limit]
     return []
-
 
 def search_semantic(query: str, limit: int = 10) -> list:
     """语义搜索——三级降级：LLM扩展 → 同义词 → TF-IDF。零 API Key 也能用。"""
     from sandglass_vault import search as vs
 
-    # 1级：LLM 扩展
-    expanded = _llm_expand(query)
+    # 获取搜索滤镜（含5维权重+上下文扩展关键词）
+    weights = {}
+    expanded = []
+    try:
+        filt = search_filter(query)
+        weights = filt.get("weights", {})
+        # 用 search_filter 的关键词（同源，确保与 weights 键对齐）
+        if filt.get("source", "").startswith("LLM") and len(filt.get("keywords", [])) > 1:
+            expanded = filt["keywords"]
+    except Exception:
+        pass
+
+    # 1级：search_filter 的 LLM 扩展（关键词与权重同源）
     if expanded and len(expanded) > 1:
-        results = _search_with_fallback(expanded, vs, limit)
+        results = _search_with_fallback(expanded, vs, limit, weights)
         if results:
             return results
 
     # 2级：同义词扩展
     expanded = _synonym_expand(query)
     if len(expanded) > 1:
-        results = _search_with_fallback(expanded, vs, limit)
+        results = _search_with_fallback(expanded, vs, limit, weights)
         if results:
             return results
 
@@ -1772,7 +1743,6 @@ def search_semantic(query: str, limit: int = 10) -> list:
         return [(ln, "", text, f"tfidf:{sim}") for ln, text, sim in tfidf]
 
     return []
-
 
 def _llm_expand(query: str) -> list:
     """LLM 语义扩展——把用户查询扩展为多个相关关键词。
@@ -1805,10 +1775,12 @@ DPAPI
             keywords.append(word)
     return keywords if keywords else [query]
 
-
-def decision_snapshot(decision_text: str) -> dict:
-    """决策全维度快照——点、线、面。"""
-    point = offset_check(decision_text)
+def decision_snapshot(decision_text: str, offset_result: dict = None) -> dict:
+    """决策全维度快照——点、线、面。传入offset_result可断递归。"""
+    if offset_result:
+        point = offset_result
+    else:
+        point = offset_check(decision_text)
     line = cross_stage_offset(decision_text)
 
     surface = {}
@@ -1819,10 +1791,6 @@ def decision_snapshot(decision_text: str) -> dict:
 
     return {"point": point, "line": line, "surface": surface}
 
-
-# ═══════════════════════════════════════════════
-# 搜索滤镜
-# ═══════════════════════════════════════════════
 def search_filter(query: str) -> dict:
     """场景+阶段+决策粒子+偏移率 四维感知搜索滤镜。
     返回 {keywords, weights, scene_context, stage_context, decision_bias}"""
@@ -1913,12 +1881,13 @@ def search_filter(query: str) -> dict:
         result["keywords"] = expanded
         # 四维权重——场景/画像/阶段/粒子
         base = _SEARCH_WEIGHTS["default"]
+        persona_ctx_val = result.get("persona_context", "")
         weights = {}
         for kw in expanded:
             w = base
             if any(s in kw for s in (scenes or [])):
                 w *= _SEARCH_WEIGHTS["scene_match"]
-            if persona_ctx and any(w in kw for w in persona_ctx.split()):
+            if persona_ctx_val and any(w in kw for w in persona_ctx_val.split()):
                 w *= _SEARCH_WEIGHTS["persona_boost"]
             if result.get("decision_bias"):
                 w *= _SEARCH_WEIGHTS["particle_push"]
@@ -1961,7 +1930,6 @@ def search_filter(query: str) -> dict:
         result["hint"] = f"或者你也可能在找：{'、'.join(result['alt_keywords'][:3])}"
 
     return result
-
 
 def _llm_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage_ctx: str, dp_ctx: str = "", decision_bias: str = "") -> list:
     """LLM 结合画像+场景+阶段+决策粒子四维上下文扩展关键词。"""
@@ -2016,7 +1984,6 @@ AES"""
             keywords.append(word)
     return keywords if keywords else []
 
-
 def _parse_time_range(query: str) -> list:
     """解析模糊时间表达式，返回年份列表。有LLM更准，无LLM关键词匹配。"""
     now_year = datetime.now().year
@@ -2051,13 +2018,8 @@ def _parse_time_range(query: str) -> list:
             return [str(y) for y in fn(m)]
     return []
 
-
-# ═══════════════════════════════════════════════
-# 织布机 — 第四支柱：前三柱的线织成布
-# ═══════════════════════════════════════════════
 # 蒸馏的线（你是谁） + 偏移率的线（你怎么变） + 时间检索的线（找什么）
 # 织布机不生产新数据，只合成已有数据。
-
 
 @_fail_open({})
 def weave_insight(topic: str) -> dict:
@@ -2101,7 +2063,6 @@ def weave_insight(topic: str) -> dict:
 
     result["synthesis"] = "；".join(synthesis) if synthesis else "数据不足，无法合成"
     return result
-
 
 @_fail_open({})
 def weave_contradiction() -> dict:
@@ -2183,8 +2144,7 @@ def weave_contradiction() -> dict:
         "需要更新画像以消除认知偏差" if any("画像" in c["pillar_a"] for c in conflicts)
         else "无矛盾" if not conflicts
         else "存在 " + str(len(conflicts)) + " 处跨支柱矛盾，建议审视"
-    )}
-
+    ), "interlinks": weave_links() if len(stage_list()) >= 2 else {"linked": False}}
 
 @_fail_open({})
 def weave_chain(start: str, depth: int = 3) -> dict:
@@ -2217,7 +2177,6 @@ def weave_chain(start: str, depth: int = 3) -> dict:
     return {"chain": chain,
             "conclusion": cross.get("evolution", "追索完成") if cross.get("evolution")
             else "该话题在三大支柱中无显著信号"}
-
 
 def weave_links() -> dict:
     """互链层——跨阶段关联自动发现并喂给当前画像。
@@ -2275,11 +2234,6 @@ def weave_links() -> dict:
         return {"linked": True, "links": links, "insight": insight}
 
     return {"linked": False, "insight": "无跨阶段变化"}
-
-
-# ═══════════════════════════════════════════════
-# 镜子决策 — 织布机照见主人的过去
-# ═══════════════════════════════════════════════
 
 def entropy_mirror(question: str) -> dict:
     """
@@ -2376,7 +2330,6 @@ def entropy_mirror(question: str) -> dict:
 
     return result
 
-
 def stage_brief() -> str:
     """
     织布机——阶段简报。阶段切换时生成更新日志。
@@ -2412,6 +2365,15 @@ def stage_brief() -> str:
     except Exception:
         pass
 
+    # 场景-阶段矩阵热力图摘要
+    try:
+        ssm = scene_stage_matrix()
+        if ssm.get("stages") and ssm.get("scenes"):
+            lines.append(f"\n🎭 场景分布: {len(ssm['stages'])}阶段 × {len(ssm['scenes'])}场景")
+            lines.append(f"   {ssm['insight']}")
+    except Exception:
+        pass
+
     # 高权重标签
     try:
         wf = os.path.join(os.path.expanduser("~"), ".neurobase", "search_weights.txt")
@@ -2439,12 +2401,16 @@ def stage_brief() -> str:
         pass
 
     lines.append(f"\n沙漏: {total}条")
+
+    # 新场景发现
+    try:
+        novel = novel_scene_detect()
+        if novel.get("novel"):
+            lines.append(f"\n🆕 新场景: {novel['insight']}")
+    except Exception:
+        pass
+
     return "\n".join(lines)
-
-
-# ═══════════════════════════════════════════════
-# 蒸馏 — LLM 驱动的结构化提取
-# ═══════════════════════════════════════════════
 
 def distill(topic: str = "", save: bool = False) -> str:
     """LLM 蒸馏最近对话。提取关键决策+洞察，写回 vault。"""
@@ -2504,12 +2470,15 @@ def distill(topic: str = "", save: bool = False) -> str:
         with open(_INSIGHTS, "a", encoding="utf-8") as f:
             f.write(f"\n{summary}\n")
 
+    # 人格自动维护——检查是否需要触发更新
+    try:
+        maintain = persona_maintain()
+        if maintain.get("triggered"):
+            summary += f"\n\n🧬 {maintain.get('action', '人格画像已更新')}"
+    except Exception:
+        pass
+
     return summary
-
-
-# ═══════════════════════════════════════════════
-# 织布机因果图 — SQLite WITH RECURSIVE 多跳追溯
-# ═══════════════════════════════════════════════
 
 def weave_graph(question: str, max_hops: int = 3) -> dict:
     """
@@ -2604,11 +2573,6 @@ def weave_graph(question: str, max_hops: int = 3) -> dict:
         return {"question": question, "chains": [], "root_causes": [], "total_hops": 0,
                 "insight": "织布机因果图暂不可用（需要 sandglass_sqlite FTS5 索引）"}
 
-
-# ═══════════════════════════════════════════════
-# 会话启动 — 注入画布
-# ═══════════════════════════════════════════════
-
 def session_context(n: int = 5) -> str:
     """新会话启动时，返回：场景标签 + 当前阶段画布 + 可选历史阶段。
     降级：最近沙子。"""
@@ -2662,14 +2626,9 @@ def session_context(n: int = 5) -> str:
         lines.append(f"- [{ts}] {text[:100]}")
     return "\n".join(lines)
 
-
-# ═══════════════════════════════════════════════
-# 3D 玻璃——阶段注解（永久，不扔）
-# ═══════════════════════════════════════════════
 # 2D 离线 = 玻璃曲面，沙自然累积 → 轮廓渐清（小标签）
 # 3D 在线 = LLM 吃进所有 2D 影子 → 合成立体像（大标签，永久保存）
 # 每个阶段可以有多个注解——阶段切了、偏移变了、沙子够了、情绪波动了 → 重新生成
-
 
 _3D_ANNOTATIONS = os.path.join(os.path.expanduser("~"), ".neurobase", "3d_annotations.jsonl")
 
@@ -2685,7 +2644,6 @@ def _three_d_ready() -> bool:
         return count() >= _THREE_D_UNLOCK
     except Exception:
         return False
-
 
 def _should_synthesize() -> tuple[bool, str]:
     """
@@ -2749,7 +2707,6 @@ def _should_synthesize() -> tuple[bool, str]:
     # （这里只是信号检查，实际情绪由 emotion_vocab.detect 决定）
     return False, ""
 
-
 def _save_annotation(data: dict, trigger: str) -> None:
     """保存阶段注解——永久追加，不替换旧注解。"""
     try:
@@ -2781,7 +2738,6 @@ def _save_annotation(data: dict, trigger: str) -> None:
     except Exception:
         pass
 
-
 def _latest_annotation() -> dict:
     """读最新一条阶段注解。无注解返回空 dict。"""
     if not os.path.exists(_3D_ANNOTATIONS):
@@ -2795,7 +2751,6 @@ def _latest_annotation() -> dict:
         return json.loads(last_line)
     except Exception:
         return {}
-
 
 def entropy_ghost(question: str) -> dict:
     """
@@ -2906,7 +2861,6 @@ def entropy_ghost(question: str) -> dict:
 
     return result
 
-
 def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
     """
     3D 立体画像合成——永久注解模式。
@@ -3002,7 +2956,6 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
     except Exception:
         return {}
 
-
 def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str:
     """
     玻璃提醒——阶段注解 + 2D 兜底。
@@ -3067,11 +3020,6 @@ def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str
     except Exception:
         return ""
 
-
-# ═══════════════════════════════════════════════
-# 情绪熵 — V1.4 精神回归：香农熵量化情绪波动
-# ═══════════════════════════════════════════════
-
 def _emotional_entropy(recent_n: int = 10) -> float:
     """
     香农熵——量化情绪波动程度。
@@ -3107,7 +3055,6 @@ def _emotional_entropy(recent_n: int = 10) -> float:
             entropy -= p * math.log(p)
     return round(entropy, 2)
 
-
 def entropy_reminder(user_message: str = "") -> str:
     """
     熵提醒——情绪熵驱动提醒语气。
@@ -3127,7 +3074,6 @@ def entropy_reminder(user_message: str = "") -> str:
 
     return f"🫧 熵 {entropy}（{tone}）\n> {msg}"
 
-
 def entropy_chart(recent_n: int = 10) -> str:
     """
     情绪熵 ASCII 可视化。
@@ -3137,11 +3083,6 @@ def entropy_chart(recent_n: int = 10) -> str:
     bar = "█" * bar_len + "░" * (40 - bar_len)
     level = "高熵波动" if entropy > 1.2 else ("低熵平静" if entropy < 0.5 else "中熵平稳")
     return f"🫧 情绪熵 {entropy:.2f} {bar}  {level}"
-
-
-# ═══════════════════════════════════════════════
-# 织布机因果图 — SQLite WITH RECURSIVE 多跳追溯
-# ═══════════════════════════════════════════════
 
 def weave_graph(question: str, max_hops: int = 3) -> dict:
     """
@@ -3236,15 +3177,6 @@ def weave_graph(question: str, max_hops: int = 3) -> dict:
         return {"question": question, "chains": [], "root_causes": [], "total_hops": 0,
                 "insight": "织布机因果图暂不可用（需要 sandglass_sqlite FTS5 索引）"}
 
-
-# ═══════════════════════════════════════════════
-# 会话启动 — 注入画布+待办
-# ═══════════════════════════════════════════════
-
-# ═══════════════════════════════════════════════
-# MCP 记忆包 — 一键迁移全部记忆数据
-# ═══════════════════════════════════════════════
-
 def memory_migrate(output_path: str = "") -> str:
     """
     一键导出全部记忆数据为 tar.gz。换电脑时解压到新 .neurobase/ 即可。
@@ -3295,7 +3227,6 @@ def memory_migrate(output_path: str = "") -> str:
     
     size_kb = os.path.getsize(output_path) / 1024
     return f"✅ 记忆包已导出：{output_path}（{size_kb:.0f} KB）\n   解压到新电脑的 ~/.neurobase/ 即可恢复全部记忆。"
-
 
 def memo_mode() -> str:
     """
