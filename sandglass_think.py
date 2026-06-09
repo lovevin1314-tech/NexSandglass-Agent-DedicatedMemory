@@ -2153,6 +2153,19 @@ def session_context(n: int = 5) -> str:
 
 _3D_ANNOTATIONS = os.path.join(os.path.expanduser("~"), ".neurobase", "3d_annotations.jsonl")
 
+# ── 3D 解锁门槛：本地优先，2000 条沙子 + LLM → 才启用立体合成 ──
+_THREE_D_UNLOCK = 2000
+
+def _three_d_ready() -> bool:
+    """3D 是否已解锁。本地累积够 + LLM 可用。"""
+    if not _LLM_KEY:
+        return False
+    try:
+        from sandglass_vault import count
+        return count() >= _THREE_D_UNLOCK
+    except Exception:
+        return False
+
 
 def _should_synthesize() -> tuple[bool, str]:
     """
@@ -2374,12 +2387,15 @@ def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str
     if emotion_trigger:
         trigger = "emotion_spike"
 
-    # 读最新注解或触发 3D 合成
-    syn = _latest_annotation()
-    if not syn or emotion_trigger:
-        should, reason = _should_synthesize()
-        if should or emotion_trigger:
-            syn = _synthesize_3d(force=bool(emotion_trigger), trigger=trigger)
+    # ── 3D 路径：沙漏 ≥ 2000 条 + 有 LLM → 启用立体合成 ──
+    syn = {}
+    if _three_d_ready():
+        # 读最新注解或触发 3D 合成
+        syn = _latest_annotation()
+        if not syn or emotion_trigger:
+            should, reason = _should_synthesize()
+            if should or emotion_trigger:
+                syn = _synthesize_3d(force=bool(emotion_trigger), trigger=trigger)
 
     if syn and "reminder_example" in syn:
         direction_cn = {"frugal": "省钱", "spend": "愿意投入", "drift": "放弃倾向"}
