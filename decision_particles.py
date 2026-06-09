@@ -291,18 +291,71 @@ def _direction(choice: str) -> str:
     return "neutral"
 
 
-def _infer_resolution(chain: list[str]) -> str:
+def _infer_local(chain: list[str]) -> str:
     """
-    LLM 吃进全链条 + 画像 + 阶段 + 历史粒子，推断真正的偏好倾向。
+    本地模糊推断——不用 LLM，靠三层结构已有数据。
     
-    "A → B → C → 回到A" → LLM 推断：
-      - 试了B（贵/复杂）退回A（便宜/熟悉）→ 成本敏感 + 习惯偏好
-      - 不是C不好，是A对他有安全感
-    
-    返回推理结论，无 LLM 或链条太短返回空。
+    策略：
+      ① 链条模式匹配：回退→习惯偏好，多条→选择困难，放弃→决策疲劳
+      ② 关键词标签：拆每个选项的关键词，匹配画像已有标签
+      ③ 历史粒子比对：最近50条粒子找相似模式
     """
     if not chain or len(chain) < 2:
         return ""
+    
+    hints = []
+    compact = [chain[0]]
+    for c in chain[1:]:
+        if c != compact[-1]:
+            compact.append(c)
+    
+    # ① 链条模式
+    if len(compact) >= 2 and compact[-1] in compact[:-1]:
+        hints.append("习惯回退")  # A→B→A 或 A→B→C→A
+    if len(compact) >= 3:
+        hints.append("选择困难")  # 3个以上不同选择
+    if any(g in " ".join(chain) for g in ["不管了", "放弃", "随便", "算了"]):
+        hints.append("决策疲劳")
+    
+    # ② 关键词标签——拆选项匹配本地词库
+    for item in compact:
+        local = _tag_local(item)
+        if local and local != "":
+            for t in local.split(","):
+                t = t.strip()
+                if t and t not in hints:
+                    hints.append(t)
+    
+    # ③ 历史比对——最近粒子找共性
+    particles = read(20)
+    if particles:
+        # 找和当前链条第一个选项相同的粒子
+        first = compact[0]
+        similar = [p for p in particles if len(p) > 1 and first[:4] in (p[1] if len(p)>1 else "")]
+        if similar:
+            common_directions = [p[3] for p in similar if len(p)>3]
+            if common_directions:
+                most = max(set(common_directions), key=common_directions.count)
+                direction_label = {"frugal": "成本敏感", "spend": "愿意投入", "drift": "红牌倾向"}.get(most, "")
+                if direction_label and direction_label not in hints:
+                    hints.append(direction_label)
+    
+    if hints:
+        return f"倾向{','.join(hints[:3])}"
+    return ""
+
+
+def _infer_resolution(chain: list[str]) -> str:
+    """
+    决策链条推断——LLM 优先，本地兜底。
+    
+    LLM：吃进画像+阶段+历史粒子，深层推断倾向
+    本地：关键词+链条模式+历史比对，模糊画像
+    """
+    if not chain or len(chain) < 2:
+        return ""
+    
+    # LLM 优先
     try:
         from sandglass_think import _llm
         
@@ -311,11 +364,8 @@ def _infer_resolution(chain: list[str]) -> str:
         
         system = (
             "你是行为模式分析师。用户做了一串决策：犹豫、试探、回退。"
-            "结合他的画像、决策历史、偏移趋势，推断这条链条背后揭示的深层偏好。\n\n"
-            "不要复述链条内容。推断维度：\n"
-            "- 为什么最后回了某个选项？（成本？习惯？安全感？完美主义？）\n"
-            "- 中间试探的选项暴露了什么倾向？（想突破但不敢？好奇但克制？）\n"
-            "- 下次遇到类似选择，该怎么服务他？（直接给什么？先过滤什么？）\n\n"
+            "结合他的画像、决策历史、偏移趋势，推断这条链条背后揭示的深层偏好。"
+            "不要复述链条内容。推断维度：为什么回退？试探暴露了什么？下次怎么服务他？"
             "输出：一句话，30字以内。格式：'倾向于XX，下次直接给XX'"
         )
         
@@ -330,7 +380,9 @@ def _infer_resolution(chain: list[str]) -> str:
             return result.strip()[:60]
     except Exception:
         pass
-    return ""
+    
+    # 本地兜底——三层结构已有数据
+    return _infer_local(chain)
 
 
 # ═══════════════════════════════════════════════
