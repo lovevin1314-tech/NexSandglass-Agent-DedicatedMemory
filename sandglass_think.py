@@ -1020,6 +1020,34 @@ def offset_chart(topic: str = "") -> str:
     return "\n".join(lines)
 
 
+def shadow_chart(sensitivity: dict = None) -> str:
+    """
+    玻璃影子可视化——三个维度的轮廓深度。
+    Unicode 阴影条 → 一屏看清省钱/花钱/放弃哪个影子更深。
+    """
+    if sensitivity is None:
+        sensitivity = _OFFSET_SENSITIVITY
+
+    comp = comprehensive_offset()
+    # 朴素估算三个维度占比（从方向 + 偏移 + 镜像敏感度近似推断）
+    frugal_pct = abs(comp["offset"]) if comp["direction"] == "frugal" else max(10, abs(comp["offset"]) // 3)
+    spend_pct = abs(comp["offset"]) if comp["direction"] == "spend" else max(10, abs(comp["offset"]) // 4)
+    drift_pct = min(50, abs(comp["offset"]) // 5)
+
+    def _bar(pct: int, width: int = 40) -> str:
+        filled = pct * width // 100
+        return "█" * filled + "░" * (width - filled)
+
+    return "\n".join([
+        "🫧 玻璃 — 影子的轮廓",
+        f"  省钱 {_bar(frugal_pct)}  {frugal_pct:>3}%（{'深' if frugal_pct > 50 else '浅'}）",
+        f"  花钱 {_bar(spend_pct)}  {spend_pct:>3}%（{'深' if spend_pct > 50 else '浅'}）",
+        f"  放弃 {_bar(drift_pct)}   {drift_pct:>3}%（{'深' if drift_pct > 30 else '淡'}）",
+        f"  {'─' * 40}",
+        f"  沙漏 {comp['sample']} 次决策 · 方向: {comp['direction']}",
+    ])
+
+
 # ═══════════════════════════════════════════════
 # 阶段标记 — 打包关联，不合并
 # ═══════════════════════════════════════════════
