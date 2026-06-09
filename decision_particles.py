@@ -62,42 +62,60 @@ def _extract_options(question: str) -> str:
 
 def _detect_choice(text: str) -> str | None:
     """
-    高精度决策检测——只落真正做选择的消息。
+    决策检测——允许中间犹豫（噪音），识别**最终**选择。
+    
+    真实决策轨迹：
+      "选A吧...算了还是B了...最后搞了C"
+        ↑噪音       ↑噪音        ↑真正的决策
+    
     策略：
-      1. 显式 A/B 选择：'选A' '还是B吧' '就C了' '决定D'
-      2. 命令式拍板：'用X' '装Y' '搞Z'——但必须有具体对象
-      3. 放弃信号：'不管了' '随便' '就那样'——记录但不作为正向决策
-    返回检测到的选择文本，无决策返回 None。
+      1. 最终决策标记（最高优先级）：'最后还是C' '最终搞了D' '定了E'
+      2. 显式选择链：找所有 '选X' '还是Y'，取**最后一个**
+      3. 命令式拍板链：找所有 '用X吧' '装Y了'，取**最后一个**  
+      4. 放弃信号：'不管了' '随便'
+    
+    返回最后一个实质性选择，无决策返回 None。
     """
     import re
 
-    # ① 显式选择模式 —— 最高置信度
-    patterns = [
-        (r"(?:我?选|就|还是|决定|定了|要)(?:择|用|搞|弄)?\s*[「『\"]?(.{1,30}?)[」』\"]?(?:吧|了|的|好|行|可以)", 1),
-        (r"还是\s*(.{1,15})\s*(?:吧|好|了)", 1),
-        (r"(?:那就|就|那)\s*[「『\"]?(.{1,20}?)[」』\"]?\s*(?:吧|了)", 1),
-        (r"我?(?:决定|打算|准备)\s*(.{1,30})", 1),
+    # ── ① 最终决策标记（最高优先级） ──
+    final_patterns = [
+        r"(?:最后|最终|定了|决定了|确定了|拍板)\s*(?:还?是|就|搞|选|用|要)?\s*[「『\"]?(.{1,30}?)[」『\"]?\s*(?:吧|了|的|好|行)",
     ]
-    for pattern, group in patterns:
-        m = re.search(pattern, text)
-        if m:
-            choice = m.group(group).strip()
-            # 过滤太短的（"就吧""还是吧"）
-            if len(choice) >= 2:
-                return choice
-
-    # ② 命令式拍板 —— 有具体动词+对象
-    action_patterns = [
-        r"(?:用|装|上|搞|跑|开|关|删|加|换|切)\s*[「『\"]?(.{1,20}?)[」』\"]?\s*(?:吧|了|的|掉)",
-    ]
-    for pattern in action_patterns:
+    for pattern in final_patterns:
         m = re.search(pattern, text)
         if m:
             choice = m.group(1).strip()
-            if len(choice) >= 2:
+            if len(choice) >= 1:
                 return choice
 
-    # ③ 放弃信号 —— 记录但不作为正向决策
+    # ── ② 显式选择——找全部匹配，取最后一个 ──
+    choice_patterns = [
+        r"(?:我?选|就|还是|决定|定了|要)(?:择|用|搞|弄)?\s*[「『\"]?(.{1,30}?)[」『\"]?(?:吧|了|的|好|行|可以)",
+        r"还是\s*(.{1,15})\s*(?:吧|好|了)",
+        r"(?:那就|就|那)\s*[「『\"]?(.{1,20}?)[」『\"]?\s*(?:吧|了)",
+        r"我?(?:决定|打算|准备)\s*(.{1,30})",
+    ]
+    explicit_choices = []
+    for pattern in choice_patterns:
+        for m in re.finditer(pattern, text):
+            choice = m.group(1).strip()
+            if len(choice) >= 2 and choice not in ["还是", "就是", "不是"]:
+                explicit_choices.append(choice)
+    if explicit_choices:
+        return explicit_choices[-1]  # 取最后一个
+
+    # ── ③ 命令式拍板——找全部匹配，取最后一个 ──
+    action_pattern = r"(?:用|装|上|搞|跑|开|关|删|加|换|切)\s*[「『\"]?(.{1,20}?)[」『\"]?\s*(?:吧|了|的|掉)"
+    action_choices = []
+    for m in re.finditer(action_pattern, text):
+        choice = m.group(1).strip()
+        if len(choice) >= 2:
+            action_choices.append(choice)
+    if action_choices:
+        return action_choices[-1]  # 取最后一个
+
+    # ── ④ 放弃信号 ──
     give_up = ["不管了", "随便", "就那样", "算了", "不搞了", "放弃"]
     for g in give_up:
         if g in text:
