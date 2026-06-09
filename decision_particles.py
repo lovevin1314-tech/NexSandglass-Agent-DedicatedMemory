@@ -68,6 +68,8 @@ def log(question: str, choice: str, ts: str = "") -> None:
     os.makedirs(os.path.dirname(_PARTICLES), exist_ok=True)
     with open(_PARTICLES, "a", encoding="utf-8") as f:
         f.write(f"{ts} | {question[:80]} | {choice[:40]} | {direction} | {tags}\n")
+    # 反哺灵魂蒸馏
+    feed_persona(question, tags, choice)
 
 
 def read(limit: int = 50) -> list:
@@ -76,6 +78,26 @@ def read(limit: int = 50) -> list:
         return []
     with open(_PARTICLES, "r", encoding="utf-8") as f:
         return [l.strip().split(" | ") for l in f.readlines()[-limit:]]
+
+
+def feed_persona(particle_type: str, tags: str, keyword: str) -> None:
+    """决策粒子反哺灵魂蒸馏——更新画像认知内核。"""
+    persona_path = os.path.join(os.path.expanduser("~"), ".neurobase", "persona", "persona.md")
+    if not os.path.exists(persona_path):
+        return
+    with open(persona_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    layer_map = {"成本观":"🔴 认知内核","性价比优先":"🔴 认知内核","技术选型":"🔵 兴趣图谱","工具偏好":"🔵 兴趣图谱","独立性":"🔴 认知内核","动手派":"🔴 认知内核","决策疲劳":"🟡 交互协议","红牌":"🟡 交互协议","极简主义":"🟡 交互协议","开源信徒":"🔵 兴趣图谱"}
+    added = []
+    for tag in tags.split(","):
+        tag = tag.strip()
+        if layer_map.get(tag) and tag not in content:
+            added.append(f"- [{datetime.now():%Y-%m-%d}] {tag}（决策粒子提炼）")
+    if added:
+        insert = content.find("## 🔴 认知内核")
+        if insert < 0: insert = len(content)
+        new = content[:insert] + "\n".join(added) + "\n" + content[insert:]
+        with open(persona_path, "w", encoding="utf-8") as f: f.write(new)
 
 
 def ratio() -> dict:
