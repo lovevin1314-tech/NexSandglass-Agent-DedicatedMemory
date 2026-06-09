@@ -59,6 +59,26 @@ def night_watch() -> str:
     with open(_LAST_COUNT, "w") as f:
         f.write(str(current_lines))
 
+    # ── 阴影副本：区块链式只读备份 ──
+    _SHADOW = os.path.join(_VAULT, "sandglass.backup")
+    if os.path.exists(_SANDGLASS):
+        if not os.path.exists(_SHADOW):
+            # 首次——从主沙漏拷贝
+            import shutil
+            shutil.copy2(_SANDGLASS, _SHADOW)
+            ok.append("✅ 阴影副本已创建（sandglass.backup）")
+        else:
+            # 比对——主文件被破坏/截断 → 从备份恢复
+            master_lines = current_lines
+            backup_lines = sum(1 for _ in open(_SHADOW, "rb"))
+            if master_lines < backup_lines:
+                import shutil
+                shutil.copy2(_SHADOW, _SANDGLASS)
+                alerts.append(f"🟡 主沙漏被截断（{master_lines}→{backup_lines}行），已从阴影副本恢复")
+            elif master_lines == backup_lines:
+                ok.append("✅ 阴影副本同步")
+            # master_lines > backup_lines → 正常累积，pulse 会同步
+
     if os.path.exists(_ERROR):
         with open(_ERROR, "r") as f:
             ts = f.read().strip()

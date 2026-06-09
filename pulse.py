@@ -234,3 +234,30 @@ def echo(user_message: str, assistant_response: str = "") -> None:
             log_message(assistant_response, "agent")
     except Exception:
         pass
+
+    # 同步阴影副本——新沙子追加到备份
+    _sync_shadow()
+
+
+def _sync_shadow() -> None:
+    """每次消息触发：主沙漏 → 阴影副本增量同步。只追加不替换。"""
+    try:
+        _VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")
+        master = os.path.join(_VAULT, "sandglass.txt")
+        shadow = os.path.join(_VAULT, "sandglass.backup")
+        if not os.path.exists(master):
+            return
+        # 比对行数——新行追加
+        with open(master, "rb") as fm:
+            master_lines = fm.readlines()
+        backup_lines_count = 0
+        if os.path.exists(shadow):
+            with open(shadow, "rb") as fb:
+                backup_lines_count = len(fb.readlines())
+        if len(master_lines) > backup_lines_count:
+            # 有新增 → 追加到阴影
+            with open(shadow, "ab") as fb:
+                for line in master_lines[backup_lines_count:]:
+                    fb.write(line)
+    except Exception:
+        pass
