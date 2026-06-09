@@ -3269,3 +3269,75 @@ def memory_migrate(output_path: str = "") -> str:
     
     size_kb = os.path.getsize(output_path) / 1024
     return f"✅ 记忆包已导出：{output_path}（{size_kb:.0f} KB）\n   解压到新电脑的 ~/.neurobase/ 即可恢复全部记忆。"
+
+
+def memo_mode() -> str:
+    """
+    回忆快闪——本地零依赖，一屏看完沙漏记住了什么。
+    
+    2D 离线（80分）:
+      - 画像摘要（persona.md 四层）
+      - 影子可视化（shadow_chart）
+      - 阶段简报（stage_brief）
+      - 最近决策（decision_particles）
+    
+    3D LLM（200分）:
+      - 加一段自然语言总结
+    """
+    lines = [f"🧬 沙漏画像记忆 — {datetime.now():%Y-%m-%d %H:%M}", ""]
+    
+    # 画像
+    lines.append("【你是谁】")
+    if os.path.exists(_PERSONA):
+        with open(_PERSONA, "r", encoding="utf-8") as f:
+            persona = f.read()
+        # 取前两段作为摘要
+        sections = [s.strip() for s in persona.split("\n## ") if s.strip()]
+        for s in sections[:2]:
+            first_line = s.split("\n")[0] if "\n" in s else s[:60]
+            lines.append(f"  {first_line[:80]}")
+    else:
+        lines.append("  （画像尚未生成）")
+    lines.append("")
+    
+    # 影子可视化
+    lines.append("【你的影子】")
+    try:
+        lines.append(shadow_chart())
+    except Exception:
+        lines.append("  （数据不足）")
+    lines.append("")
+    
+    # 阶段简报
+    lines.append("【当前阶段】")
+    try:
+        lines.append(stage_brief())
+    except Exception:
+        lines.append("  （数据不足）")
+    lines.append("")
+    
+    # 最近决策
+    lines.append("【最近决策粒子】")
+    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+    if os.path.exists(dp_path):
+        with open(dp_path, "r", encoding="utf-8") as f:
+            particles = f.readlines()[-5:]
+        for p in particles:
+            lines.append(f"  {p.strip()[:100]}")
+    if len(lines) == 1:
+        lines.append("  （决策粒子尚未生成）")
+    lines.append("")
+    
+    # LLM 增强
+    if _LLM_KEY:
+        try:
+            ctx = "\n".join(lines)
+            result = _llm(
+                "你是记忆展示助手。用户想看沙漏记住了什么。总结一下画像+影子+阶段的关联。一句话，20字以内。",
+                ctx[:3000], max_tokens=60)
+            if result:
+                lines.append(f"💬 {result.strip()}")
+        except Exception:
+            pass
+    
+    return "\n".join(lines)
