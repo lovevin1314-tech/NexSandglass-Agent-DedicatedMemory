@@ -2077,6 +2077,106 @@ def weave_links() -> dict:
 
 
 # ═══════════════════════════════════════════════
+# 镜子决策 — 织布机照见主人的过去
+# ═══════════════════════════════════════════════
+
+def mirror_decision(question: str) -> dict:
+    """
+    织布机新入口——主人面临选择，镜子照见过去的影子。
+    
+    流程：
+    ① 拆问题为关键词 → 搜沙子 → 找匹配的决策粒子
+    ② 搜历史决策模式 → 类似选择时主人怎么做的
+    ③ 读当前偏移率 → 影子现在往哪边倒
+    ④ 输出：过去的数据，不给结论
+    
+    返回 {past_decisions, similar_queries, current_trend, persona_hint}
+    """
+    from sandglass_vault import search, count as sv_count
+
+    result = {
+        "question": question,
+        "past_decisions": [],
+        "similar_queries": [],
+        "current_trend": "",
+        "persona_hint": "",
+    }
+
+    # ① 搜历史沙子
+    similar = search(question[:30], limit=10)
+    if similar:
+        result["similar_queries"] = [
+            f"[{ts[:10]}] {text[:80]}..." for _, ts, text in similar[:5]
+        ]
+
+    # ② 搜决策粒子
+    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+    if os.path.exists(dp_path):
+        try:
+            with open(dp_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            # 关键词匹配
+            keywords = set(question.lower().split())
+            matches = []
+            for line in lines[-100:]:
+                if any(kw in line.lower() for kw in keywords if len(kw) > 1):
+                    parts = line.strip().split(" | ")
+                    if len(parts) >= 4:
+                        matches.append({
+                            "ts": parts[0][:10],
+                            "options": parts[1] if len(parts) > 1 else "",
+                            "choice": parts[2] if len(parts) > 2 else "",
+                            "direction": parts[3] if len(parts) > 3 else "",
+                            "tags": parts[4] if len(parts) > 4 else "",
+                        })
+            if matches:
+                result["past_decisions"] = matches[-5:]
+        except Exception:
+            pass
+
+    # ③ 当前偏移趋势
+    try:
+        comp = comprehensive_offset()
+        if comp["sample"] >= 2:
+            direction_cn = {"frugal": "省钱", "spend": "愿意投入", "drift": "放弃倾向"}
+            d = direction_cn.get(comp["direction"], comp["direction"])
+            result["current_trend"] = f"影子偏向{d}（{comp['offset']:+d}%），{comp['sample']}次决策"
+    except Exception:
+        pass
+
+    # ④ 画像提示（有 LLM 时总结）
+    if _LLM_KEY and result["past_decisions"]:
+        try:
+            persona_text = ""
+            if os.path.exists(_PERSONA):
+                with open(_PERSONA, "r", encoding="utf-8") as f:
+                    persona_text = f.read()[:1500]
+
+            past_summary = "\n".join(
+                f"- {d['ts']}: {d['options']} → {d['choice']} ({d['direction']})"
+                for d in result["past_decisions"]
+            )
+
+            system = (
+                "你是决策镜子。你有用户画像 + 他过去面对类似选择时的历史。"
+                "不要说'应该选什么'——只总结他过去的模式和行为倾向。"
+                "一句话，15字以内。"
+            )
+
+            llm_result = _llm(
+                system,
+                f"问题：{question}\n画像：{persona_text}\n趋势：{result['current_trend']}\n\n过去类似决策：\n{past_summary}",
+                max_tokens=60,
+            )
+            if llm_result:
+                result["persona_hint"] = llm_result.strip()[:50]
+        except Exception:
+            pass
+
+    return result
+
+
+# ═══════════════════════════════════════════════
 # 蒸馏 — LLM 驱动的结构化提取
 # ═══════════════════════════════════════════════
 
