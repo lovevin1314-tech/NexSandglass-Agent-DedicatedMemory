@@ -140,20 +140,14 @@ def pulse(user_message: str = "") -> str:
     except ImportError:
         pass
 
+    # ── 偏移率觉察（玻璃模式）──
     try:
-        from sandglass_vault import search, count as sv_count
-        from sandglass_think import comprehensive_offset, persona_freshness
-
-        comp = comprehensive_offset()
-        if abs(comp["offset"]) >= 40 and comp["sample"] >= 3:
-            direction_cn = {"frugal": "省钱优先", "spend": "愿意投入", "drift": "红牌漂移"}.get(
-                comp["direction"], comp["direction"]
-            )
-            signals.append(
-                f"📊 觉察：你最近{comp['sample']}次决策偏向「{direction_cn}」（偏移{comp['offset']:+d}%）"
-            )
-
-        fresh = persona_freshness()
+        from sandglass_think import glass_reminder
+        reminder = glass_reminder(user_message)
+        if reminder:
+            signals.append(reminder)
+    except Exception:
+        pass
         if fresh.get("stale") and fresh.get("level", 0) >= 1:
             count = fresh.get("since_sands", 0)
             msg = f"📊 觉察：画像已滞后 {count}条沙子，建议更新。" if count > 0 else "📊 觉察：画像需要更新。"
