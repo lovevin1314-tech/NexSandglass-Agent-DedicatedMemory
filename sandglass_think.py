@@ -1,6 +1,7 @@
 """NeuroBase Sandglass L3 — 蒸馏·偏移率·搜索滤镜。完整架构见 CLAUDE.md / README。"""
 
 import json
+import hashlib
 import logging
 import os
 import re
@@ -231,7 +232,7 @@ _PERSONA_SYSTEM = """# 🧬 人格架构师 — 渐进演化协议
 
 ## ⛔ 铁律
 1. **只能从提供的对话沙子中提炼，禁止编造。**
-2. **每一条声明如果知道来源行号，注明 `(L行号)`。这叫"项链"——可追溯到 sandglass.txt。**
+2. **每条声明必须注明 `[src:L行号]`——这叫"项链"，可追溯到 sandglass.txt。系统会自动加 SHA256 hash 防 LLM 幻觉。**
 3. **首次生成用 write 模式全量写，增量更新只改变化部分。**
 4. **保持克制：信息不足的维度留空，不要臆测。**
 5. **中文输出。**
@@ -305,7 +306,7 @@ def persona_build() -> str:
     # 组装沙子给 LLM
     lines = []
     for ln, ts, text in sands:
-        lines.append(f"[L{ln} | {ts}] {text[:300]}")
+        lines.append(f"[L{ln}:{hashlib.sha256(text.encode()).hexdigest()[:8]} | {ts}] {text[:300]}")
     sand_text = "\n".join(lines)
 
     first_line = sands[-1][0] if sands else 0
@@ -683,9 +684,32 @@ def stage_similarity(stage_a: str, stage_b: str) -> dict:
     return {"overlap": len(overlap), "score": round(score, 2), "suggestion": suggestion}
 
 def persona_trace(claim: str) -> list:
-    """给定人格声明，搜索 sandglass 找到来源行。返回 [(行号, 时间, 明文), ...]"""
+    """给定人格声明，搜索 sandglass 找到来源行并验证 SHA256 hash。"""
     from sandglass_vault import search
 
+    # 提取 [src:hash:L行号] 格式的溯源标记
+    src_match = re.search(r'\[src:([a-f0-9]+):L?(\d+)\]', claim)
+    if src_match:
+        expected_hash = src_match.group(1)
+        line_num = int(src_match.group(2))
+        # 验证源行内容是否匹配
+        results = search("", limit=1)
+        # 直接读沙漏行验证 hash
+        sg = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.txt")
+        if os.path.exists(sg):
+            with open(sg, "r", encoding="utf-8") as f:
+                for i, line in enumerate(f, 1):
+                    if i == line_num:
+                        actual_hash = hashlib.sha256(line.strip().encode()).hexdigest()[:8]
+                        if actual_hash == expected_hash:
+                            return [{"line": line_num, "verified": True, "text": line.strip()[:100]}]
+                        else:
+                            return [{"line": line_num, "verified": False,
+                                     "expected": expected_hash, "actual": actual_hash,
+                                     "warning": "源行已变或 LLM 幻觉行号"}]
+            return [{"line": line_num, "verified": False, "warning": "行号不存在——LLM 幻觉"}]
+
+    # Fallback: no hash tag, do plain search
     tokens = re.findall(r"[\u4e00-\u9fff]{2,}|[a-zA-Z]{3,}", claim)
     query = " ".join(tokens[:5])
     return search(query, limit=5)
@@ -1358,6 +1382,8 @@ def scene_stage_cross_validate() -> dict:
     阶段标记说两个阶段相似，但按场景拆分后重新检查——相似只存在于某些场景。
     返回 {findings, suggestion}"""
     marks = stage_marks()
+    if isinstance(marks, list):
+        return {"findings": [], "suggestion": "暂无阶段标记数据"}
     findings = []
 
     for stage, tag_list in marks.items():
@@ -1541,32 +1567,41 @@ def persona_maintain() -> dict:
     return {"triggered": False, "reason": "更新失败"}
 
 def novel_scene_detect() -> dict:
-    """新场景发现。检测最近沙子中从未在历史阶段出现过的话题。"""
-    guessed = set(scene_guess())
-    history = scene_history()
+    """频率突变检测新场景——不用关键词，纯统计。"""
+    import re
+    from sandglass_vault import recent
+    recent_sands = recent(20)
+    hist_sands = recent(200)
+    if not recent_sands:
+        return {"novel": [], "insight": "数据不足"}
 
-    all_historical = set()
-    for h in history:
-        all_historical.update(h.get("scenes", []))
+    # 简单分词：2字以上中文词+3字以上英文词
+    def _words(sands):
+        freq = {}
+        for _, _, text in sands:
+            for w in re.findall(r'[\u4e00-\u9fff]{2,}|[a-zA-Z]{3,}', text.lower()):
+                freq[w] = freq.get(w, 0) + 1
+        return freq
 
-    novel = guessed - all_historical
-    if not novel:
+    recent_freq = _words(recent_sands)
+    hist_freq = _words(hist_sands) if hist_sands else {}
+
+    # 频率突增3倍以上 = 新场景信号
+    novel_words = []
+    for w, rc in recent_freq.items():
+        hc = hist_freq.get(w, 0)
+        if rc >= 2 and (hc == 0 or rc / max(hc, 1) >= 3):
+            novel_words.append((w, rc, hc))
+
+    if not novel_words:
         return {"novel": [], "insight": "无新场景"}
 
-    from sandglass_vault import recent
-    sands = recent(20)
-    evidence = {}
-    for sc in novel:
-        keywords = _SCENE_KEYWORDS.get(sc, [])
-        for ln, ts, text in sands:
-            if any(kw.lower() in text.lower() for kw in keywords):
-                evidence[sc] = text[:100]
-                break
-
-    return {
-        "novel": [{"scene": sc, "evidence": evidence.get(sc, "")} for sc in novel],
-        "insight": "发现 " + str(len(novel)) + " 个新场景：" + "、".join(novel) + "。在之前任何阶段都不存在。"
-    }
+    novel_words.sort(key=lambda x: x[1]/max(x[2],1), reverse=True)
+    top = novel_words[:5]
+    insight = "发现 " + str(len(top)) + " 个频率突增词: " + ", ".join(
+        f"{w}({rc}vs{hc})" for w, rc, hc in top) + "。可能是新话题。"
+    return {"novel": [{"word": w, "recent": rc, "historical": hc} for w, rc, hc in top],
+            "insight": insight}
 
 def search_with_stage_label(query: str, limit: int = 5) -> list:
     """搜索并对每条结果标注阶段兼容性。"""
@@ -1668,13 +1703,15 @@ def composite_rerank(results, weights, text_w=0.6, ext_w=0.4):
     if not results or not weights:
         return sorted(results, key=lambda x: x[0], reverse=True)
 
-    # 文本相关性proxy：关键词匹配长度（越长越相关）
+    # 文本相关性proxy：关键词命中次数（越长≠越相关）
+    keywords = list(weights.keys()) if weights else []
     scores = []
     for item in results:
         kw = item[3] if len(item) > 3 else ""
-        text_len = len(item[2]) if len(item) > 2 else 0
+        text = item[2].lower() if len(item) > 2 else ""
+        hit_count = sum(1 for k in keywords if k.lower() in text) if keywords else 1
         ext_w_val = weights.get(kw, 1.0)
-        scores.append((text_len, ext_w_val, item))
+        scores.append((hit_count, ext_w_val, item))
 
     # Min-Max归一化
     t_vals = [s[0] for s in scores]
@@ -1708,8 +1745,51 @@ def _search_with_fallback(expanded, vs, limit=10, weights=None):
         return results[:limit]
     return []
 
+
+def _sentiment_wind() -> float:
+    """从最近沙子读情绪风向。>0正面 <0负面。零新文件——复用L3情绪熵。"""
+    from sandglass_vault import recent
+    from emotion_vocab import detect as emotion_detect
+    sands = recent(5)
+    if not sands: return 0.0
+    mood_scores = {"开心": 1, "意外": 0.5, "困惑": -0.5,
+                   "悲伤": -1, "焦虑": -1, "愤怒": -1, "放弃": -1}
+    scores = []
+    for _, _, text in sands:
+        det = emotion_detect(text)
+        if det.get("mood"):
+            scores.append(mood_scores.get(det["mood"], 0))
+    return round(sum(scores) / max(len(scores), 1), 2)
+
+
+def sentiment_rerank(results, wind: float):
+    """情感重排——正面风推正面内容，负面风推中性内容。"""
+    if abs(wind) < 0.3 or not results: return results
+    from emotion_vocab import load_vocab
+    vocab = load_vocab()
+    positive_words = set(vocab.get("开心", {}).get("zh", []) + vocab.get("开心", {}).get("en", []))
+    negative_words = set()
+    for mood in ["悲伤", "焦虑", "愤怒", "放弃"]:
+        negative_words.update(vocab.get(mood, {}).get("zh", []))
+        negative_words.update(vocab.get(mood, {}).get("en", []))
+
+    scored = []
+    for item in results:
+        text = item[2] if len(item) > 2 else ""
+        pos = sum(1 for w in positive_words if w in text)
+        neg = sum(1 for w in negative_words if w in text)
+        sentiment_score = (pos - neg) / max(len(text.split()), 1)
+        # 正面风→推正面内容   负面风→抑制负面，中性/正面浮到上面
+        if wind > 0:
+            boost = sentiment_score * wind * 0.2
+        else:
+            boost = min(sentiment_score, 0) * abs(wind) * 0.15  # 负面内容被压下
+        scored.append((boost, item))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [item for _, item in scored]
+
+
 def search_semantic(query: str, limit: int = 10) -> list:
-    """语义搜索——三级降级：LLM扩展 → 同义词 → TF-IDF。零 API Key 也能用。"""
     from sandglass_vault import search as vs
 
     # 获取搜索滤镜（含5维权重+上下文扩展关键词）
@@ -1726,21 +1806,22 @@ def search_semantic(query: str, limit: int = 10) -> list:
 
     # 1级：search_filter 的 LLM 扩展（关键词与权重同源）
     if expanded and len(expanded) > 1:
-        results = _search_with_fallback(expanded, vs, limit, weights)
+        results = _search_with_fallback(expanded, vs, limit * 2, weights)
         if results:
-            return results
+            return sentiment_rerank(results[:limit], _sentiment_wind())
 
     # 2级：同义词扩展
     expanded = _synonym_expand(query)
     if len(expanded) > 1:
-        results = _search_with_fallback(expanded, vs, limit, weights)
+        results = _search_with_fallback(expanded, vs, limit * 2, weights)
         if results:
-            return results
+            return sentiment_rerank(results[:limit], _sentiment_wind())
 
     # 3级：TF-IDF 余弦相似度
     tfidf = _tfidf_search(query, limit)
     if tfidf:
-        return [(ln, "", text, f"tfidf:{sim}") for ln, text, sim in tfidf]
+        results = [(ln, "", text, f"tfidf:{sim}") for ln, text, sim in tfidf]
+        return sentiment_rerank(results[:limit], _sentiment_wind())
 
     return []
 
@@ -2422,7 +2503,7 @@ def distill(topic: str = "", save: bool = False) -> str:
 
     lines = []
     for ln, ts, text in latest:
-        lines.append(f"[L{ln} | {ts}] {text[:300]}")
+        lines.append(f"[L{ln}:{hashlib.sha256(text.encode()).hexdigest()[:8]} | {ts}] {text[:300]}")
     sand_text = "\n".join(lines)
 
     system = """# 对话蒸馏器
@@ -2510,7 +2591,7 @@ def weave_graph(question: str, max_hops: int = 3) -> dict:
                         -- 起点：匹配关键词的沙子行
                         SELECT rowid, content, 'sand', 0, content
                         FROM sandglass_fts
-                        WHERE content MATCH ?
+                        WHERE content LIKE '%' || ? || '%'
                         LIMIT 10
                         
                         UNION ALL
@@ -3083,99 +3164,6 @@ def entropy_chart(recent_n: int = 10) -> str:
     bar = "█" * bar_len + "░" * (40 - bar_len)
     level = "高熵波动" if entropy > 1.2 else ("低熵平静" if entropy < 0.5 else "中熵平稳")
     return f"🫧 情绪熵 {entropy:.2f} {bar}  {level}"
-
-def weave_graph(question: str, max_hops: int = 3) -> dict:
-    """
-    因果图——回答"为什么"的问题。
-    
-    从沙子/决策粒子/标签三个源出发，用 CTE 递归追溯因果链。
-    零额外依赖——SQLite WITH RECURSIVE 内置。
-    
-    返回 {chains, root_causes, insight}
-    """
-    try:
-        from sandglass_sqlite import _get_db
-        db = _get_db()
-        cursor = db.cursor()
-        
-        # 拆问题为搜索词
-        keywords = [w for w in re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z]+', question) if len(w) > 1][:3]
-        if not keywords:
-            keywords = [question[:20]]
-        
-        # CTE 递归：从匹配关键词的沙子和决策粒子出发，追溯关联
-        chains = []
-        root_causes = set()
-        
-        for kw in keywords:
-            try:
-                cursor.execute("""
-                    WITH RECURSIVE trace(id, content, source, depth, path) AS (
-                        -- 起点：匹配关键词的沙子行
-                        SELECT rowid, content, 'sand', 0, content
-                        FROM sandglass_fts
-                        WHERE content MATCH ?
-                        LIMIT 10
-                        
-                        UNION ALL
-                        
-                        -- 第一跳：包含同一关键词的相邻沙子
-                        SELECT s.rowid, s.content, 'adjacent', trace.depth + 1,
-                               trace.path || ' -> ' || s.content
-                        FROM sandglass_fts s
-                        JOIN trace ON s.content MATCH ?
-                        WHERE trace.depth < ?
-                        LIMIT 5
-                    )
-                    SELECT depth, source, path FROM trace ORDER BY depth
-                """, (kw, kw, max_hops))
-                
-                for depth, source, path in cursor.fetchall():
-                    chains.append({"keyword": kw, "depth": depth, "source": source,
-                                   "path": path[:200] if path else ""})
-                    # 提取根源关键词
-                    if depth == max_hops and path:
-                        root_word = path.split(' -> ')[-1][:30]
-                        root_causes.add(root_word)
-            except Exception:
-                continue
-        
-        cursor.close()
-        
-        # 补充：从决策粒子标签追溯
-        dp_roots = set()
-        dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
-        if os.path.exists(dp_path):
-            with open(dp_path, "r", encoding="utf-8") as f:
-                dp_lines = f.readlines()[-30:]
-            for kw in keywords:
-                for line in dp_lines:
-                    if kw in line.lower():
-                        parts = line.strip().split(" | ")
-                        if len(parts) >= 5:
-                            dp_roots.add(parts[4][:50])  # 标签作为根源
-        
-        all_roots = root_causes | dp_roots
-        
-        # 生成洞察
-        insight_parts = []
-        if all_roots:
-            insight_parts.append(f"追溯到最后：{'、'.join(list(all_roots)[:5])}")
-        if chains:
-            insight_parts.append(f"共 {len(chains)} 跳因果链")
-        if not chains and not all_roots:
-            insight_parts.append("数据不足，多积累几天沙子就能追溯了")
-        
-        return {
-            "question": question,
-            "chains": chains[:10],
-            "root_causes": list(all_roots)[:10],
-            "total_hops": len(chains),
-            "insight": "；".join(insight_parts) if insight_parts else "暂无因果链",
-        }
-    except Exception:
-        return {"question": question, "chains": [], "root_causes": [], "total_hops": 0,
-                "insight": "织布机因果图暂不可用（需要 sandglass_sqlite FTS5 索引）"}
 
 def memory_migrate(output_path: str = "") -> str:
     """

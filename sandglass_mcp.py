@@ -262,7 +262,8 @@ def _handle_request(req: dict) -> str:
 
 
 def main():
-    """MCP stdio 主循环。"""
+    """MCP stdio 主循环。设 SANDGLASS_MCP_TOKEN 环境变量可启用 token 校验。"""
+    ALLOWED = os.environ.get("SANDGLASS_MCP_TOKEN", "")
     while True:
         try:
             line = sys.stdin.readline()
@@ -273,6 +274,12 @@ def main():
                 continue
 
             request = json.loads(line)
+            # 可选 token 校验
+            if ALLOWED and request.get("params", {}).get("token", "") != ALLOWED:
+                sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": request.get("id"),
+                    "error": {"code": -32001, "message": "Unauthorized"}}) + "\n")
+                sys.stdout.flush()
+                continue
             response = _handle_request(request)
             if response:
                 sys.stdout.write(response + "\n")
