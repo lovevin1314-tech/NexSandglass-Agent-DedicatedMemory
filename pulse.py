@@ -116,14 +116,14 @@ def pulse(user_message: str = "") -> str:
     try:
         from emotion_vocab import detect as emotion_detect, mood_message, learn as emotion_learn
         det = emotion_detect(user_message)
-        if det and det.get("mood"):
+        if det["mood"]:
             msg = mood_message(det)
             if msg:
                 signals.append(msg)
             # 如果是自我情绪，自动学习新表达
-            if det.get("emitter") == "自我":
-                for kw in det.get("keywords", []):
-                    emotion_learn(kw, det.get("mood", ""), "zh" if any('\\u4e00' <= c <= '\\u9fff' for c in kw) else "en")
+            if det["emitter"] == "自我":
+                for kw in det["keywords"]:
+                    emotion_learn(kw, det["mood"], "zh" if any('\u4e00' <= c <= '\u9fff' for c in kw) else "en")
             # 调用 echo 落沙
             echo(user_message)
 
