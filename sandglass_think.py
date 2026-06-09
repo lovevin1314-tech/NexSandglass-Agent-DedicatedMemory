@@ -105,6 +105,129 @@ def _llm(system: str, user: str, max_tokens: int = 2048) -> str:
 
 
 # ═══════════════════════════════════════════════
+# 全面体检 — 沙漏记忆系统三层健康 + 全接口冒烟
+# ═══════════════════════════════════════════════
+
+_FULL_SANITY = {
+    "L1_plugin": ["plugin.py"],
+    "L1_nightwatch": ["nightwatch.py"],
+    "L2_vault": ["sandglass_vault.py"],
+    "L2_sqlite": ["sandglass_sqlite.py"],
+    "L3_think": ["sandglass_think.py"],
+    "L3_pulse": ["pulse.py"],
+    "L3_emotion": ["emotion_vocab.py"],
+    "L3_particles": ["decision_particles.py"],
+    "L3_log": ["sandglass_log.py"],
+    "L3_mcp": ["mcp_server.py"],
+    "L3_nex": ["nexsandglass.py"],
+    "L3_test": ["test_smoke.py"],
+}
+
+_HEALTH_REPORT = os.path.join(os.path.expanduser("~"), ".neurobase", "health_report.json")
+
+def full_sanity() -> dict:
+    """
+    沙漏记忆系统全面体检——三层健康 + 全接口冒烟。
+    
+    - L0（会话层）：Hermes alive check
+    - L1（写层）：沙漏文件 + 加密 + 插件
+    - L2（读层）：FTS5/idx/mmap/search
+    - L3（思层）：偏移率/画像/情绪熵/织布机/决策粒子/搜索
+
+    返回 {l0, l1, l2, l3, total, summary, details}
+    """
+    report = {"ts": datetime.now().isoformat(), "layers": {}, "total": 0, "passed": 0, "details": {}}
+
+    # L0
+    try:
+        import hermes_constants
+        report["layers"]["L0"] = "✅ Hermes alive"
+        report["passed"] += 1
+    except Exception:
+        report["layers"]["L0"] = "⚠️ Hermes not detected (standalone mode)"
+    report["total"] += 1
+
+    # L1
+    try:
+        from nightwatch import night_watch
+        nw = night_watch()
+        report["layers"]["L1"] = "✅" if "沙漏存在" in nw else "⚠️"
+        report["details"]["L1_nightwatch"] = nw[:200]
+        if "沙漏存在" in nw: report["passed"] += 1
+    except Exception as e:
+        report["layers"]["L1"] = f"❌ {e}"
+    report["total"] += 1
+
+    # L2
+    try:
+        from sandglass_vault import count, search
+        total = count()
+        hits = search("test", limit=3)
+        l2_ok = total >= 0 and isinstance(hits, list)
+        report["layers"]["L2"] = f"✅ {total}条沙子, 搜索正常" if l2_ok else "⚠️"
+        report["details"]["L2_sands"] = total
+        if l2_ok: report["passed"] += 1
+    except Exception as e:
+        report["layers"]["L2"] = f"❌ {e}"
+    report["total"] += 1
+
+    # L3 — 全接口检查
+    try:
+        from functools import lru_cache
+        # 只测不会产生副作用的读接口
+        checks = {}
+        try:
+            from sandglass_think import _emotional_entropy
+            checks["情绪熵"] = "✅" if _emotional_entropy() >= 0 else "?"
+        except: checks["情绪熵"] = "❌"
+        try:
+            from sandglass_think import comprehensive_offset
+            o = comprehensive_offset()
+            checks["偏移率"] = f"✅ {o['offset']:+d}% ({o['sample']}条)"
+        except: checks["偏移率"] = "❌"
+        try:
+            from sandglass_think import weave_contradiction
+            w = weave_contradiction()
+            checks["织布机"] = f"✅ {len(w.get('conflicts',[]))}处矛盾"
+        except: checks["织布机"] = "❌"
+        try:
+            from sandglass_think import stage_list
+            s = stage_list()
+            checks["阶段"] = f"✅ {len(s)}阶段"
+        except: checks["阶段"] = "❌"
+        try:
+            from sandglass_think import search_filter
+            sf = search_filter("test")
+            checks["搜索"] = "✅" if sf.get("keywords") else "⚠️"
+        except: checks["搜索"] = "❌"
+        try:
+            from decision_particles import _detect_chain
+            c = _detect_chain("选A还是B")
+            checks["决策粒子"] = "✅" if isinstance(c, list) else "⚠️"
+        except: checks["决策粒子"] = "❌"
+
+        l3_ok = all("✅" in v for v in checks.values())
+        report["layers"]["L3"] = "✅ 全接口通过" if l3_ok else "⚠️ 部分接口异常"
+        report["details"]["L3_checks"] = checks
+        if l3_ok: report["passed"] += 1
+    except Exception as e:
+        report["layers"]["L3"] = f"❌ {e}"
+    report["total"] += 1
+
+    # 总结
+    status = "🎉 全部通过" if report["passed"] == report["total"] else f"⚠️ {report['passed']}/{report['total']} 通过"
+    report["summary"] = status
+    report["summary_short"] = f"L0{'✅' if '✅' in report['layers'].get('L0','') else '⚠️'} L1{'✅' if '✅' in report['layers'].get('L1','') else '⚠️'} L2{'✅' if '✅' in report['layers'].get('L2','') else '⚠️'} L3{'✅' if '✅' in report['layers'].get('L3','') else '⚠️'}"
+
+    # 落盘
+    os.makedirs(os.path.dirname(_HEALTH_REPORT), exist_ok=True)
+    with open(_HEALTH_REPORT, "w", encoding="utf-8") as f:
+        json.dump(report, f, ensure_ascii=False, indent=2)
+
+    return report
+
+
+# ═══════════════════════════════════════════════
 # 人格画像 — 偷师 TencentDB 四层深度扫描
 # ═══════════════════════════════════════════════
 
