@@ -128,12 +128,12 @@ def pulse(user_message: str = "") -> str:
             echo(user_message)
 
             # 决策粒子自动触发——高精度版本
-            # 只落真正做选择的时刻，不落日常对话
+            # 只落真正做选择的时刻，_detect_chain() 抓全链条，取最后一项为决策
             try:
-                from decision_particles import log as dp_log, _detect_choice
-                ch = _detect_choice(user_message)
+                from decision_particles import log as dp_log, _detect_chain
+                ch = _detect_chain(user_message)
                 if ch:
-                    dp_log(user_message[:80], ch)
+                    dp_log(user_message[:80], ch[-1])
             except Exception:
                 pass
 
