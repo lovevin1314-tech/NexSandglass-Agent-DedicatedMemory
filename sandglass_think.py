@@ -641,11 +641,20 @@ _FRUGAL = 60   # 省钱信号正在变实（累计+）
 _SPEND = -60   # 花钱轮廓正在成形（累计-）
 _DRIFT = -80   # 放弃倾向的影子（累计--）
 
-# 镜子敏感度——叠多少条才说"轮廓成形了"（不判对错，只描述）
+# 镜子敏感度——三层独立，不判对错
 _OFFSET_SENSITIVITY = {
-    "frugal": 50,  # 省钱影子叠 50 条 → 开始照见轮廓
-    "spend":  50,  # 花钱影子叠 50 条 → 轮廓渐清
-    "drift":  30,  # 放弃更敏感：30 条就开始留意
+    "frugal": 50,   # 省钱影子叠 50 层 → 轮廓成形
+    "spend":  50,   # 花钱影子叠 50 层 → 轮廓成形
+    "drift":  30,   # 放弃更敏感（30 层就开始注意）
+}
+
+# 搜索四维权重——场景匹配/画像增强/阶段偏置/粒子助推
+_SEARCH_WEIGHTS = {
+    "scene_match": 1.5,     # 当前场景匹配 → ×1.5
+    "default": 1.0,          # 默认权重
+    "persona_boost": 1.3,   # 画像相关 → ×1.3
+    "stage_bias": 0.7,      # 过去阶段 → ×0.7（现在更重要）
+    "particle_push": 1.2,   # 决策粒子强化 → ×1.2
 }
 
 
@@ -1728,9 +1737,20 @@ def search_filter(query: str) -> dict:
         result.get("decision_bias", ""))
     if expanded and len(expanded) > 1:
         result["keywords"] = expanded
-        result["weights"] = {kw: 1.5 if any(s in kw for s in (scenes or [])) else 1.0
-                            for kw in expanded}
-        result["source"] = "LLM场景+阶段+决策粒子"
+        # 四维权重——场景/画像/阶段/粒子
+        base = _SEARCH_WEIGHTS["default"]
+        weights = {}
+        for kw in expanded:
+            w = base
+            if any(s in kw for s in (scenes or [])):
+                w *= _SEARCH_WEIGHTS["scene_match"]
+            if persona_ctx and any(w in kw for w in persona_ctx.split()):
+                w *= _SEARCH_WEIGHTS["persona_boost"]
+            if result.get("decision_bias"):
+                w *= _SEARCH_WEIGHTS["particle_push"]
+            weights[kw] = round(w, 2)
+        result["weights"] = weights
+        result["source"] = "LLM场景+阶段+决策粒子(4D权重)"
     else:
         result["source"] = "关键词匹配"
 
