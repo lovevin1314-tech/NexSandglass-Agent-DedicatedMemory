@@ -748,11 +748,16 @@ _OFFSET_SIGNALS = {
     "drift_烦躁": ["随便", "算了", "就这样"],
 }
 
-# Drift 三档偏移权重
-_DRIFT_WEIGHTS = {
-    "drift_放弃": 100,   # 深放弃——最高关注
-    "drift_妥协": 60,    # 理性权衡——不是坏事
-    "drift_烦躁": 30,    # 暂时情绪——可能只是累了
+# ── 波浪阈值——单一真相来源。不判对错，只照影子深浅 ──
+_WAVE_THRESHOLDS = {
+    # 轮廓成形（多少层影子算"成形"）
+    "frugal": {"contour": 50},   # 省钱影子叠 50 层 → 轮廓成形
+    "spend":  {"contour": 50},   # 同上
+    "drift":  {"contour": 30,    # 放弃更敏感
+               # 三档权重——同一个"放弃"的不同深浅
+               "放弃": 100,       # 深放弃
+               "妥协": 60,       # 理性权衡
+               "烦躁": 30},      # 暂时情绪
 }
 
 # 阶段切换——小波浪累积触发
@@ -763,13 +768,6 @@ _STAGE_CONSECUTIVE = 2  # 连续 2 次高偏移 → 静默切阶段
 _FRUGAL = 60   # 省钱信号正在变实（累计+）
 _SPEND = -60   # 花钱轮廓正在成形（累计-）
 _DRIFT = -80   # 放弃倾向的影子（累计--）
-
-# 镜子敏感度——三层独立，不判对错
-_OFFSET_SENSITIVITY = {
-    "frugal": 50,   # 省钱影子叠 50 层 → 轮廓成形
-    "spend":  50,   # 花钱影子叠 50 层 → 轮廓成形
-    "drift":  30,   # 放弃更敏感（30 层就开始注意）
-}
 
 # 搜索四维权重——场景匹配/画像增强/阶段偏置/粒子助推
 _SEARCH_WEIGHTS = {
@@ -996,17 +994,17 @@ def offset_check(decision_text: str, user_persisted: bool = False) -> dict:
     if drift_hits > 0:
         # 按最高档取权重
         if drift_giveup > 0:
-            offset = _DRIFT_WEIGHTS["drift_放弃"]
+            offset = _WAVE_THRESHOLDS["drift"]["放弃"]
             matched = [w for w in _OFFSET_SIGNALS["drift_放弃"] if w in text]
             key = "放弃的影子（深）"
             hints = ["放弃信号浮起来了——" + "、".join(matched[:2]) + "。影子不用怕，留着观察"]
         elif drift_tradeoff > 0:
-            offset = _DRIFT_WEIGHTS["drift_妥协"]
+            offset = _WAVE_THRESHOLDS["drift"]["妥协"]
             matched = [w for w in _OFFSET_SIGNALS["drift_妥协"] if w in text]
             key = "权衡的影子（中）"
             hints = ["理性权衡——" + "、".join(matched[:2]) + "。不是放弃，是计算"]
         else:
-            offset = _DRIFT_WEIGHTS["drift_烦躁"]
+            offset = _WAVE_THRESHOLDS["drift"]["烦躁"]
             matched = [w for w in _OFFSET_SIGNALS["drift_烦躁"] if w in text]
             key = "烦躁的影子（浅）"
             hints = ["暂时的情绪——" + "、".join(matched[:2]) + "。可能只是累了"]
@@ -1164,7 +1162,7 @@ def shadow_chart(sensitivity: dict = None) -> str:
     Unicode 阴影条 → 一屏看清省钱/花钱/放弃哪个影子更深。
     """
     if sensitivity is None:
-        sensitivity = _OFFSET_SENSITIVITY
+        sensitivity = _WAVE_THRESHOLDS
 
     comp = comprehensive_offset()
     # 朴素估算三个维度占比（从方向 + 偏移 + 镜像敏感度近似推断）
@@ -3034,7 +3032,7 @@ def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str
         d = direction_cn.get(comp["direction"], "")
         if not d:
             return ""
-        sensitivity = _OFFSET_SENSITIVITY.get(comp["direction"], 50)
+        sensitivity = _WAVE_THRESHOLDS.get(comp["direction"], {}).get("contour", 50)
         if comp["sample"] >= sensitivity:
             desc = f"最近{comp['sample']}条决策里——{d}的影子叠了{comp['sample']}层，轮廓已经成形了"
         else:
