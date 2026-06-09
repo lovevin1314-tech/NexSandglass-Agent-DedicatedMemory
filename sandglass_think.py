@@ -2140,6 +2140,21 @@ def _synthesize_3d() -> dict:
     if not _LLM_KEY:
         return {}
 
+    # ── 缓存检查：1小时内 + 沙子没大变化 → 直接返回 ──
+    _CACHE_PATH = os.path.join(os.path.expanduser("~"), ".neurobase", "3d_cache.json")
+    try:
+        from sandglass_vault import count as sv_count
+        current_total = sv_count()
+        if os.path.exists(_CACHE_PATH):
+            with open(_CACHE_PATH, "r", encoding="utf-8") as f:
+                cache = json.loads(f.read())
+            cache_age = (datetime.now() - datetime.fromisoformat(cache["timestamp"])).total_seconds()
+            sand_delta = abs(current_total - cache.get("sandglass_count", 0))
+            if cache_age < 3600 and sand_delta < 100:
+                return cache  # 缓存有效，直接返回
+    except Exception:
+        pass
+
     try:
         from sandglass_vault import count as sv_count
 
