@@ -2773,3 +2773,57 @@ def entropy_chart(recent_n: int = 10) -> str:
 # 会话启动 — 注入画布+待办
 # ═══════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════
+# MCP 记忆包 — 一键迁移全部记忆数据
+# ═══════════════════════════════════════════════
+
+def memory_migrate(output_path: str = "") -> str:
+    """
+    一键导出全部记忆数据为 tar.gz。换电脑时解压到新 .neurobase/ 即可。
+    
+    打包内容：
+      sandglass.txt / sandglass.backup（沙子+阴影）
+      sandglass.idx（米粒索引）
+      persona/（画像+阶段+时间线）
+      decision_particles.txt（决策粒子）
+      search_weights.txt / echo_wind.jsonl（搜索权重+回音折风）
+    
+    不打包代码——只打包记忆本身。
+    """
+    import tarfile, os
+    
+    if not output_path:
+        desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+        ts = datetime.now().strftime("%Y%m%d_%H%M")
+        output_path = os.path.join(desktop, f"neurobase_memory_{ts}.tar.gz")
+    
+    # 要打包的文件和目录
+    to_pack = [
+        "sandglass.txt",
+        "sandglass.backup",
+        "sandglass.idx",
+        "decision_particles.txt",
+        "decision_particles_backup.txt",
+        "search_weights.txt",
+        "echo_wind.jsonl",
+    ]
+    
+    # 目录整体打包（保持结构）
+    dirs_to_pack = [
+        "persona",
+        "chatlog",
+    ]
+    
+    with tarfile.open(output_path, "w:gz") as tar:
+        for f in to_pack:
+            fp = os.path.join(_VAULT, f)
+            if os.path.exists(fp):
+                tar.add(fp, arcname=f)
+        
+        for d in dirs_to_pack:
+            dp = os.path.join(_VAULT, d)
+            if os.path.exists(dp):
+                tar.add(dp, arcname=d)
+    
+    size_kb = os.path.getsize(output_path) / 1024
+    return f"✅ 记忆包已导出：{output_path}（{size_kb:.0f} KB）\n   解压到新电脑的 ~/.neurobase/ 即可恢复全部记忆。"
