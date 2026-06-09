@@ -60,6 +60,52 @@ def _extract_options(question: str) -> str:
     return "_".join(p[:20] for p in parts[:5] if p)
 
 
+def _detect_choice(text: str) -> str | None:
+    """
+    高精度决策检测——只落真正做选择的消息。
+    策略：
+      1. 显式 A/B 选择：'选A' '还是B吧' '就C了' '决定D'
+      2. 命令式拍板：'用X' '装Y' '搞Z'——但必须有具体对象
+      3. 放弃信号：'不管了' '随便' '就那样'——记录但不作为正向决策
+    返回检测到的选择文本，无决策返回 None。
+    """
+    import re
+
+    # ① 显式选择模式 —— 最高置信度
+    patterns = [
+        (r"(?:我?选|就|还是|决定|定了|要)(?:择|用|搞|弄)?\s*[「『\"]?(.{1,30}?)[」』\"]?(?:吧|了|的|好|行|可以)", 1),
+        (r"还是\s*(.{1,15})\s*(?:吧|好|了)", 1),
+        (r"(?:那就|就|那)\s*[「『\"]?(.{1,20}?)[」』\"]?\s*(?:吧|了)", 1),
+        (r"我?(?:决定|打算|准备)\s*(.{1,30})", 1),
+    ]
+    for pattern, group in patterns:
+        m = re.search(pattern, text)
+        if m:
+            choice = m.group(group).strip()
+            # 过滤太短的（"就吧""还是吧"）
+            if len(choice) >= 2:
+                return choice
+
+    # ② 命令式拍板 —— 有具体动词+对象
+    action_patterns = [
+        r"(?:用|装|上|搞|跑|开|关|删|加|换|切)\s*[「『\"]?(.{1,20}?)[」』\"]?\s*(?:吧|了|的|掉)",
+    ]
+    for pattern in action_patterns:
+        m = re.search(pattern, text)
+        if m:
+            choice = m.group(1).strip()
+            if len(choice) >= 2:
+                return choice
+
+    # ③ 放弃信号 —— 记录但不作为正向决策
+    give_up = ["不管了", "随便", "就那样", "算了", "不搞了", "放弃"]
+    for g in give_up:
+        if g in text:
+            return g
+
+    return None
+
+
 # ═══════════════════════════════════════════════
 # 第三层全量上下文——喂给 LLM 自己推断
 # ═══════════════════════════════════════════════
