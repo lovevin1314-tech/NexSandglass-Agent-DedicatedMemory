@@ -1752,7 +1752,18 @@ def search_filter(query: str) -> dict:
         result["weights"] = weights
         result["source"] = "LLM场景+阶段+决策粒子(4D权重)"
     else:
-        result["source"] = "关键词匹配"
+        # 2D 离线也吃决策粒子权重——本地 80 分
+        alt_keywords = _synonym_expand(query)
+        keywords = alt_keywords if alt_keywords else [query]
+        weights = {}
+        for kw in keywords:
+            w = _SEARCH_WEIGHTS["default"]
+            if result.get("decision_weight_boost") and any(t in kw for t in result["decision_weight_boost"]):
+                w *= _SEARCH_WEIGHTS["particle_push"]
+            weights[kw] = round(w, 2)
+        result["keywords"] = keywords
+        result["weights"] = weights
+        result["source"] = "2D本地权重(决策粒子)"
 
     # ── 同时保留非LLM路径的关键词作为备选 ──
     result["alt_keywords"] = _synonym_expand(query) if not expanded or len(expanded) <= 1 else []
