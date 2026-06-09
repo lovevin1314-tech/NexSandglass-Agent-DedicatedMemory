@@ -68,8 +68,8 @@ def log(question: str, choice: str, ts: str = "") -> None:
     os.makedirs(os.path.dirname(_PARTICLES), exist_ok=True)
     with open(_PARTICLES, "a", encoding="utf-8") as f:
         f.write(f"{ts} | {question[:80]} | {choice[:40]} | {direction} | {tags}\n")
-    # 反哺灵魂蒸馏
-    feed_persona(question, tags, choice)
+    # 反哺第三层四支柱
+    feed_all(question, tags, choice, direction)
 
 
 def read(limit: int = 50) -> list:
@@ -98,6 +98,49 @@ def feed_persona(particle_type: str, tags: str, keyword: str) -> None:
         if insert < 0: insert = len(content)
         new = content[:insert] + "\n".join(added) + "\n" + content[insert:]
         with open(persona_path, "w", encoding="utf-8") as f: f.write(new)
+
+
+def feed_all(question: str, choice: str, tags: str, direction: str) -> None:
+    """决策粒子喂第三层四支柱。"""
+    feed_persona(question, tags, choice)           # 🧬 灵魂蒸馏
+    _update_search_weights(tags)                    # ⏳ 时间检索
+    _weave_check(tags, choice)                      # 🧵 织布机
+    # 📊 偏移率 — 粒子落盘即计数，ratio() 直接读
+
+
+def _update_search_weights(tags: str) -> None:
+    """时间检索：高频标签→搜索权重缓存。"""
+    wf = os.path.join(os.path.expanduser("~"), ".neurobase", "search_weights.txt")
+    weights = {}
+    if os.path.exists(wf):
+        with open(wf, "r", encoding="utf-8") as f:
+            for line in f:
+                if ":" in line:
+                    k, v = line.strip().split(":", 1)
+                    weights[k] = int(v)
+    for tag in tags.split(","):
+        tag = tag.strip()
+        weights[tag] = weights.get(tag, 0) + 1
+    with open(wf, "w", encoding="utf-8") as f:
+        for k, v in sorted(weights.items(), key=lambda x: x[1], reverse=True)[:20]:
+            f.write(f"{k}:{v}\n")
+
+
+def _weave_check(tags: str, choice: str) -> None:
+    """织布机：决策粒子与画像矛盾检测。"""
+    p = os.path.join(os.path.expanduser("~"), ".neurobase", "persona", "persona.md")
+    if not os.path.exists(p): return
+    with open(p, "r", encoding="utf-8") as f: persona = f.read()
+    contra = []
+    if "成本观" in tags and "性价比优先" in persona and "spend" in _direction(choice):
+        contra.append("画像:性价比优先 ↔ 决策:愿意投入")
+    if "决策疲劳" in tags and "追根溯源" in persona:
+        contra.append("画像:追根溯源 ↔ 决策:红牌放弃")
+    if contra:
+        wl = os.path.join(os.path.expanduser("~"), ".neurobase", "weave_alerts.txt")
+        with open(wl, "a", encoding="utf-8") as f:
+            for c in contra:
+                f.write(f"[{datetime.now():%Y-%m-%d %H:%M}] {c}\n")
 
 
 def ratio() -> dict:
