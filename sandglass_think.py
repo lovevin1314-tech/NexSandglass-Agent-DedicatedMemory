@@ -2117,47 +2117,144 @@ def session_context(n: int = 5) -> str:
 
 
 # ═══════════════════════════════════════════════
-# 3D 玻璃——LLM 合成立体画像 + 动态语气
+# 3D 玻璃——阶段注解（永久，不扔）
 # ═══════════════════════════════════════════════
-# 2D 离线 = 玻璃曲面，沙自然累积 → 轮廓渐清
-# 3D 在线 = LLM 吃进所有 2D 影子 → 合成立体像 → 决定怎么提醒
+# 2D 离线 = 玻璃曲面，沙自然累积 → 轮廓渐清（小标签）
+# 3D 在线 = LLM 吃进所有 2D 影子 → 合成立体像（大标签，永久保存）
+# 每个阶段可以有多个注解——阶段切了、偏移变了、沙子够了、情绪波动了 → 重新生成
 
 
-def _synthesize_3d() -> dict:
+_3D_ANNOTATIONS = os.path.join(os.path.expanduser("~"), ".neurobase", "3d_annotations.jsonl")
+
+
+def _should_synthesize() -> tuple[bool, str]:
     """
-    LLM 吃进全部第三层数据，合成立体画像。
-    不接 LLM 返回空 dict，上游自动走 2D 玻璃模式。
+    判断是否该生成新的 3D 注解。四个触发条件：
+    ① 阶段切换 → 新阶段该有新的大标签
+    ② 偏移率超 ±60% → 轮廓变了
+    ③ 沙子里程碑（比上次生成多 100 条）→ 够多了重新看
+    ④ 情绪波动（焦虑/放弃/开心）→ 立刻重新审视
+    
+    返回 (should, trigger_reason)
+    """
+    try:
+        from sandglass_vault import count as sv_count
+        current = sv_count()
+    except Exception:
+        return False, ""
 
-    返回 {
-        "persona_type": "ENTP 成本敏感型",
-        "emotional_state": "压力期",
-        "decision_pattern": "平时省但焦虑时花",
-        "reminder_tone": "好奇式提问比关心式更有效",
-        "reminder_example": "你以前遇到类似选择都会花，这次为什么省了？",
-        "contour_depth": "左偏 67% 深 / 右偏 23% 浅 / 放弃 10% 淡",
-    }
+    # 没有注解 → 首次生成
+    if not os.path.exists(_3D_ANNOTATIONS):
+        return True, "first_synthesis"
+
+    # 读最后一条注解
+    last_line = ""
+    with open(_3D_ANNOTATIONS, "r", encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                last_line = line.strip()
+    if not last_line:
+        return True, "corrupted_annotations"
+
+    try:
+        last = json.loads(last_line)
+    except Exception:
+        return True, "parse_error"
+
+    # ① 阶段切换
+    current_stage_name = ""
+    try:
+        log = _read_decision_log(1)
+        if log:
+            current_stage_name = log[-1].get("stage", "")
+    except Exception:
+        pass
+    if current_stage_name and current_stage_name != last.get("stage", ""):
+        return True, f"stage_switch:{last.get('stage','?')}→{current_stage_name}"
+
+    # ② 偏移率超阈值
+    try:
+        comp = comprehensive_offset()
+        if abs(comp["offset"]) >= _STAGE_THRESHOLD:
+            return True, f"offset_threshold:{comp['offset']:+.0f}%"
+    except Exception:
+        pass
+
+    # ③ 沙子 +100
+    last_count = last.get("sand_count", 0)
+    if current >= last_count + 100:
+        return True, f"sand_milestone:{last_count}→{current}"
+
+    # ④ 情绪波动 — 由 pulse.py 调用时传入
+    # （这里只是信号检查，实际情绪由 emotion_vocab.detect 决定）
+    return False, ""
+
+
+def _save_annotation(data: dict, trigger: str) -> None:
+    """保存阶段注解——永久追加，不替换旧注解。"""
+    try:
+        current_stage = "?"
+        from sandglass_vault import count as sv_count
+        try:
+            log = _read_decision_log(1)
+            if log:
+                current_stage = log[-1].get("stage", "?")
+        except Exception:
+            pass
+
+        annotation = {
+            "stage": current_stage,
+            "generated_at": datetime.now().isoformat(),
+            "trigger": trigger,
+            "sand_count": sv_count(),
+            "persona_type": data.get("persona_type", ""),
+            "emotional_state": data.get("emotional_state", ""),
+            "decision_pattern": data.get("decision_pattern", ""),
+            "reminder_tone": data.get("reminder_tone", ""),
+            "reminder_example": data.get("reminder_example", ""),
+            "offset_direction": data.get("offset", {}).get("direction", ""),
+            "offset_value": data.get("offset", {}).get("offset", 0),
+        }
+        os.makedirs(os.path.dirname(_3D_ANNOTATIONS), exist_ok=True)
+        with open(_3D_ANNOTATIONS, "a", encoding="utf-8") as f:
+            f.write(json.dumps(annotation, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def _latest_annotation() -> dict:
+    """读最新一条阶段注解。无注解返回空 dict。"""
+    if not os.path.exists(_3D_ANNOTATIONS):
+        return {}
+    last_line = ""
+    with open(_3D_ANNOTATIONS, "r", encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                last_line = line.strip()
+    try:
+        return json.loads(last_line)
+    except Exception:
+        return {}
+
+
+def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
+    """
+    3D 立体画像合成——永久注解模式。
+    
+    - 先检查 _should_synthesize() → 不需要生成则返回最新注解
+    - 需要生成 → LLM 吃全量数据 → 保存为永久注解
+    - 不接 LLM 返回空 dict → 上游走 2D 玻璃
     """
     if not _LLM_KEY:
         return {}
 
-    # ── 缓存检查：1小时内 + 沙子没大变化 → 直接返回 ──
-    _CACHE_PATH = os.path.join(os.path.expanduser("~"), ".neurobase", "3d_cache.json")
-    try:
-        from sandglass_vault import count as sv_count
-        current_total = sv_count()
-        if os.path.exists(_CACHE_PATH):
-            with open(_CACHE_PATH, "r", encoding="utf-8") as f:
-                cache = json.loads(f.read())
-            cache_age = (datetime.now() - datetime.fromisoformat(cache["timestamp"])).total_seconds()
-            sand_delta = abs(current_total - cache.get("sandglass_count", 0))
-            if cache_age < 3600 and sand_delta < 100:
-                return cache  # 缓存有效，直接返回
-    except Exception:
-        pass
+    # 检查是否该生成（除非强制或情绪波动触发）
+    if not force and trigger not in ("emotion_spike",):
+        should, reason = _should_synthesize()
+        if not should:
+            return _latest_annotation()
 
     try:
-        from sandglass_vault import count as sv_count
-
         # 1. 画像
         persona_text = ""
         if os.path.exists(_PERSONA):
@@ -2213,7 +2310,6 @@ def _synthesize_3d() -> dict:
         if not result:
             return {}
 
-        # 尝试解析 JSON
         m = re.search(r"\{.*\}", result, re.DOTALL)
         if m:
             data = json.loads(m.group())
@@ -2225,6 +2321,10 @@ def _synthesize_3d() -> dict:
                 "spend": comp.get("spend_pct", abs(comp["offset"]) if comp["direction"] == "spend" else 0),
                 "drift": comp.get("drift_pct", 100 if comp["direction"] == "drift" else 0),
             }
+
+            # 永久保存注解
+            _save_annotation(data, trigger if trigger else "periodic")
+
             return data
 
         return {"raw": result, "source": "3D 玻璃合成（非JSON）"}
@@ -2233,35 +2333,51 @@ def _synthesize_3d() -> dict:
         return {}
 
 
-def glass_reminder(user_message: str = "") -> str:
+def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str:
     """
-    玻璃提醒——3D LLM 优先，无 LLM 回退 2D 玻璃。
-    
-    - 有 LLM → _synthesize_3d() 推断人格 → 动态语气 → 提醒
-    - 无 LLM → 只描述轮廓方向（省钱/花钱/放弃哪边正在变深）
-    
+    玻璃提醒——阶段注解 + 2D 兜底。
+
+    - 先读最新 3D 阶段注解 → 直接用（永久保存的）
+    - 触发条件满足 → 重新合成 3D
+    - 无 LLM → 2D 描述方向
+
     不判对错，不说"该怎样"。
     """
-    # 尝试 3D
-    syn = _synthesize_3d()
+    trigger = ""
+    if emotion_trigger:
+        trigger = "emotion_spike"
+
+    # 读最新注解或触发 3D 合成
+    syn = _latest_annotation()
+    if not syn or emotion_trigger:
+        should, reason = _should_synthesize()
+        if should or emotion_trigger:
+            syn = _synthesize_3d(force=bool(emotion_trigger), trigger=trigger)
+
     if syn and "reminder_example" in syn:
-        # LLM 自己决定了语气和内容
         direction_cn = {"frugal": "省钱", "spend": "愿意投入", "drift": "放弃倾向"}
-        d = syn.get("offset", {}).get("direction", "")
-        contour = f"影子偏向{direction_cn.get(d, d)}（{syn.get('offset',{}).get('offset',0):+d}%）"
+        d = syn.get("offset_direction", "")
+        contour = f"影子偏向{direction_cn.get(d, d)}（{syn.get('offset_value',0):+d}%）"
         if syn.get("persona_type"):
             contour += f"，{syn['persona_type']}"
+
+        annotation_hint = ""
+        if os.path.exists(_3D_ANNOTATIONS):
+            count = sum(1 for _ in open(_3D_ANNOTATIONS, "r", encoding="utf-8"))
+            if count > 1:
+                annotation_hint = f"（共 {count} 个阶段注解）"
+
         return "\n".join([
-            f"🫧 玻璃：{contour}",
+            f"🫧 玻璃：{contour} {annotation_hint}",
             f"> {syn['reminder_example']}",
         ])
-    
-    # 回退 2D 玻璃——纯描述方向
+
+    # 回退 2D 玻璃
     try:
         from sandglass_vault import count
         total = count()
         if total < 5:
-            return ""  # 沙子太少，轮廓还没成形
+            return ""
         comp = comprehensive_offset()
         if comp["sample"] < 2:
             return ""
