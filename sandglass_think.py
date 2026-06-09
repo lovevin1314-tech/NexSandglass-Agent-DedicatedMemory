@@ -1578,9 +1578,9 @@ def decision_snapshot(decision_text: str) -> dict:
 # 搜索滤镜
 # ═══════════════════════════════════════════════
 def search_filter(query: str) -> dict:
-    """场景+阶段双感知搜索滤镜。有 API 时 LLM 双维扩展。
-    返回 {keywords, weights, scene_context, stage_context}"""
-    result = {"keywords": [query], "weights": {}, "scene_context": "", "stage_context": ""}
+    """场景+阶段+决策粒子+偏移率 四维感知搜索滤镜。
+    返回 {keywords, weights, scene_context, stage_context, decision_bias}"""
+    result = {"keywords": [query], "weights": {}, "scene_context": "", "stage_context": "", "decision_bias": ""}
 
     # ── 场景感知（当前语境）──
     scenes = scene_current()
@@ -1593,7 +1593,6 @@ def search_filter(query: str) -> dict:
     if os.path.exists(_PERSONA):
         with open(_PERSONA, "r", encoding="utf-8") as f:
             persona = f.read()
-        # 提取关键维度
         for dim, keywords in [("认知内核", ["决策", "核心价值", "驱动力"]),
                                ("偏好", ["喜欢", "偏好", "开源", "免费", "本地"]),
                                ("工具", ["Python", "Hermes", "DPAPI"])]:
@@ -1607,32 +1606,58 @@ def search_filter(query: str) -> dict:
     except Exception:
         pass
 
+    # ── 决策粒子权重注入（主人说的：记忆库学得好→拿着决策粒子和偏移率去强化搜索滤镜）──
+    try:
+        wf = os.path.join(_NB, "search_weights.txt")
+        if os.path.exists(wf):
+            weights = {}
+            with open(wf, "r", encoding="utf-8") as f:
+                for line in f:
+                    if ":" in line:
+                        k, v = line.strip().split(":", 1)
+                        weights[k] = int(v)
+            # 高权重标签（≥3次）→ 注入搜索偏好
+            top = [k for k, v in sorted(weights.items(), key=lambda x: x[1], reverse=True)[:5] if v >= 2]
+            if top:
+                result["decision_weight_boost"] = top
+                result["decision_bias"] = f"近期决策倾向：{'、'.join(top)}"
+    except Exception:
+        pass
+
+    # ── 决策粒子全量喂入 LLM 扩展（让 LLM 吃决策历史推断搜索意图）──
+    dp_path = os.path.join(_NB, "decision_particles.txt")
+    dp_context = ""
+    if os.path.exists(dp_path):
+        try:
+            with open(dp_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()[-15:]
+            if lines:
+                dp_context = "## 近期决策\n" + "".join(lines)
+        except Exception:
+            pass
+
     # ── 时间范围感知 ──
     time_hint = _parse_time_range(query)
     if time_hint:
         result["time_range"] = time_hint
-    try:
-        comp = comprehensive_offset()
-        off = abs(comp["offset"])
-        if off >= 40:
-            direction_cn = {"frugal": "省钱", "spend": "愿意投入"}.get(comp["direction"], "")
-            result["offset_visible"] = True
-            result["hint"] = f"检测到偏移{off}%（偏好{direction_cn}）。或者你也可能想问的是这个？"
-        elif off >= 20:
-            result["offset_weight"] = 1.3 if comp["direction"] == "frugal" else 0.7
-    except Exception:
-        pass
 
-    # ── LLM 三维扩展（有 API Key 时）──
+    # ═══════════════════════════════════════════════
+    # 注：偏移率（comprehensive_offset）是独立系统，不在此处计算。
+    # 搜索滤镜专注：决策粒子权重 → 搜索偏置。偏移率做：计算偏移方向/幅度。
+    # ═══════════════════════════════════════════════
+
+    # ── LLM 四维扩展（有 API Key 时）──
     expanded = _llm_expand_with_context(query, 
         result.get("persona_context", ""),
         result.get("scene_context", ""), 
-        result.get("stage_context", ""))
+        result.get("stage_context", ""),
+        dp_context,
+        result.get("decision_bias", ""))
     if expanded and len(expanded) > 1:
         result["keywords"] = expanded
         result["weights"] = {kw: 1.5 if any(s in kw for s in (scenes or [])) else 1.0
                             for kw in expanded}
-        result["source"] = "LLM场景+阶段双感知"
+        result["source"] = "LLM场景+阶段+决策粒子"
     else:
         result["source"] = "关键词匹配"
 
@@ -1644,23 +1669,25 @@ def search_filter(query: str) -> dict:
     return result
 
 
-def _llm_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage_ctx: str) -> list:
-    """LLM 结合画像+场景+阶段三维上下文扩展关键词。"""
+def _llm_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage_ctx: str, dp_ctx: str = "", decision_bias: str = "") -> list:
+    """LLM 结合画像+场景+阶段+决策粒子四维上下文扩展关键词。"""
     if not _LLM_KEY:
         return []
 
-    system = """你是搜索关键词扩展器。根据用户的画像、当前场景和历史阶段，扩展相关关键词。
+    system = """你是搜索关键词扩展器。根据用户的画像、当前场景、历史阶段和近期决策，扩展相关关键词。
 规则：
 1. 第一个词必须是用户原词
 2. 结合画像，返回符合用户偏好的词
 3. 结合场景上下文，返回该场景下最可能相关的词
 4. 结合阶段轨迹，返回历史上该话题相关的词
-5. 返回 3-8 个关键词，一行一个
+5. 结合近期决策倾向，推测用户真正在找什么——决策粒子揭示行为模式，搜索词只是表面意图
+6. 返回 3-8 个关键词，一行一个
 
 示例：
 画像：性价比优先，偏好开源工具，关注本地加密
 场景：NeuroBase开发
 阶段轨迹：2024年偏向省钱自研，2025年开始接受付费工具
+近期决策：成本观,动手派,独立性
 查询：加密
 输出：
 加密
@@ -1677,6 +1704,10 @@ AES"""
         ctx += f"{scene_ctx}\n"
     if stage_ctx:
         ctx += f"阶段轨迹：{stage_ctx}\n"
+    if decision_bias:
+        ctx += f"{decision_bias}\n"
+    if dp_ctx:
+        ctx += f"{dp_ctx}\n"
 
     user = f"{ctx}查询：{query}"
     result = _llm(system, user, max_tokens=200)
