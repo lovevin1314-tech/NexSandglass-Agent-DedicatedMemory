@@ -429,6 +429,29 @@ def _infer_resolution(chain: list[str]) -> str:
     return _infer_local(chain)
 
 
+_ECHO_WIND = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
+
+def _infer_sentiment(question: str) -> str:
+    """从决策粒子上下文推断情感风。"""
+    positive = ["太棒", "太好了", "终于", "完美", "好主意", "聪明", "厉害"]
+    negative = ["烦死", "太难", "不好", "失败", "后悔", "算了", "没用"]
+    for w in positive:
+        if w in question: return "正面"
+    for w in negative:
+        if w in question: return "负面"
+    return ""
+
+def _echo_spread(sentiment: str, options: str) -> None:
+    """回音折扩散——情感风落到语义邻居。"""
+    if not sentiment: return
+    entry = {"ts": datetime.now().isoformat(), "sentiment": sentiment,
+             "options": options,
+             "spread_weight": 1.3 if sentiment == "正面" else 0.8}
+    os.makedirs(os.path.dirname(_ECHO_WIND), exist_ok=True)
+    with open(_ECHO_WIND, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
 # ═══════════════════════════════════════════════
 # 落粒子
 # ═══════════════════════════════════════════════
