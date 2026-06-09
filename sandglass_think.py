@@ -684,6 +684,31 @@ def comprehensive_offset(scene: str = "") -> dict:
     total = 0
     weight_sum = 0
     directions = {"frugal": 0, "spend": 0, "drift": 0, "neutral": 0}
+    chain_stats = {"total_decisions": 0, "hesitations": 0, "avg_chain_len": 0}
+    # 🆕 读取决策粒子链条
+    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+    if os.path.exists(dp_path):
+        import re as _re
+        with open(dp_path, "r", encoding="utf-8") as f:
+            dp_lines = f.readlines()[-100:]
+            for line in dp_lines:
+                parts = line.strip().split(" | ")
+                if len(parts) >= 3:
+                    # 格式: ts | options | chain_or_choice | direction | tags
+                    chain_or_choice = parts[2]
+                    # 检测链条: "A→B→A" 或 "A→B→A 回到A(...)"
+                    arrows = _re.findall(r"→\s*(\S+)", chain_or_choice)
+                    if len(arrows) >= 2:
+                        chain_stats["total_decisions"] += len(arrows)
+                        # 回退: 链条中最后一个 = 之前出现过的 → 犹豫
+                        if arrows[-1] in arrows[:-1]:
+                            chain_stats["hesitations"] += 1
+                    elif arrows:
+                        chain_stats["total_decisions"] += 1
+        
+        chain_len = len([l for l in dp_lines if _re.search(r"→", l)])
+        if chain_len:
+            chain_stats["avg_chain_len"] = round(chain_stats["total_decisions"] / chain_len, 1)
 
     for i, e in enumerate(entries):
         weight = i + 1
@@ -710,6 +735,7 @@ def comprehensive_offset(scene: str = "") -> dict:
         "direction": max(directions, key=directions.get),
         "sample": len(entries),
         "trend": trend,
+        "chain": chain_stats,  # 🆕 决策链条——犹豫度/平均长度
     }
     if scene:
         result["scene"] = scene
