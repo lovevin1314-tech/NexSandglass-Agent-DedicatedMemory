@@ -1890,7 +1890,17 @@ def search_filter(query: str) -> dict:
     # ═══════════════════════════════════════════════
     # 注：偏移率（comprehensive_offset）是独立系统，不在此处计算。
     # 搜索滤镜专注：决策粒子权重 → 搜索偏置。偏移率做：计算偏移方向/幅度。
+    # 但偏移方向作为第 5 维权重注入搜索结果排序。
     # ═══════════════════════════════════════════════
+
+    # ── 偏移方向（第 5 维权重）──
+    offset_dir = ""
+    try:
+        comp = comprehensive_offset()
+        if comp["sample"] >= 2:
+            offset_dir = comp["direction"]
+    except Exception:
+        pass
 
     # ── LLM 四维扩展（有 API Key 时）──
     expanded = _llm_expand_with_context(query, 
@@ -1912,6 +1922,14 @@ def search_filter(query: str) -> dict:
                 w *= _SEARCH_WEIGHTS["persona_boost"]
             if result.get("decision_bias"):
                 w *= _SEARCH_WEIGHTS["particle_push"]
+            # 🆕 第 5 维：偏移方向——省钱的你搜到开源方案更靠前
+            if offset_dir:
+                if offset_dir == "frugal" and any(x in kw for x in ["免费","开源","本地","自己","省"]):
+                    w *= 1.3
+                elif offset_dir == "spend" and any(x in kw for x in ["付费","高效","专业","买"]):
+                    w *= 1.3
+                elif offset_dir == "drift" and any(x in kw for x in ["简单","不用","现成","快速"]):
+                    w *= 1.2
             weights[kw] = round(w, 2)
         result["weights"] = weights
         result["source"] = "LLM场景+阶段+决策粒子(4D权重)"
@@ -1924,10 +1942,18 @@ def search_filter(query: str) -> dict:
             w = _SEARCH_WEIGHTS["default"]
             if result.get("decision_weight_boost") and any(t in kw for t in result["decision_weight_boost"]):
                 w *= _SEARCH_WEIGHTS["particle_push"]
+            # 🆕 第 5 维偏移方向
+            if offset_dir:
+                if offset_dir == "frugal" and any(x in kw for x in ["免费","开源","本地","自己","省"]):
+                    w *= 1.3
+                elif offset_dir == "spend" and any(x in kw for x in ["付费","高效","专业","买"]):
+                    w *= 1.3
+                elif offset_dir == "drift" and any(x in kw for x in ["简单","不用","现成","快速"]):
+                    w *= 1.2
             weights[kw] = round(w, 2)
         result["keywords"] = keywords
         result["weights"] = weights
-        result["source"] = "2D本地权重(决策粒子)"
+        result["source"] = "2D本地权重(决策粒子+偏移方向)"
 
     # ── 同时保留非LLM路径的关键词作为备选 ──
     result["alt_keywords"] = _synonym_expand(query) if not expanded or len(expanded) <= 1 else []
