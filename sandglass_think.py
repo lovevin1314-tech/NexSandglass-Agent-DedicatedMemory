@@ -619,7 +619,17 @@ def persona_trace(claim: str) -> list:
 _OFFSET_SIGNALS = {
     "frugal": ["免费", "不花钱", "自己搞", "本地", "省钱", "性价比", "开源"],
     "spend": ["花钱", "省事", "买", "付费", "订阅", "不值", "效率优先"],
-    "drift": ["不管了", "能用就行", "不纠结", "随便", "放弃"],
+    # Drift 拆三档——不是一类东西
+    "drift_放弃": ["不管了", "放弃", "不搞了"],
+    "drift_妥协": ["能用就行", "不纠结", "就那样", "将就"],
+    "drift_烦躁": ["随便", "算了", "就这样"],
+}
+
+# Drift 三档偏移权重
+_DRIFT_WEIGHTS = {
+    "drift_放弃": 100,   # 深放弃——最高关注
+    "drift_妥协": 60,    # 理性权衡——不是坏事
+    "drift_烦躁": 30,    # 暂时情绪——可能只是累了
 }
 
 # 阶段切换——小波浪累积触发
@@ -828,16 +838,33 @@ def offset_check(decision_text: str, user_persisted: bool = False) -> dict:
 
     frugal_hits = sum(1 for w in _OFFSET_SIGNALS["frugal"] if w in text)
     spend_hits = sum(1 for w in _OFFSET_SIGNALS["spend"] if w in text)
-    drift_hits = sum(1 for w in _OFFSET_SIGNALS["drift"] if w in text)
+    # 🆕 Drift 拆三档独立检测——放弃≠妥协≠烦躁
+    drift_giveup = sum(1 for w in _OFFSET_SIGNALS["drift_放弃"] if w in text)
+    drift_tradeoff = sum(1 for w in _OFFSET_SIGNALS["drift_妥协"] if w in text)
+    drift_irritated = sum(1 for w in _OFFSET_SIGNALS["drift_烦躁"] if w in text)
+    drift_hits = drift_giveup + drift_tradeoff + drift_irritated
 
     # 玻璃——曲面有倒影，不清晰但3D。沙够多，轮廓自然立体
     dimensions = {}
     if drift_hits > 0:
-        offset = 100
+        # 按最高档取权重
+        if drift_giveup > 0:
+            offset = _DRIFT_WEIGHTS["drift_放弃"]
+            matched = [w for w in _OFFSET_SIGNALS["drift_放弃"] if w in text]
+            key = "放弃的影子（深）"
+            hints = ["放弃信号浮起来了——" + "、".join(matched[:2]) + "。影子不用怕，留着观察"]
+        elif drift_tradeoff > 0:
+            offset = _DRIFT_WEIGHTS["drift_妥协"]
+            matched = [w for w in _OFFSET_SIGNALS["drift_妥协"] if w in text]
+            key = "权衡的影子（中）"
+            hints = ["理性权衡——" + "、".join(matched[:2]) + "。不是放弃，是计算"]
+        else:
+            offset = _DRIFT_WEIGHTS["drift_烦躁"]
+            matched = [w for w in _OFFSET_SIGNALS["drift_烦躁"] if w in text]
+            key = "烦躁的影子（浅）"
+            hints = ["暂时的情绪——" + "、".join(matched[:2]) + "。可能只是累了"]
         direction = "drift"
-        matched_drift = [w for w in _OFFSET_SIGNALS["drift"] if w in text]
-        dimensions["放弃倾向的影子"] = matched_drift
-        hints = ["放弃信号浮起来了——" + "、".join(matched_drift[:2]) + "。影子不用怕，留着观察"]
+        dimensions[key] = matched
     elif spend_hits > frugal_hits:
         offset = abs(spend_hits - frugal_hits) * 20
         direction = "spend"
@@ -916,7 +943,9 @@ def cross_stage_offset(decision_text: str) -> dict:
         # 在当前阶段画像上量同一个决策
         frugal = sum(1 for w in _OFFSET_SIGNALS["frugal"] if w in persona_text)
         spend = sum(1 for w in _OFFSET_SIGNALS["spend"] if w in persona_text)
-        drift = sum(1 for w in _OFFSET_SIGNALS["drift"] if w in persona_text)
+        drift = sum(1 for w in _OFFSET_SIGNALS["drift_放弃"] if w in persona_text) + \
+                sum(1 for w in _OFFSET_SIGNALS["drift_妥协"] if w in persona_text) + \
+                sum(1 for w in _OFFSET_SIGNALS["drift_烦躁"] if w in persona_text)
 
         # 决策本身的方向
         dec_text = decision_text.lower()
