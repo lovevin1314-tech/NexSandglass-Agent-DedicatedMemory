@@ -1,4 +1,4 @@
-# NexSandglass 沙漏记忆系统⏳ V1.7.5 — 全接通
+# NexSandglass 沙漏记忆系统⏳ V1.7.6 — 全接通+Bug修复
 
 > **是记住。是理解。是懂你。是想你。**
 
@@ -9,7 +9,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Lines](https://img.shields.io/badge/Lines-4773-lightgrey)]()
+[![Lines](https://img.shields.io/badge/Lines-5098-lightgrey)]()
 [![Size](https://img.shields.io/badge/Size-57KB-brightgreen)]()
 
 > **Soul Distillation (灵魂蒸馏):** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity (偏移率)**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories——we forge a unique, evolving soul that resonates with the user.

@@ -149,6 +149,8 @@ def pulse(user_message: str = "") -> str:
         reminder = glass_reminder(user_message)
         if reminder:
             signals.append(reminder)
+        fresh = persona_freshness()
+        if fresh.get("stale") and fresh.get("level", 0) >= 1:
     except Exception:
         pass
         if fresh.get("stale") and fresh.get("level", 0) >= 1:

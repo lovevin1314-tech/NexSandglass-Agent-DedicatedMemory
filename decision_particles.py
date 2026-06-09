@@ -580,54 +580,56 @@ def _update_search_weights(tags: str) -> None:
 
 
 def _weave_check(tags: str, direction: str) -> None:
-    """
-    动态织布——不硬编码规则，遍历偏移信号检测言行是否一致。
-    
-    检测逻辑:
-      标签里有省钱 → 画像里有没有性价比信号 → 不一致
-      标签里有花钱 → 画像里有没有投入信号 → 不一致
-      标签里有放弃 → 画像里有没有清醒信号 → 不一致
-    """
+    """动态织布——从_OFFSET_SIGNALS源取信号，检测言行是否一致。"""
     p = os.path.join(os.path.expanduser("~"), ".neurobase", "persona", "persona.md")
     if not os.path.exists(p):
         return
     with open(p, "r", encoding="utf-8") as f:
         persona = f.read()
 
+    try:
+        from sandglass_think import _OFFSET_SIGNALS
+    except Exception:
+        return
+
     contra = []
+    frugal_words = _OFFSET_SIGNALS.get("frugal", [])
+    spend_words = _OFFSET_SIGNALS.get("spend", [])
+    drift_all = (_OFFSET_SIGNALS.get("drift_放弃", []) +
+                 _OFFSET_SIGNALS.get("drift_妥协", []) +
+                 _OFFSET_SIGNALS.get("drift_烦躁", []))
 
-    # 动态匹配——遍历 frugal/spend/drift 三组信号
-    frugal_signals = ["免费", "不花钱", "省钱", "性价比", "开源", "自己搞", "本地"]
-    spend_signals = ["花钱", "付费", "买", "效率优先", "省事"]
-    drift_signals = ["不管了", "随便", "放弃", "不纠结", "算了"]
-
-    # 省钱标签 → 检查画像里是否有省钱信号
-    if any(s in tags for s in ["成本观", "性价比优先", "独立性", "动手派"]):
-        matched_frugal = [w for w in frugal_signals if w in persona]
-        if not matched_frugal:
-            contra.append("画像标签:省钱倾向 ↔ 画像里没找到省钱信号——画像可能滞后")
-
-    # 花钱标签 → 检查画像里是否有花钱信号
-    if any(s in tags for s in ["愿意投入"]):
-        matched_spend = [w for w in spend_signals if w in persona]
-        if not matched_spend:
-            contra.append("画像标签:愿意投入 ↔ 画像里没找到花钱信号——画像可能滞后")
-
-    # 当前方向 vs 画像倾向
+    # 当前方向 vs 画像倾向——用源信号做语义匹配
     if direction == "spend":
-        matched_frugal = [w for w in frugal_signals if w in persona]
-        if matched_frugal:
-            contra.append(f"方向矛盾: 当前花钱 ↔ 画像倾向省钱({'、'.join(matched_frugal[:3])})")
+        matched = [w for w in frugal_words if w in persona]
+        if matched:
+            contra.append(f"方向矛盾: 当前花钱 ↔ 画像倾向省钱({'、'.join(matched[:3])})")
     elif direction == "frugal":
-        matched_spend = [w for w in spend_signals if w in persona]
-        if matched_spend:
-            contra.append(f"方向矛盾: 当前省钱 ↔ 画像倾向花钱({'、'.join(matched_spend[:3])})")
+        matched = [w for w in spend_words if w in persona]
+        if matched:
+            contra.append(f"方向矛盾: 当前省钱 ↔ 画像倾向花钱({'、'.join(matched[:3])})")
     elif direction == "drift":
-        # drift 特别敏感——一旦出现就检查
-        contra.append("⚠ 放弃信号出现——检查是否压力期")
+        matched = [w for w in drift_all if w in persona]
+        if matched:
+            contra.append(f"⚠ 放弃信号出现——检查是否压力期 (画像有{'、'.join(matched[:3])})")
+
+    # 标签里有的倾向但画像里找不到对应信号 → 画像滞后
+    tag_frugal = any(t in tags for t in ["成本观", "性价比优先", "独立性", "动手派", "省钱"])
+    tag_spend = any(t in tags for t in ["愿意投入", "花钱", "付费"])
+    if tag_frugal and not any(w in persona for w in frugal_words):
+        contra.append("标签倾向:省钱 ↔ 画像缺省钱信号——画像可能滞后")
+    if tag_spend and not any(w in persona for w in spend_words):
+        contra.append("标签倾向:花钱 ↔ 画像缺花钱信号——画像可能滞后")
 
     if contra:
+        # 24h cooldown——drift告警不刷屏
+        last_alert = os.path.join(os.path.expanduser("~"), ".neurobase", ".last_drift_alert")
+        if os.path.exists(last_alert):
+            if datetime.now().timestamp() - os.path.getmtime(last_alert) < 86400:
+                return
         wl = os.path.join(os.path.expanduser("~"), ".neurobase", "weave_alerts.txt")
         with open(wl, "a", encoding="utf-8") as f:
             for c in contra:
                 f.write(f"[{datetime.now():%Y-%m-%d %H:%M}] {c}\n")
+        os.utime(last_alert, None) if not os.path.exists(last_alert) else None
+        with open(last_alert, "a"): pass  # touch
