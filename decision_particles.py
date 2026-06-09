@@ -60,68 +60,68 @@ def _extract_options(question: str) -> str:
     return "_".join(p[:20] for p in parts[:5] if p)
 
 
-def _detect_choice(text: str) -> str | None:
+def _detect_chain(text: str) -> list[str]:
     """
-    决策检测——允许中间犹豫（噪音），识别**最终**选择。
+    决策链条检测——不判对错，记录全过程。
     
-    真实决策轨迹：
-      "选A吧...算了还是B了...最后搞了C"
-        ↑噪音       ↑噪音        ↑真正的决策
+    "选A吧...还是B了...最后搞了C...算了还是A好"
+      → ['A', 'B', 'C', 'A']
     
-    策略：
-      1. 最终决策标记（最高优先级）：'最后还是C' '最终搞了D' '定了E'
-      2. 显式选择链：找所有 '选X' '还是Y'，取**最后一个**
-      3. 命令式拍板链：找所有 '用X吧' '装Y了'，取**最后一个**  
-      4. 放弃信号：'不管了' '随便'
-    
-    返回最后一个实质性选择，无决策返回 None。
+    真实人类的决策是波浪形的——犹豫、试探、回退。
+    记忆体的责任是记录这个波浪，LLM 吃进画像+链条来推断倾向。
     """
     import re
-
-    # ── ① 最终决策标记（最高优先级） ──
-    final_patterns = [
-        r"(?:最后|最终|定了|决定了|确定了|拍板)\s*(?:还?是|就|搞|选|用|要)?\s*[「『\"]?(.{1,30}?)[」『\"]?\s*(?:吧|了|的|好|行)",
-    ]
-    for pattern in final_patterns:
-        m = re.search(pattern, text)
-        if m:
-            choice = m.group(1).strip()
-            if len(choice) >= 1:
-                return choice
-
-    # ── ② 显式选择——找全部匹配，取最后一个 ──
+    
+    chain = []
+    seen = set()
+    
+    # ① 显式选择
     choice_patterns = [
         r"(?:我?选|就|还是|决定|定了|要)(?:择|用|搞|弄)?\s*[「『\"]?(.{1,30}?)[」『\"]?(?:吧|了|的|好|行|可以)",
         r"还是\s*(.{1,15})\s*(?:吧|好|了)",
         r"(?:那就|就|那)\s*[「『\"]?(.{1,20}?)[」『\"]?\s*(?:吧|了)",
         r"我?(?:决定|打算|准备)\s*(.{1,30})",
+        r"(?:最后|最终|定了|确定了|拍板)\s*(?:还?是|就|搞|选|用|要)?\s*[「『\"]?(.{1,30}?)[」『\"]?\s*(?:吧|了|的|好|行)",
     ]
-    explicit_choices = []
     for pattern in choice_patterns:
         for m in re.finditer(pattern, text):
             choice = m.group(1).strip()
-            if len(choice) >= 2 and choice not in ["还是", "就是", "不是"]:
-                explicit_choices.append(choice)
-    if explicit_choices:
-        return explicit_choices[-1]  # 取最后一个
-
-    # ── ③ 命令式拍板——找全部匹配，取最后一个 ──
+            if len(choice) >= 1 and choice not in ("还是", "就是", "不是"):
+                chain.append(choice)
+    
+    # ② 命令式拍板
     action_pattern = r"(?:用|装|上|搞|跑|开|关|删|加|换|切)\s*[「『\"]?(.{1,20}?)[」『\"]?\s*(?:吧|了|的|掉)"
-    action_choices = []
     for m in re.finditer(action_pattern, text):
         choice = m.group(1).strip()
         if len(choice) >= 2:
-            action_choices.append(choice)
-    if action_choices:
-        return action_choices[-1]  # 取最后一个
-
-    # ── ④ 放弃信号 ──
+            chain.append(choice)
+    
+    # ③ 放弃信号
     give_up = ["不管了", "随便", "就那样", "算了", "不搞了", "放弃"]
     for g in give_up:
         if g in text:
-            return g
+            chain.append(g)
+    
+    return chain
 
-    return None
+
+def _chain_summary(chain: list[str]) -> str:
+    """链条摘要：'A → B → C → 回到A'"""
+    if not chain:
+        return ""
+    if len(chain) == 1:
+        return chain[0]
+    # 去相邻重复
+    compact = [chain[0]]
+    for c in chain[1:]:
+        if c != compact[-1]:
+            compact.append(c)
+    if len(compact) == 1:
+        return compact[0]
+    # 检测回退：最后一个回到了之前出现过的
+    if len(compact) >= 2 and compact[-1] in compact[:-1]:
+        return " → ".join(compact) + f"  回到{compact[-1]}"
+    return " → ".join(compact)
 
 
 # ═══════════════════════════════════════════════
@@ -291,26 +291,82 @@ def _direction(choice: str) -> str:
     return "neutral"
 
 
+def _infer_resolution(chain: list[str]) -> str:
+    """
+    LLM 吃进全链条 + 画像 + 阶段 + 历史粒子，推断真正的偏好倾向。
+    
+    "A → B → C → 回到A" → LLM 推断：
+      - 试了B（贵/复杂）退回A（便宜/熟悉）→ 成本敏感 + 习惯偏好
+      - 不是C不好，是A对他有安全感
+    
+    返回推理结论，无 LLM 或链条太短返回空。
+    """
+    if not chain or len(chain) < 2:
+        return ""
+    try:
+        from sandglass_think import _llm
+        
+        context = _read_context()
+        summary = _chain_summary(chain)
+        
+        system = (
+            "你是行为模式分析师。用户做了一串决策：犹豫、试探、回退。"
+            "结合他的画像、决策历史、偏移趋势，推断这条链条背后揭示的深层偏好。\n\n"
+            "不要复述链条内容。推断维度：\n"
+            "- 为什么最后回了某个选项？（成本？习惯？安全感？完美主义？）\n"
+            "- 中间试探的选项暴露了什么倾向？（想突破但不敢？好奇但克制？）\n"
+            "- 下次遇到类似选择，该怎么服务他？（直接给什么？先过滤什么？）\n\n"
+            "输出：一句话，30字以内。格式：'倾向于XX，下次直接给XX'"
+        )
+        
+        user_prompt = (
+            f"决策链条：{summary}\n"
+            f"全链条：{' → '.join(chain)}\n\n"
+            f"== 用户上下文 ==\n{context[:3000]}"
+        )
+        
+        result = _llm(system, user_prompt, max_tokens=80)
+        if result and result.strip():
+            return result.strip()[:60]
+    except Exception:
+        pass
+    return ""
+
+
 # ═══════════════════════════════════════════════
 # 落粒子
 # ═══════════════════════════════════════════════
 
 def log(question: str, choice: str, ts: str = "") -> None:
+    """
+    落一粒决策。记录全链条，LLM 推断倾向。
+    
+    格式：早饭_午饭 | A → B → A  回到A(成本敏感) | furgal | 成本观,习惯偏好
+              ↑选项     ↑决策链条+推断                   ↑方向  ↑标签
+    """
     if not ts:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     options = _extract_options(question)
     tags = _tag(question, choice)
     direction = _direction(choice)
-    enriched = _enrich_choice_with_llm(question, choice) if _has_llm() else choice
+    
+    # 链条 + LLM 推断
+    chain = _detect_chain(question + " " + choice)
+    if chain:
+        summary = _chain_summary(chain)
+        inference = _infer_resolution(chain) if _has_llm() else ""
+        resolved = f"{summary}  ({inference})" if inference else summary
+    else:
+        resolved = choice
 
-    record = f"{options} | {enriched} | {direction} | {tags}"
+    record = f"{options} | {resolved} | {direction} | {tags}"
 
     os.makedirs(os.path.dirname(_PARTICLES), exist_ok=True)
     with open(_PARTICLES, "a", encoding="utf-8") as f:
         f.write(f"{ts} | {record}\n")
 
-    feed_all(enriched, tags, direction)
+    feed_all(resolved, tags, direction)
 
 
 def _has_llm() -> bool:
