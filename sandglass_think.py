@@ -2346,6 +2346,104 @@ def distill(topic: str = "", save: bool = False) -> str:
 
 
 # ═══════════════════════════════════════════════
+# 织布机因果图 — SQLite WITH RECURSIVE 多跳追溯
+# ═══════════════════════════════════════════════
+
+def weave_graph(question: str, max_hops: int = 3) -> dict:
+    """
+    因果图——回答"为什么"的问题。
+    
+    从沙子/决策粒子/标签三个源出发，用 CTE 递归追溯因果链。
+    零额外依赖——SQLite WITH RECURSIVE 内置。
+    
+    返回 {chains, root_causes, insight}
+    """
+    try:
+        from sandglass_sqlite import _get_db
+        db = _get_db()
+        cursor = db.cursor()
+        
+        # 拆问题为搜索词
+        keywords = [w for w in re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z]+', question) if len(w) > 1][:3]
+        if not keywords:
+            keywords = [question[:20]]
+        
+        # CTE 递归：从匹配关键词的沙子和决策粒子出发，追溯关联
+        chains = []
+        root_causes = set()
+        
+        for kw in keywords:
+            try:
+                cursor.execute("""
+                    WITH RECURSIVE trace(id, content, source, depth, path) AS (
+                        -- 起点：匹配关键词的沙子行
+                        SELECT rowid, content, 'sand', 0, content
+                        FROM sandglass_fts
+                        WHERE content MATCH ?
+                        LIMIT 10
+                        
+                        UNION ALL
+                        
+                        -- 第一跳：包含同一关键词的相邻沙子
+                        SELECT s.rowid, s.content, 'adjacent', trace.depth + 1,
+                               trace.path || ' -> ' || s.content
+                        FROM sandglass_fts s
+                        JOIN trace ON s.content MATCH ?
+                        WHERE trace.depth < ?
+                        LIMIT 5
+                    )
+                    SELECT depth, source, path FROM trace ORDER BY depth
+                """, (kw, kw, max_hops))
+                
+                for depth, source, path in cursor.fetchall():
+                    chains.append({"keyword": kw, "depth": depth, "source": source,
+                                   "path": path[:200] if path else ""})
+                    # 提取根源关键词
+                    if depth == max_hops and path:
+                        root_word = path.split(' -> ')[-1][:30]
+                        root_causes.add(root_word)
+            except Exception:
+                continue
+        
+        cursor.close()
+        
+        # 补充：从决策粒子标签追溯
+        dp_roots = set()
+        dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+        if os.path.exists(dp_path):
+            with open(dp_path, "r", encoding="utf-8") as f:
+                dp_lines = f.readlines()[-30:]
+            for kw in keywords:
+                for line in dp_lines:
+                    if kw in line.lower():
+                        parts = line.strip().split(" | ")
+                        if len(parts) >= 5:
+                            dp_roots.add(parts[4][:50])  # 标签作为根源
+        
+        all_roots = root_causes | dp_roots
+        
+        # 生成洞察
+        insight_parts = []
+        if all_roots:
+            insight_parts.append(f"追溯到最后：{'、'.join(list(all_roots)[:5])}")
+        if chains:
+            insight_parts.append(f"共 {len(chains)} 跳因果链")
+        if not chains and not all_roots:
+            insight_parts.append("数据不足，多积累几天沙子就能追溯了")
+        
+        return {
+            "question": question,
+            "chains": chains[:10],
+            "root_causes": list(all_roots)[:10],
+            "total_hops": len(chains),
+            "insight": "；".join(insight_parts) if insight_parts else "暂无因果链",
+        }
+    except Exception:
+        return {"question": question, "chains": [], "root_causes": [], "total_hops": 0,
+                "insight": "织布机因果图暂不可用（需要 sandglass_sqlite FTS5 索引）"}
+
+
+# ═══════════════════════════════════════════════
 # 会话启动 — 注入画布
 # ═══════════════════════════════════════════════
 
@@ -2767,6 +2865,104 @@ def entropy_chart(recent_n: int = 10) -> str:
     bar = "█" * bar_len + "░" * (40 - bar_len)
     level = "高熵波动" if entropy > 1.2 else ("低熵平静" if entropy < 0.5 else "中熵平稳")
     return f"🫧 情绪熵 {entropy:.2f} {bar}  {level}"
+
+
+# ═══════════════════════════════════════════════
+# 织布机因果图 — SQLite WITH RECURSIVE 多跳追溯
+# ═══════════════════════════════════════════════
+
+def weave_graph(question: str, max_hops: int = 3) -> dict:
+    """
+    因果图——回答"为什么"的问题。
+    
+    从沙子/决策粒子/标签三个源出发，用 CTE 递归追溯因果链。
+    零额外依赖——SQLite WITH RECURSIVE 内置。
+    
+    返回 {chains, root_causes, insight}
+    """
+    try:
+        from sandglass_sqlite import _get_db
+        db = _get_db()
+        cursor = db.cursor()
+        
+        # 拆问题为搜索词
+        keywords = [w for w in re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z]+', question) if len(w) > 1][:3]
+        if not keywords:
+            keywords = [question[:20]]
+        
+        # CTE 递归：从匹配关键词的沙子和决策粒子出发，追溯关联
+        chains = []
+        root_causes = set()
+        
+        for kw in keywords:
+            try:
+                cursor.execute("""
+                    WITH RECURSIVE trace(id, content, source, depth, path) AS (
+                        -- 起点：匹配关键词的沙子行
+                        SELECT rowid, content, 'sand', 0, content
+                        FROM sandglass_fts
+                        WHERE content MATCH ?
+                        LIMIT 10
+                        
+                        UNION ALL
+                        
+                        -- 第一跳：包含同一关键词的相邻沙子
+                        SELECT s.rowid, s.content, 'adjacent', trace.depth + 1,
+                               trace.path || ' -> ' || s.content
+                        FROM sandglass_fts s
+                        JOIN trace ON s.content MATCH ?
+                        WHERE trace.depth < ?
+                        LIMIT 5
+                    )
+                    SELECT depth, source, path FROM trace ORDER BY depth
+                """, (kw, kw, max_hops))
+                
+                for depth, source, path in cursor.fetchall():
+                    chains.append({"keyword": kw, "depth": depth, "source": source,
+                                   "path": path[:200] if path else ""})
+                    # 提取根源关键词
+                    if depth == max_hops and path:
+                        root_word = path.split(' -> ')[-1][:30]
+                        root_causes.add(root_word)
+            except Exception:
+                continue
+        
+        cursor.close()
+        
+        # 补充：从决策粒子标签追溯
+        dp_roots = set()
+        dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+        if os.path.exists(dp_path):
+            with open(dp_path, "r", encoding="utf-8") as f:
+                dp_lines = f.readlines()[-30:]
+            for kw in keywords:
+                for line in dp_lines:
+                    if kw in line.lower():
+                        parts = line.strip().split(" | ")
+                        if len(parts) >= 5:
+                            dp_roots.add(parts[4][:50])  # 标签作为根源
+        
+        all_roots = root_causes | dp_roots
+        
+        # 生成洞察
+        insight_parts = []
+        if all_roots:
+            insight_parts.append(f"追溯到最后：{'、'.join(list(all_roots)[:5])}")
+        if chains:
+            insight_parts.append(f"共 {len(chains)} 跳因果链")
+        if not chains and not all_roots:
+            insight_parts.append("数据不足，多积累几天沙子就能追溯了")
+        
+        return {
+            "question": question,
+            "chains": chains[:10],
+            "root_causes": list(all_roots)[:10],
+            "total_hops": len(chains),
+            "insight": "；".join(insight_parts) if insight_parts else "暂无因果链",
+        }
+    except Exception:
+        return {"question": question, "chains": [], "root_causes": [], "total_hops": 0,
+                "insight": "织布机因果图暂不可用（需要 sandglass_sqlite FTS5 索引）"}
 
 
 # ═══════════════════════════════════════════════
