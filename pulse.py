@@ -126,14 +126,7 @@ def pulse(user_message: str = "") -> str:
                     emotion_learn(kw, det["mood"], "zh" if any('\u4e00' <= c <= '\u9fff' for c in kw) else "en")
             # 调用 echo 落沙
             echo(user_message)
-            # 提取决策粒子
-            try:
-                from decision_particles import log as dp_log
-                # 检测是否包含决策关键词
-                if any(w in user_message for w in ["选","用","装","免费","花钱","不管了","就","还是"]):
-                    dp_log(user_message[:80], user_message[:40])
-            except Exception:
-                pass
+
     except ImportError:
         pass
 
