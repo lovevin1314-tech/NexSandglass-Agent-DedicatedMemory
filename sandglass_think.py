@@ -2773,6 +2773,116 @@ def _latest_annotation() -> dict:
         return {}
 
 
+def entropy_ghost(question: str) -> dict:
+    """
+    幽灵决策——'如果我当时选了另一个选项会怎样？'
+    
+    本地优先（80分）:
+      ① 查历史类似决策的后续因果链（weave_graph）
+      ② 查同标签决策的后续偏移模式
+      ③ 基于历史数据推断
+    
+    LLM 增强（+120分）:
+      喂上下文 → LLM 推演虚拟分支
+    
+    不论 2D 还是 3D，都标注'幽灵决策——纯虚拟推演，未修改任何数据'
+    """
+    from decision_particles import read as dp_read
+
+    result = {
+        "question": question,
+        "mode": "2D 本地",
+        "similar_patterns": [],
+        "causal_chain": [],
+        "inference": "",
+        "llm_enhanced": False,
+    }
+
+    # ① 查历史类似决策
+    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+    if os.path.exists(dp_path):
+        try:
+            with open(dp_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            keywords = set(question.lower().split())
+            matches = []
+            for line in lines[-100:]:
+                if any(kw in line.lower() for kw in keywords if len(kw) > 1):
+                    parts = line.strip().split(" | ")
+                    if len(parts) >= 5:
+                        matches.append({
+                            "ts": parts[0][:10],
+                            "options": parts[1],
+                            "choice": parts[2],
+                            "direction": parts[3],
+                            "tags": parts[4],
+                        })
+            result["similar_patterns"] = matches[-5:]
+        except Exception:
+            pass
+
+    # ② 查因果链（weave_graph 多跳追溯）
+    try:
+        graph = weave_graph(question[:20])
+        if graph.get("nodes"):
+            result["causal_chain"] = [
+                f"{n['depth']}跳: {n['label']}" for n in graph["nodes"][:5]
+            ]
+    except Exception:
+        pass
+
+    # ③ 本地推断——基于真实历史模式
+    if result["similar_patterns"]:
+        directions = [p["direction"] for p in result["similar_patterns"]]
+        tags_all = [p["tags"] for p in result["similar_patterns"]]
+        most_dir = max(set(directions), key=directions.count) if directions else "?"
+        if result["causal_chain"]:
+            result["inference"] = (
+                f"历史模式：类似决策的因果链显示→{result['causal_chain'][0]}。"
+                f"最常出现的后续方向是'{most_dir}'。"
+                f"镜像类比：如果当时这样选，画像可能会往'{most_dir}'方向移动。"
+            )
+        else:
+            result["inference"] = (
+                f"历史模式：类似决策后，最常出现的倾向是'{most_dir}'。"
+                f"数据不够做因果追溯，但方向可参考。"
+            )
+
+    # ④ LLM 增强（200分）
+    if _LLM_KEY and result["similar_patterns"]:
+        try:
+            persona_text = ""
+            if os.path.exists(_PERSONA):
+                with open(_PERSONA, "r", encoding="utf-8") as f:
+                    persona_text = f.read()[:2000]
+
+            past = "\n".join(
+                f"- {p['ts']}: {p['options']} → {p['choice']} ({p['direction']})"
+                for p in result["similar_patterns"]
+            )
+
+            system = (
+                "你是幽灵决策推演师——模拟'如果当时选了另一个选项会怎样'。"
+                "你有用户的完整画像和真实决策历史。"
+                "基于他的行为模式推演虚拟分支。不要说'应该选什么'。"
+                "标注这是纯虚拟推演。一句话，30字以内。"
+            )
+
+            llm_result = _llm(
+                system,
+                f"问题：{question}\n画像：{persona_text}\n历史类似决策：\n{past}\n本地推断：{result['inference']}",
+                max_tokens=80,
+            )
+            if llm_result:
+                result["inference"] = f"{llm_result.strip()}（幽灵决策——纯虚拟推演）"
+                result["llm_enhanced"] = True
+                result["mode"] = "3D LLM 增强"
+        except Exception:
+            pass
+
+    return result
+
+
 def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
     """
     3D 立体画像合成——永久注解模式。
