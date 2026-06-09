@@ -580,18 +580,54 @@ def _update_search_weights(tags: str) -> None:
 
 
 def _weave_check(tags: str, direction: str) -> None:
-    p = os.path.join(_NB, "persona", "persona.md")
+    """
+    动态织布——不硬编码规则，遍历偏移信号检测言行是否一致。
+    
+    检测逻辑:
+      标签里有省钱 → 画像里有没有性价比信号 → 不一致
+      标签里有花钱 → 画像里有没有投入信号 → 不一致
+      标签里有放弃 → 画像里有没有清醒信号 → 不一致
+    """
+    p = os.path.join(os.path.expanduser("~"), ".neurobase", "persona", "persona.md")
     if not os.path.exists(p):
         return
     with open(p, "r", encoding="utf-8") as f:
         persona = f.read()
+
     contra = []
-    if "成本观" in tags and "性价比优先" in persona and direction == "spend":
-        contra.append("画像:性价比优先 ↔ 决策:愿意投入")
-    if "决策疲劳" in tags and "追根溯源" in persona:
-        contra.append("画像:追根溯源 ↔ 决策:红牌放弃")
+
+    # 动态匹配——遍历 frugal/spend/drift 三组信号
+    frugal_signals = ["免费", "不花钱", "省钱", "性价比", "开源", "自己搞", "本地"]
+    spend_signals = ["花钱", "付费", "买", "效率优先", "省事"]
+    drift_signals = ["不管了", "随便", "放弃", "不纠结", "算了"]
+
+    # 省钱标签 → 检查画像里是否有省钱信号
+    if any(s in tags for s in ["成本观", "性价比优先", "独立性", "动手派"]):
+        matched_frugal = [w for w in frugal_signals if w in persona]
+        if not matched_frugal:
+            contra.append("画像标签:省钱倾向 ↔ 画像里没找到省钱信号——画像可能滞后")
+
+    # 花钱标签 → 检查画像里是否有花钱信号
+    if any(s in tags for s in ["愿意投入"]):
+        matched_spend = [w for w in spend_signals if w in persona]
+        if not matched_spend:
+            contra.append("画像标签:愿意投入 ↔ 画像里没找到花钱信号——画像可能滞后")
+
+    # 当前方向 vs 画像倾向
+    if direction == "spend":
+        matched_frugal = [w for w in frugal_signals if w in persona]
+        if matched_frugal:
+            contra.append(f"方向矛盾: 当前花钱 ↔ 画像倾向省钱({'、'.join(matched_frugal[:3])})")
+    elif direction == "frugal":
+        matched_spend = [w for w in spend_signals if w in persona]
+        if matched_spend:
+            contra.append(f"方向矛盾: 当前省钱 ↔ 画像倾向花钱({'、'.join(matched_spend[:3])})")
+    elif direction == "drift":
+        # drift 特别敏感——一旦出现就检查
+        contra.append("⚠ 放弃信号出现——检查是否压力期")
+
     if contra:
-        wl = os.path.join(_NB, "weave_alerts.txt")
+        wl = os.path.join(os.path.expanduser("~"), ".neurobase", "weave_alerts.txt")
         with open(wl, "a", encoding="utf-8") as f:
             for c in contra:
                 f.write(f"[{datetime.now():%Y-%m-%d %H:%M}] {c}\n")
