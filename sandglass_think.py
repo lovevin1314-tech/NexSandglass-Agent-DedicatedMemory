@@ -2699,5 +2699,76 @@ def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str
 
 
 # ═══════════════════════════════════════════════
+# 情绪熵 — V1.4 精神回归：香农熵量化情绪波动
+# ═══════════════════════════════════════════════
+
+def _emotional_entropy(recent_n: int = 10) -> float:
+    """
+    香农熵——量化情绪波动程度。
+    0 = 完全平静（全是同一种情绪）
+    ~1.95 = 高熵（7种情绪均匀分布，波动大）
+    """
+    import math
+    from emotion_vocab import detect as emotion_detect
+    from sandglass_vault import recent
+
+    sands = recent(recent_n + 5)  # 多取几条，过滤空
+    if not sands:
+        return 0.0
+
+    # 收集最近消息的情绪标签
+    mood_counts = {}
+    total = 0
+    for _, _, text in sands[-recent_n:]:
+        if not text: continue
+        det = emotion_detect(text)
+        if det.get("mood"):
+            mood_counts[det["mood"]] = mood_counts.get(det["mood"], 0) + 1
+            total += 1
+
+    if total == 0:
+        return 0.0
+
+    # H = -Σ p_i × log(p_i)
+    entropy = 0.0
+    for count in mood_counts.values():
+        p = count / total
+        if p > 0:
+            entropy -= p * math.log(p)
+    return round(entropy, 2)
+
+
+def entropy_reminder(user_message: str = "") -> str:
+    """
+    熵提醒——情绪熵驱动提醒语气。
+    高熵 → 陪伴式安静提醒     低熵 → 小二热情提醒
+    """
+    entropy = _emotional_entropy()
+
+    if entropy > 1.2:
+        tone = "安静的陪伴"
+        msg = "情绪波动比较大，我安静陪着。需要的时候叫我。"
+    elif entropy < 0.5:
+        tone = "小二热情"
+        msg = "状态很稳！有事尽管说。"
+    else:
+        tone = "平稳关注"
+        msg = "一切如常。有需要叫我。"
+
+    return f"🫧 熵 {entropy}（{tone}）\n> {msg}"
+
+
+def entropy_chart(recent_n: int = 10) -> str:
+    """
+    情绪熵 ASCII 可视化。
+    """
+    entropy = _emotional_entropy(recent_n)
+    bar_len = min(int(entropy * 20), 40)
+    bar = "█" * bar_len + "░" * (40 - bar_len)
+    level = "高熵波动" if entropy > 1.2 else ("低熵平静" if entropy < 0.5 else "中熵平稳")
+    return f"🫧 情绪熵 {entropy:.2f} {bar}  {level}"
+
+
+# ═══════════════════════════════════════════════
 # 会话启动 — 注入画布+待办
 # ═══════════════════════════════════════════════
