@@ -145,39 +145,35 @@ def pulse(user_message: str = "") -> str:
 
     # ── 偏移率觉察（玻璃模式）──
     try:
-        from sandglass_think import glass_reminder
+        from sandglass_think import glass_reminder, persona_freshness
         reminder = glass_reminder(user_message)
         if reminder:
             signals.append(reminder)
         fresh = persona_freshness()
         if fresh.get("stale") and fresh.get("level", 0) >= 1:
-    except Exception:
-        pass
-        if fresh.get("stale") and fresh.get("level", 0) >= 1:
             count = fresh.get("since_sands", 0)
             msg = f"📊 觉察：画像已滞后 {count}条沙子，建议更新。" if count > 0 else "📊 觉察：画像需要更新。"
             signals.append(msg)
-
-        # 对比今昔——搜过去相关的话题
-        total = sv_count()
-        if total > 50 and user_message and random.random() < 0.10:
-            old = search(user_message[:20], limit=3)
-            if old and len(old) >= 2:
-                _, ts, text = old[-1]
-                text = text.strip()[:60]
-                if len(text) > 10:
-                    signals.append(
-                        f"📊 觉察：{ts[:10]} 你也说过——「{text}」— 看看今天有什么不同。"
-                    )
     except Exception:
         pass
+
+    # 对比今昔——搜过去相关的话题
+    total = sv_count()
+    if total > 50 and user_message and random.random() < 0.10:
+        old = search(user_message[:20], limit=3)
+        if old and len(old) >= 2:
+            _, ts, text = old[-1]
+            text = text.strip()[:60]
+            if len(text) > 10:
+                signals.append(
+                    f"📊 觉察：{ts[:10]} 你也说过——「{text}」— 看看今天有什么不同。"
+                )
 
     # ═══════════════════════════════════════════════
     # 第三层：提醒（待办 + 里程碑）──
     # ═══════════════════════════════════════════════
 
     try:
-        from sandglass_vault import count as sv_count
         from sandglass_think import task_pending
 
         tasks = task_pending()

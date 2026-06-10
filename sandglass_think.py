@@ -306,7 +306,7 @@ def persona_build() -> str:
     # 组装沙子给 LLM
     lines = []
     for ln, ts, text in sands:
-        lines.append(f"[L{ln}:{hashlib.sha256(text.encode()).hexdigest()[:8]} | {ts}] {text[:300]}")
+        lines.append(f"[L{ln}:{hashlib.sha256(text[:300].encode()).hexdigest()[:8]} | {ts}] {text[:300]}")
     sand_text = "\n".join(lines)
 
     first_line = sands[-1][0] if sands else 0
@@ -2524,7 +2524,7 @@ def distill(topic: str = "", save: bool = False) -> str:
 
     lines = []
     for ln, ts, text in latest:
-        lines.append(f"[L{ln}:{hashlib.sha256(text.encode()).hexdigest()[:8]} | {ts}] {text[:300]}")
+        lines.append(f"[L{ln}:{hashlib.sha256(text[:300].encode()).hexdigest()[:8]} | {ts}] {text[:300]}")
     sand_text = "\n".join(lines)
 
     system = """# 对话蒸馏器
@@ -2621,7 +2621,7 @@ def weave_graph(question: str, max_hops: int = 3) -> dict:
                         SELECT s.rowid, s.content, 'adjacent', trace.depth + 1,
                                trace.path || ' -> ' || s.content
                         FROM sandglass_fts s
-                        JOIN trace ON s.content MATCH ?
+                        JOIN trace ON s.content LIKE '%' || ? || '%'
                         WHERE trace.depth < ?
                         LIMIT 5
                     )
