@@ -62,6 +62,39 @@ _TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "fact_store",
+            "description": "影子沙事实存储。action=add/search/probe/reason。存储结构化事实，信任评分排序。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["add", "search", "probe", "reason"]},
+                    "content": {"type": "string", "description": "事实内容"},
+                    "category": {"type": "string", "default": "general"},
+                    "query": {"type": "string"},
+                    "entity": {"type": "string"},
+                },
+                "required": ["action"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fact_feedback",
+            "description": "信任评分反馈。标记记忆是否有帮助。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "line_num": {"type": "integer"},
+                    "helpful": {"type": "boolean"},
+                },
+                "required": ["line_num", "helpful"],
+            },
+        },
+    },
+]    {
+        "type": "function",
+        "function": {
             "name": "sandglass_echo",
             "description": "读取回音折——最近的情感风向。",
             "parameters": {"type": "object", "properties": {}},
@@ -147,6 +180,58 @@ class NexSandglassProvider(MemoryProvider):
         """清理。"""
         logger.info("NexSandglass MemoryProvider shutdown")
 
+    # ═══════ fact_store / fact_feedback ═══════
+
+    def _handle_fact_store(self, args: dict) -> str:
+        try:
+            from sandglass_vault import search as vault_search
+            from shadow_sand import shadow_search as _ss, shadow_feedback
+            action = args.get("action", "search")
+
+            if action == "add":
+                from sandglass_log import log_message
+                content = args.get("content", "")
+                category = args.get("category", "general")
+                log_message(content, "fact_store")
+                return json.dumps({"status": "added", "content": content[:100]})
+
+            if action == "search":
+                query = args.get("query", "")
+                results = vault_search(query, limit=10)
+                shadow_hits = _ss(query, limit=10)
+                return json.dumps({
+                    "fts_results": [{"line": ln, "text": txt[:200]} for ln, _, txt in results],
+                    "shadow_boosted": [{"line": ln, "trust": score} for score, ln in shadow_hits],
+                }, ensure_ascii=False)
+
+            if action == "probe":
+                entity = args.get("entity", "")
+                results = _ss(entity, limit=20)
+                return json.dumps([{"line": ln, "trust": score} for score, ln in results], ensure_ascii=False)
+
+            if action == "reason":
+                entity = args.get("entity", "")
+                results = _ss(entity, limit=5)
+                if results:
+                    ln = results[0][1]
+                    from sandglass_vault import search as vs
+                    r = vs(str(ln), limit=1)
+                    if r:
+                        return json.dumps({"line": ln, "text": r[0][2][:300]}, ensure_ascii=False)
+                return json.dumps({"status": "no results"})
+
+            return tool_error(f"Unknown fact_store action: {action}")
+        except Exception as e:
+            return tool_error(f"fact_store error: {e}")
+
+    def _handle_fact_feedback(self, args: dict) -> str:
+        try:
+            from shadow_sand import shadow_feedback
+            result = shadow_feedback(args["line_num"], args.get("helpful", True))
+            return json.dumps(result, ensure_ascii=False)
+        except Exception as e:
+            return tool_error(f"fact_feedback error: {e}")
+
     def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
         """会话结束——蒸馏 + 偏移检查。"""
         try:
@@ -199,6 +284,12 @@ class NexSandglassProvider(MemoryProvider):
                 from sandglass_think import _sentiment_wind
                 wind = _sentiment_wind()
                 return json.dumps({"wind": wind, "direction": "正面" if wind > 0 else ("负面" if wind < 0 else "中性")}, ensure_ascii=False)
+
+            if name == "fact_store":
+                return self._handle_fact_store(args)
+
+            if name == "fact_feedback":
+                return self._handle_fact_feedback(args)
 
             return tool_error(f"Unknown NexSandglass tool: {name}")
 
