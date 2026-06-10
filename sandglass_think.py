@@ -2491,6 +2491,21 @@ def stage_brief() -> str:
     except Exception:
         pass
 
+    # 自动蒸馏——每50条新沙子触发一次
+    try:
+        last_distill = os.path.join(os.path.expanduser("~"), ".neurobase", ".last_distill")
+        since = total
+        if os.path.exists(last_distill):
+            with open(last_distill) as f:
+                since = total - int(f.read().strip() or 0)
+        if since >= 50:
+            lines.append(f"\n🔄 自动蒸馏触发（+{since}条新对话）")
+            distill("自动蒸馏", save=True)
+            with open(last_distill, "w") as f:
+                f.write(str(total))
+    except Exception:
+        pass
+
     return "\n".join(lines)
 
 def distill(topic: str = "", save: bool = False) -> str:
