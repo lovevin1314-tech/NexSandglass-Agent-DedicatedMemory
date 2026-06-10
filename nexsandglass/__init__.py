@@ -1,0 +1,231 @@
+"""
+NexSandglass MemoryProvider — MemoryProvider for Hermes
+========================================================
+让 Hermes 使用 NexSandglass 作为记忆后端，替代 Holographic。
+
+零API Key、零外部依赖——纯本地驱动。投石问路（倒排索引）优先、
+五维权重排序、偏移率感知、回音折情绪追踪、影子灵魂预测。
+"""
+from __future__ import annotations
+
+import json, logging, os, re, threading, time
+from typing import Any, Dict, List, Optional
+
+# Hermes 的 MemoryProvider 抽象基类
+from agent.memory_provider import MemoryProvider
+from agent.memory_manager import sanitize_context
+from tools.registry import tool_error
+
+logger = logging.getLogger(__name__)
+
+# ══════════════════════════════════════════════════════════
+# 工具方法——把 sandglass 函数暴露给 Hermes 模型调用
+# ══════════════════════════════════════════════════════════
+
+_TOOL_SCHEMAS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "sandglass_search",
+            "description": "搜索沙漏记忆——投石问路（倒排索引）优先，五维权重排序。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "搜索关键词"},
+                    "limit": {"type": "integer", "default": 10},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "sandglass_recent",
+            "description": "获取最近 N 条记忆。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "n": {"type": "integer", "default": 10},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "sandglass_offset",
+            "description": "计算当前偏移率——主人决策方向的趋势。返回偏移百分比和方向。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "sandglass_echo",
+            "description": "读取回音折——最近的情感风向。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+]
+
+
+class NexSandglassProvider(MemoryProvider):
+    """NexSandglass 记忆提供器——替代 Holographic，纯本地零依赖。"""
+
+    def __init__(self, config: dict = None):
+        self._config = config or {}
+        self._lock = threading.Lock()
+        self._initialized = False
+        self._turn_count = 0
+
+    # ═══════ MemoryProvider 核心接口 ═══════
+
+    @property
+    def name(self) -> str:
+        return "nexsandglass"
+
+    def is_available(self) -> bool:
+        """始终可用——零API Key，纯本地。"""
+        return True
+
+    def initialize(self) -> None:
+        """设置沙漏路径、重建投石问路索引。"""
+        with self._lock:
+            if self._initialized:
+                return
+            # 确保 sandglass 模块可导入
+            import sys
+            nb_scripts = os.path.expanduser("~/.neurobase/scripts")
+            if nb_scripts not in sys.path:
+                sys.path.insert(0, nb_scripts)
+
+            from sandglass_vault import rebuild_index
+            rebuild_index()
+            self._initialized = True
+            logger.info("NexSandglass MemoryProvider initialized")
+
+    def system_prompt_block(self) -> str:
+        """注入到 Hermes 系统提示中。"""
+        try:
+            from sandglass_vault import count
+            from sandglass_think import comprehensive_offset
+            total = count()
+            off = comprehensive_offset()
+            return (
+                "## 记忆系统\n"
+                f"你使用 NexSandglass 记忆系统。当前存储 {total} 条记忆。\n"
+                f"主人偏移率: {off['offset']:+d}% ({off['direction']})。\n"
+                "你可以使用 sandglass_search 搜索记忆，sandglass_recent 查看最近记忆，"
+                "sandglass_offset 检查偏移趋势。"
+            )
+        except Exception:
+            return "## 记忆系统\n你使用 NexSandglass 记忆系统。记忆工具可用。"
+
+    def prefetch(self, query: str) -> Optional[List[Dict[str, Any]]]:
+        """每轮对话前预搜索。"""
+        try:
+            from sandglass_vault import search
+            results = search(query, limit=5)
+            return [{"line": ln, "ts": ts, "text": txt[:300]} for ln, ts, txt in results]
+        except Exception:
+            return None
+
+    def sync_turn(self, user_msg: str, assistant_msg: str) -> None:
+        """每轮对话后落沙。"""
+        try:
+            from sandglass_log import log_message
+            if user_msg:
+                log_message(user_msg, "user")
+            if assistant_msg:
+                log_message(assistant_msg, "agent")
+            self._turn_count += 1
+        except Exception:
+            pass
+
+    def shutdown(self) -> None:
+        """清理。"""
+        logger.info("NexSandglass MemoryProvider shutdown")
+
+    def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
+        """会话结束——蒸馏 + 偏移检查。"""
+        try:
+            # 落最后一轮对话
+            for msg in messages[-5:]:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if content:
+                    from sandglass_log import log_message
+                    log_message(str(content)[:500], role)
+
+            # 触发偏移检查 + 织造
+            from sandglass_think import comprehensive_offset
+            off = comprehensive_offset()
+            if abs(off.get("offset", 0)) >= 30:
+                logger.info(f"会话结束偏移: {off['offset']:+d}% ({off['direction']})")
+
+        except Exception:
+            pass
+
+    # ═══════ 工具暴露 ═══════
+
+    def get_tool_schemas(self) -> List[Dict[str, Any]]:
+        return _TOOL_SCHEMAS
+
+    def handle_tool_call(self, name: str, args: Dict[str, Any]) -> str:
+        try:
+            if name == "sandglass_search":
+                from sandglass_vault import search
+                results = search(args.get("query", ""), limit=args.get("limit", 10))
+                return json.dumps(
+                    [{"line": ln, "ts": ts, "text": txt[:200]} for ln, ts, txt in results],
+                    ensure_ascii=False,
+                )
+
+            if name == "sandglass_recent":
+                from sandglass_vault import recent
+                results = recent(args.get("n", 10))
+                return json.dumps(
+                    [{"line": ln, "ts": ts, "text": txt[:200]} for ln, ts, txt in results],
+                    ensure_ascii=False,
+                )
+
+            if name == "sandglass_offset":
+                from sandglass_think import comprehensive_offset
+                off = comprehensive_offset()
+                return json.dumps(off, ensure_ascii=False)
+
+            if name == "sandglass_echo":
+                from sandglass_think import _sentiment_wind
+                wind = _sentiment_wind()
+                return json.dumps({"wind": wind, "direction": "正面" if wind > 0 else ("负面" if wind < 0 else "中性")}, ensure_ascii=False)
+
+            return tool_error(f"Unknown NexSandglass tool: {name}")
+
+        except Exception as e:
+            return tool_error(f"NexSandglass error: {e}")
+
+    # ═══════ 可选钩子 ═══════
+
+    def on_memory_write(self, action: str, target: str, content: str, metadata: dict = None) -> None:
+        """镜像内置记忆写入——同步落沙。"""
+        try:
+            from sandglass_log import log_message
+            text = f"[{action}] {target}: {content[:200]}"
+            log_message(text, "memory_write")
+        except Exception:
+            pass
+
+    def on_pre_compress(self, messages: List[Dict[str, Any]]) -> Optional[str]:
+        """上下文压缩前提取关键记忆。"""
+        try:
+            from sandglass_vault import search as vs
+            # 提取最后一轮对话的关键词搜索
+            if messages:
+                last = messages[-1].get("content", "")[:100]
+                if last:
+                    results = vs(last, limit=3)
+                    return "\n".join(txt[:200] for _, _, txt in results)
+        except Exception:
+            pass
+        return None
