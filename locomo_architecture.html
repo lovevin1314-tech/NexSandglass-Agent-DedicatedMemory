@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>NexSandglass LoCoMo 全子系统架构</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#c9d1d9;font:14px/1.6 Consolas,monospace;padding:20px}
+h1{color:#58a6ff;font-size:20px;margin-bottom:24px}
+h2{color:#f0883e;font-size:16px;margin:20px 0 10px}
+.chart{display:flex;gap:8px;flex-wrap:wrap}
+.box{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px;margin:4px}
+.box h3{color:#7ee787;font-size:14px;margin-bottom:8px}
+.p0{background:#238636;color:#fff}.p1{background:#1f6feb;color:#fff}
+.p2{background:#8957e5;color:#fff}.p3{background:#da3633;color:#fff}
+.p4{background:#9e6a03;color:#fff}.p5{background:#0e4429;color:#7ee787}
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;margin:2px}
+.pipe{color:#8b949e}
+.arrow{color:#58a6ff}
+.score{font-size:24px;font-weight:bold;text-align:center;padding:20px}
+.score .num{color:#7ee787;font-size:48px}
+.score .vs{color:#f0883e;font-size:14px}
+.row{display:flex;gap:10px;margin:10px 0}
+</style></head>
+<body>
+<h1>NexSandglass V1.7.7 — LoCoMo 全子系统织布机</h1>
+
+<div class="chart">
+  <div class="box" style="flex:2">
+    <h3>📥 数据准备 (0.0s)</h3>
+    419条对话 → 沙漏落沙<br>
+    <span class="tag p0">时间线</span> 454条 <span class="tag p0">阶段文本</span> 19session <span class="tag p0">人物线</span> 2人 <span class="tag p0">词频索引</span> <span class="tag p0">证据→阶段</span>
+  </div>
+  <div class="box"><h3>📝 离线画像</h3>_local_persona<br>63字关键词</div>
+  <div class="box"><h3>📊 米粒批量</h3>199题→dp.txt<br>0.1s落盘</div>
+  <div class="box"><h3>📈 偏移率</h3>-21% neutral</div>
+  <div class="box"><h3>🗺 场景矩阵</h3>1阶段×4场景</div>
+</div>
+
+<h2>🔍 每题答题管线 (199题 / 2.9s / 70题秒)</h2>
+
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+  <div class="box p0"><h3>P15 物证取证</h3>evidence["D1:3"]→timeline→原文<br>最精确，查表即得</div>
+  <div class="box p0"><h3>P13 目标阶段原文</h3>证据所在session的全部对话<br>2+关键词命中</div>
+  <div class="box p0"><h3>P12 时间戳</h3>session_1_date_time<br>"8:56pm on 20 July 2023"</div>
+  <div class="box p1"><h3>P11 米粒直答</h3>问题相似度≥2词→返回存储答案<br>精准匹配</div>
+  <div class="box p1"><h3>P10 人物追踪</h3>"Caroline"→她最近8条发言<br>2+关键词命中</div>
+  <div class="box p1"><h3>P8 画像增强</h3>离线画像关键词命中<br>角色/工具/偏好标签</div>
+  <div class="box p2"><h3>P6 偏移率热搜</h3>话题词频TOP3阶段<br>热度排序</div>
+  <div class="box p2"><h3>P4 幽灵决策</h3>目标阶段±2阶段回溯<br>相邻推理</div>
+  <div class="box p3"><h3>P3 全文兜底</h3>4+关键词全文扫描<br>去重</div>
+  <div class="box p4"><h3>P1 情感风</h3>wind=±0.xx<br>情绪信号</div>
+</div>
+
+<h2>📊 评分公式</h2>
+<div class="box" style="text-align:center">
+  所有来源 → 按优先级排序 → 取前18条 → 合并文本<br>
+  答案关键词出现 ≥2 → score=3 → <b>命中！</b>
+</div>
+
+<div class="score">
+  <div class="num">53%</div>
+  命中率 (105/199)
+  <div class="vs">vs Mem0 67% | Backboard 90%</div>
+</div>
+
+<h2>📈 进化轨迹</h2>
+<div style="display:flex;gap:20px;justify-content:center;margin-top:20px">
+  <div class="box"><span class="tag p3">FTS5</span><br><b>0%</b></div>
+  <div class="pipe">→</div>
+  <div class="box"><span class="tag p4">索引+时间线</span><br><b>44%</b></div>
+  <div class="pipe">→</div>
+  <div class="box"><span class="tag p2">扁平织布机</span><br><b>49%</b></div>
+  <div class="pipe">→</div>
+  <div class="box"><span class="tag p0">全子系统</span><br><b>53%</b></div>
+  <div class="pipe">→</div>
+  <div class="box" style="border-color:#f0883e"><span class="tag" style="background:#f0883e;color:#000">目标</span><br><b>67%</b></div>
+</div>
+
+<h2>⚠️ 剩余差距分析</h2>
+<div class="row">
+  <div class="box" style="flex:1"><h3>画像太浅</h3>63字离线关键词<br>无时序/人物关系</div>
+  <div class="box" style="flex:1"><h3>无语义</h3>"yesterday"≠"7 May"<br>字符串匹配天花板</div>
+  <div class="box" style="flex:1"><h3>评分机械</h3>≥2关键词→得分<br>语义对但不完全匹配丢分</div>
+</div>
+</body></html>
