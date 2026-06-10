@@ -256,6 +256,7 @@ _PERSONA_SYSTEM = """# 🧬 人格架构师 — 渐进演化协议
 3. **首次生成用 write 模式全量写，增量更新只改变化部分。**
 4. **保持克制：信息不足的维度留空，不要臆测。**
 5. **中文输出。**
+6. **调用 glass_reminder() 读取当前玻璃画像——2D 曲面轮廓 + 3D 立体注解。画像生成过程中随时核对玻璃结果，确保一致。** 调用 persona_project() 读取影子灵魂——如果偏移方向暗示用户正在变化，在画像中标注趋势。**
 
 ## 🔬 四层深度扫描
 
@@ -332,7 +333,23 @@ def persona_build() -> str:
     first_line = sands[-1][0] if sands else 0
     last_line = sands[0][0] if sands else 0
 
-    user_prompt = f"当前时间：{datetime.now():%Y-%m-%d %H:%M}\n沙子范围：L{first_line} ~ L{last_line}\n\n=== 主人对话沙子 ===\n{sand_text[:30000]}\n=== 结束 ===\n\n请执行四层深度扫描，生成 persona.md。首次生成，全量写入。"
+    user_prompt = f"当前时间：{datetime.now():%Y-%m-%d %H:%M}\n沙子范围：L{first_line} ~ L{last_line}\n\n"
+
+    # 玻璃画像 + 影子灵魂 注入
+    try:
+        glass = glass_reminder("", emotion_trigger=False)
+        if glass and "无需提醒" not in glass:
+            user_prompt += f"=== 玻璃画像（2D轮廓+3D注解） ===\n{glass}\n\n"
+    except: pass
+    try:
+        off = comprehensive_offset()
+        if off.get("direction") and off["direction"] != "neutral":
+            proj = persona_project(off["direction"], off.get("offset", 0))
+            if proj.get("shadow_persona"):
+                user_prompt += f"=== 影子灵魂（如果选相反方向） ===\n{proj['shadow_persona'][:500]}\n\n"
+    except: pass
+
+    user_prompt += f"=== 主人对话沙子 ===\n{sand_text[:30000]}\n=== 结束 ===\n\n请执行四层深度扫描，生成 persona.md。首次生成，全量写入。"
 
     result = _llm(_PERSONA_SYSTEM.format(time=datetime.now().strftime("%Y-%m-%d %H:%M"),
                                           first_line=first_line, last_line=last_line,
