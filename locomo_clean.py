@@ -1,7 +1,4 @@
 """
-# 考试场景——影子沙优先
-from sandglass_think import scene_mode
-scene_mode('exam')
 
 NexSandglass LoCoMo — 全链路联动完全隔离版
 ============================================

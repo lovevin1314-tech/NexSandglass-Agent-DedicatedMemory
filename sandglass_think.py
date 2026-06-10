@@ -20,12 +20,16 @@ def scene_mode(mode: str = None) -> str:
     global _SCENE_MODE
     if mode: _SCENE_MODE = mode
     if _SCENE_MODE: return _SCENE_MODE
-    # 自动检测: 最近5条沙子全是英文QA→考试场景
+    # 织布机综合判断——情绪熵+偏移率+场景矩阵
     try:
-        from sandglass_vault import recent
-        sands = recent(5)
-        en_count = sum(1 for _,_,t in sands if t and sum(1 for c in t if 'a'<=c.lower()<='z')>len(t)*0.4)
-        return 'exam' if en_count >= 4 else 'normal'
+        e = _emotional_entropy()
+        off = comprehensive_offset()
+        # 高熵+强偏移→情绪波动场景  /  低熵+稳定→考试/分析场景
+        if e > 1.0 and abs(off.get('offset',0)) > 40:
+            return 'emotional'
+        if e < 0.3 and abs(off.get('offset',0)) < 20:
+            return 'exam'
+        return 'normal'
     except: return 'normal'
 
 from sandglass_vault import _tokenize
