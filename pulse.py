@@ -5,8 +5,10 @@ NexSandglass V1.4.2 — 感知深度
 每次对话前 pulse() 自动选择最深的一层回应。
 """
 
-import os, re, random
+import os, re, random, logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 sys_path = os.path.dirname(os.path.abspath(__file__))
 import sys; sys.path.insert(0, sys_path)
@@ -127,55 +129,66 @@ def pulse(user_message: str = "") -> str:
             # 调用 echo 落沙
             echo(user_message)
 
-            # 决策粒子自动触发——三步过滤防闲话
-            # ① 语言检测：中英都有决策信号才进
-            # ② _is_decision()：粗筛——是决策才走 _detect_chain
-            # ③ _detect_chain()：精筛——真正的选择链条
-            try:
-                from decision_particles import log as dp_log, _detect_chain, _is_decision
-                if _is_decision(user_message):
-                    ch = _detect_chain(user_message)
-                    if ch:
-                        dp_log(user_message, ch[-1], chain=ch)
-            except Exception:
-                pass
-
     except ImportError:
-        pass
+        logger.error("emotion_vocab 导入失败——核心模块损坏，情绪+决策链路中断")
+        return ""
+
+    # 决策粒子自动触发——三步过滤防闲话
+    try:
+        from decision_particles import log as dp_log, _detect_chain, _is_decision
+        if _is_decision(user_message):
+            ch = _detect_chain(user_message)
+            if ch:
+                dp_log(user_message, ch[-1], chain=ch)
+    except Exception as e:
+        logger.error(f"决策粒子触发失败: {e}")
 
     # ── 偏移率觉察（玻璃模式）──
     try:
-        from sandglass_think import glass_reminder
+        from sandglass_think import glass_reminder, persona_freshness
         reminder = glass_reminder(user_message)
         if reminder:
             signals.append(reminder)
-    except Exception:
-        pass
+        fresh = persona_freshness()
         if fresh.get("stale") and fresh.get("level", 0) >= 1:
             count = fresh.get("since_sands", 0)
             msg = f"📊 觉察：画像已滞后 {count}条沙子，建议更新。" if count > 0 else "📊 觉察：画像需要更新。"
             signals.append(msg)
+    except Exception as e:
+        logger.error(f"画像新鲜度检测失败: {e}")
 
-        # 对比今昔——搜过去相关的话题
-        total = sv_count()
-        if total > 50 and user_message and random.random() < 0.10:
-            old = search(user_message[:20], limit=3)
-            if old and len(old) >= 2:
-                _, ts, text = old[-1]
-                text = text.strip()[:60]
-                if len(text) > 10:
-                    signals.append(
-                        f"📊 觉察：{ts[:10]} 你也说过——「{text}」— 看看今天有什么不同。"
-                    )
-    except Exception:
-        pass
+    # 对比今昔——搜过去相关的话题
+    from sandglass_vault import count as sv_count, search
+    total = sv_count()
+    if total > 50 and user_message and random.random() < 0.10:
+        old = search(user_message[:20], limit=3)
+        if old and len(old) >= 2:
+            _, ts, text = old[-1]
+            text = text.strip()[:60]
+            if len(text) > 10:
+                signals.append(
+                    f"📊 觉察：{ts[:10]} 你也说过——「{text}」— 看看今天有什么不同。"
+                )
+
+    # ═══════════════════════════════════════════════
+    # 第三层：跨会话待办自动提醒 ──
+    # ═══════════════════════════════════════════════
+    try:
+        from sandglass_think import task_pending
+        tasks = task_pending()
+        if tasks:
+            count = len(tasks)
+            signals.append(f"📋 待办提醒: {count}项未完成")
+            for t in tasks[:3]:
+                signals.append(f"  ⏳ {t.get('task', '')[:80]}")
+    except Exception as e:
+        logger.error(f"待办提醒失败: {e}")
 
     # ═══════════════════════════════════════════════
     # 第三层：提醒（待办 + 里程碑）──
     # ═══════════════════════════════════════════════
 
     try:
-        from sandglass_vault import count as sv_count
         from sandglass_think import task_pending
 
         tasks = task_pending()
@@ -185,15 +198,68 @@ def pulse(user_message: str = "") -> str:
             else:
                 signals.append(f"📋 提醒：{len(tasks)}项待办未完成")
 
-        # 里程碑——仅首次命中时触发
+        # 里程碑——沙子量级触发系统演化
         total = sv_count()
         _MILESTONE_FLAG = os.path.join(os.path.expanduser("~"), ".neurobase", f".milestone_{total}")
         if total % 100 == 0 and total > 0 and not os.path.exists(_MILESTONE_FLAG):
             os.makedirs(os.path.dirname(_MILESTONE_FLAG), exist_ok=True)
             with open(_MILESTONE_FLAG, "w") as f: f.write("ok")
-            signals.insert(0, f"🎉 {'里程碑' if is_cn else 'Milestone'}：{total} {'条记忆' if is_cn else 'memories'}。")
-    except Exception:
-        pass
+
+            # ── 演化动作：不同量级触发不同事件 ──
+            if total == 100:
+                # 首次画像生成
+                try:
+                    from sandglass_think import persona_build
+                    persona_build()
+                    signals.insert(0, "🧬 沙漏满100条——首次灵魂蒸馏，画像已生成")
+                except Exception as e:
+                    logger.warning(f"里程碑100: persona_build失败: {e}")
+
+            elif total == 200:
+                # 偏移率基准建立
+                try:
+                    from sandglass_think import comprehensive_offset
+                    comp = comprehensive_offset()
+                    if comp.get("sample", 0) >= 2:
+                        d = comp.get("direction", "neutral")
+                        signals.insert(0, f"📊 沙漏满200条——偏移率基准建立，影子开始偏向{d}")
+                    else:
+                        signals.insert(0, "📊 沙漏满200条——偏移率基准建立")
+                except Exception as e:
+                    logger.warning(f"里程碑200: offset失败: {e}")
+
+            elif total == 500:
+                # 波浪开始成形
+                signals.insert(0, "🌊 沙漏满500条——小波浪开始累积，影子轮廓成形")
+
+            elif total == 1000:
+                # 阶段切换启用
+                try:
+                    from sandglass_think import _maybe_switch_stage
+                    _maybe_switch_stage("neutral")
+                    signals.insert(0, "📜 沙漏满1000条——阶段切换系统启用")
+                except Exception as e:
+                    logger.warning(f"里程碑1000: stage_switch失败: {e}")
+
+            elif total == 1500:
+                # 预3D
+                signals.insert(0, "🔮 沙漏满1500条——接近3D立体合成门槛(2000)")
+
+            elif total >= 2000 and total % 500 == 0:
+                # 3D已解锁，每次+500触发重合成
+                try:
+                    from sandglass_think import _should_synthesize, _synthesize_3d
+                    should, _ = _should_synthesize()
+                    if should:
+                        _synthesize_3d(force=True, trigger="milestone")
+                        signals.insert(0, "🧬 3D立体合成已更新")
+                except Exception as e:
+                    logger.warning(f"里程碑3D: synthesize失败: {e}")
+
+            else:
+                signals.insert(0, f"🎉 里程碑：{total}条记忆")
+    except Exception as e:
+        logger.warning(f"里程碑检测失败: {e}")
 
     if signals:
         # ── 情绪协调：根据优先级决定提醒策略 ──
@@ -235,8 +301,8 @@ def echo(user_message: str, assistant_response: str = "") -> None:
         log_message(user_message, "user")
         if assistant_response:
             log_message(assistant_response, "agent")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"沙漏落沙失败: {e}")
 
     # 同步阴影副本——新沙子追加到备份
     _sync_shadow()
@@ -262,5 +328,5 @@ def _sync_shadow() -> None:
             with open(shadow, "ab") as fb:
                 for line in master_lines[backup_lines_count:]:
                     fb.write(line)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"影子同步失败: {e}")
