@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 _LLM_KEY = os.environ.get("DEEPSEEK_API_KEY", "") or os.environ.get("OPENROUTER_API_KEY", "")
 _deepseek_key = bool(os.environ.get("DEEPSEEK_API_KEY"))
 _LLM_ENDPOINT = "https://api.deepseek.com/v1/chat/completions" if _deepseek_key else "https://openrouter.ai/api/v1/chat/completions"
-_LLM_MODEL = "deepseek-chat" if _deepseek_key else "deepseek/deepseek-v4-flash"
+_LLM_MODEL = "deepseek-v4-flash" if _deepseek_key else "deepseek/deepseek-v4-flash"
 
 def _extract_md_section(content, section_name):
     """从 markdown 内容中提取指定 section 的文本。"""
@@ -83,7 +83,7 @@ def _llm(system: str, user: str, max_tokens: int = 2048) -> str:
         req = urllib.request.Request(_LLM_ENDPOINT, data=payload, headers=headers)
         resp = urllib.request.urlopen(req, timeout=60)
         body = json.loads(resp.read().decode("utf-8"))
-        return body["choices"][0]["message"]["content"]
+        return body["choices"][0]["message"].get("content") or body["choices"][0]["message"].get("reasoning_content", "")
     except Exception:
         return ""
 
