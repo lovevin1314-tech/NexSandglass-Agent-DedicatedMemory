@@ -2483,6 +2483,13 @@ def stage_brief() -> str:
 
     lines.append(f"\n沙漏: {total}条")
 
+    # 情绪熵可视化
+    try:
+        from sandglass_think import entropy_chart
+        lines.append(f"\n{entropy_chart()}")
+    except Exception:
+        pass
+
     # 新场景发现
     try:
         novel = novel_scene_detect()
