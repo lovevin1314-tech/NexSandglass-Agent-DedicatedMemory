@@ -2546,11 +2546,9 @@ def stage_brief() -> str:
         sw = stage_switch_prediction()
         lines.append(f"🧬 阶段简报 — {datetime.now():%Y-%m-%d}")
         lines.append("─" * 40)
-        if sw.get("current_stage"):
-            lines.append(f"当前阶段: {sw['current_stage']}")
-        if sw.get("predicted") and sw.get("next_stage"):
-            lines.append(f"预切换: {sw['current_stage']} → {sw['next_stage']}")
-            lines.append(f"原因: {sw.get('reason', '连续偏移超阈值')}")
+        if sw.get("predicted"):
+            lines.append(f"⚠ 预切换: {sw.get('eta_sands', '?')}条沙子后 (置信度{sw.get('confidence',0):.0%})")
+            lines.append(f"趋势斜率: {sw.get('trend_slope', 0)}")
     except Exception:
         lines.append(f"🧬 阶段简报 — {datetime.now():%Y-%m-%d}")
 
@@ -3026,7 +3024,7 @@ def entropy_ghost(question: str) -> dict:
         graph = weave_graph(question[:20])
         if graph.get("chains"):
             result["causal_chain"] = [
-                f"{n['depth']}跳: {n['label']}" for n in graph["nodes"][:5]
+                f"{n['depth']}跳: {n['label']}" for n in graph["chains"][:5]
             ]
     except Exception:
         pass
