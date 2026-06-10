@@ -587,10 +587,7 @@ def _weave_check(tags: str, direction: str) -> None:
     with open(p, "r", encoding="utf-8") as f:
         persona = f.read()
 
-    try:
-        from sandglass_think import _OFFSET_SIGNALS
-    except Exception:
-        return
+    from offset_signals import _OFFSET_SIGNALS
 
     contra = []
     frugal_words = _OFFSET_SIGNALS.get("frugal", [])
