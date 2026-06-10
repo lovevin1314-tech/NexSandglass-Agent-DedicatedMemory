@@ -13,8 +13,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # ═══════════════════ 场景感知 ═══════════════════
-_SCENE_MODE = None  # None=自动, 'exam'=考试, 'normal'=日常
-
 def scene_mode(mode: str = None) -> str:
     """设置/读取场景模式。'exam'只走影子沙，'normal'全开L3。"""
     global _SCENE_MODE
@@ -49,22 +47,11 @@ _INSIGHTS = os.path.join(_VAULT, "memory", "insights.md")
 # 纪律因子 — L3铁律约束
 # ═══════════════════════════════════════════════
 
-_IRON_RULES = os.path.join(_VAULT, "iron_rules.txt")
+from scene_l3 import *
+from weave_l3 import *
+from emotion_l3 import *
 
-def iron_rules() -> list:
-    """读取用户设定的铁律——绝不违反的规则。最多5条。"""
-    if not os.path.exists(_IRON_RULES):
-        return []
-    with open(_IRON_RULES, "r", encoding="utf-8") as f:
-        return [l.strip() for l in f.readlines() if l.strip()][:5]
-
-def iron_rules_set(rules: list) -> bool:
-    """设定铁律。覆盖写入，最多5条。"""
-    os.makedirs(os.path.dirname(_IRON_RULES), exist_ok=True)
-    with open(_IRON_RULES, "w", encoding="utf-8") as f:
-        for r in rules[:5]:
-            f.write(r[:200] + "\n")
-    return True
+from discipline import iron_rules, iron_rules_set
 
 logger = logging.getLogger(__name__)
 
@@ -602,13 +589,6 @@ def stage_canvas(stage: str) -> str | None:
 _SCENE_FILE = os.path.join(_VAULT, "persona", "scenes.json")
 
 # 场景关键词（可扩展）
-_SCENE_KEYWORDS = {
-    "工作项目": ["项目", "任务", "进度", "交付", "上线", "需求", "方案"],
-    "学习研究": ["学习", "教程", "算法", "框架", "论文", "原理"],
-    "个人事务": ["生活", "日常", "计划", "健身", "旅行", "购物"],
-    "技术开发": ["代码", "架构", "部署", "API", "bug", "性能", "脚本"],
-}
-
 def _load_scenes() -> list:
     """加载当前场景标签列表。"""
     if not os.path.exists(_SCENE_FILE):
@@ -619,13 +599,6 @@ def _load_scenes() -> list:
     except Exception:
         return []
 
-def _save_scenes(tags: list) -> None:
-    """保存场景标签列表。去重。"""
-    os.makedirs(os.path.dirname(_SCENE_FILE), exist_ok=True)
-    unique = list(dict.fromkeys(tags))  # 保序去重
-    with open(_SCENE_FILE, "w", encoding="utf-8") as f:
-        json.dump(unique, f, ensure_ascii=False)
-
 def scene_add(tag: str) -> list:
     """添加一个场景标签。返回当前全部标签。"""
     tags = _load_scenes()
@@ -635,31 +608,9 @@ def scene_add(tag: str) -> list:
         _save_scenes(tags)
     return tags
 
-def scene_remove(tag: str) -> list:
-    """移除一个场景标签。"""
-    tags = _load_scenes()
-    tag = tag.strip()
-    if tag in tags:
-        tags.remove(tag)
-        _save_scenes(tags)
-    return tags
-
 def scene_current() -> list:
     """返回当前激活的场景标签列表。"""
     return _load_scenes()
-
-def scene_guess() -> list:
-    """从最近沙子猜测当前场景标签（可重合多个）。"""
-    from sandglass_vault import recent
-
-    sands = recent(15)
-    text = " ".join(t[2] for t in sands).lower()
-
-    matched = []
-    for scene, keywords in _SCENE_KEYWORDS.items():
-        if any(kw.lower() in text for kw in keywords):
-            matched.append(scene)
-    return matched
 
 def scene_sync() -> list:
     """同步场景：猜当前 → 合并到已有标签（只增不删）。返回新标签列表。"""
@@ -673,32 +624,6 @@ def scene_sync() -> list:
     return existing
 
 _SCENE_TIMELINE = os.path.join(_PERSONA_DIR, "scene-timeline.jsonl")
-
-def _log_scene_timeline(scenes: list) -> None:
-    """记录场景快照。去重：如果和上次完全一样，不记。"""
-    os.makedirs(os.path.dirname(_SCENE_TIMELINE), exist_ok=True)
-    last_scenes = set()
-    if os.path.exists(_SCENE_TIMELINE):
-        with open(_SCENE_TIMELINE, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            if lines:
-                try:
-                    last = json.loads(lines[-1].strip())
-                    last_scenes = set(last.get("scenes", []))
-                except Exception:
-                    pass
-
-    cur = set(scenes)
-    if cur == last_scenes:
-        return
-
-    entry = {
-        "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "stage": _current_stage(),
-        "scenes": sorted(cur),
-    }
-    with open(_SCENE_TIMELINE, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 def scene_history(stage: str = "") -> list:
     """场景历史。不指定阶段则返回全部。返回 [{ts, stage, scenes}]"""
@@ -1487,73 +1412,6 @@ def persona_freshness() -> dict:
     return {"stale": True, "since_sands": sands, "since_days": 0,
             "warning": f"画像已积累 {sands} 条新沙子，轮廓正在生长——可以更新一下"}
 
-def scene_dominance() -> dict:
-    """场景主导权转移分析。
-    返回 {current: {scene: %}, shift: [{scene, from_pct, to_pct}], insight: 描述}
-    核心：注意力分配变了=你不是同一个人了。"""
-    history = scene_history()
-    if len(history) < 2:
-        return {"current": {}, "shift": [], "insight": "数据不足"}
-
-    # 按阶段分组
-    stages = {}
-    for h in history:
-        s = h.get("stage", "?")
-        if s not in stages:
-            stages[s] = []
-        stages[s].extend(h.get("scenes", []))
-
-    # 每个阶段的场景占比
-    stage_pcts = {}
-    for stage, scenes in stages.items():
-        total = len(scenes)
-        if total == 0:
-            continue
-        counts = {}
-        for sc in scenes:
-            counts[sc] = counts.get(sc, 0) + 1
-        stage_pcts[stage] = {sc: round(c / total * 100) for sc, c in counts.items()}
-
-    # 找最老和最新
-    ordered = sorted(stage_pcts.keys())
-    if len(ordered) < 2:
-        return {"current": stage_pcts.get(ordered[0], {}), "shift": [],
-                "insight": "只有一个阶段，无法对比"}
-
-    earliest = stage_pcts[ordered[0]]
-    latest = stage_pcts[ordered[-1]]
-
-    # 检测占比变化 >20% 的场景
-    all_scenes = set(list(earliest.keys()) + list(latest.keys()))
-    shifts = []
-    for sc in all_scenes:
-        old_pct = earliest.get(sc, 0)
-        new_pct = latest.get(sc, 0)
-        delta = new_pct - old_pct
-        if abs(delta) >= 20:
-            shifts.append({"scene": sc, "from_pct": old_pct, "to_pct": new_pct, "delta": delta})
-
-    # 生成洞察
-    insight = ""
-    if shifts:
-        rising = [s for s in shifts if s["delta"] > 0]
-        falling = [s for s in shifts if s["delta"] < 0]
-        parts = []
-        if rising:
-            rising_str = "、".join(s["scene"] + "(" + str(s["from_pct"]) + "%→" + str(s["to_pct"]) + "%)" for s in rising)
-            parts.append("上升：" + rising_str)
-        if falling:
-            falling_str = "、".join(s["scene"] + "(" + str(s["from_pct"]) + "%→" + str(s["to_pct"]) + "%)" for s in falling)
-            parts.append("下降：" + falling_str)
-        if len(ordered) >= 3:
-            parts.append(f"跨 {len(ordered)} 个阶段持续变化")
-        insight = "；".join(parts)
-
-        if any(abs(s["delta"]) >= 30 for s in shifts):
-            insight += "。注意力的影子往新方向移了——核心身份可能在生长"
-
-    return {"current": latest, "shift": shifts, "insight": insight}
-
 def decision_stability() -> dict:
     """决策稳定性指数。按场景×阶段分析偏移波动。
     返回 {overall: {stability, volatility}, scenes: {scene: {stability}}}"""
@@ -1595,61 +1453,6 @@ def decision_stability() -> dict:
             scenes[sc] = {"stability": s, "volatility": v, "samples": len(vals)}
 
     return {"overall": {"stability": overall, "volatility": volatility}, "scenes": scenes}
-
-def stage_switch_prediction() -> dict:
-    """阶段切换预测。基于偏移轨迹斜率估算切换时间。
-    返回 {predicted, eta_sands, confidence, trend_slope}"""
-    entries = _read_decision_log(50)
-    if len(entries) < 10:
-        return {"predicted": False, "eta_sands": -1, "confidence": 0, "trend_slope": 0}
-
-    # 简单线性回归：索引 → 偏移值
-    n = len(entries)
-    xs = list(range(n))
-    ys = [e["offset"] for e in entries]
-
-    sum_x = sum(xs)
-    sum_y = sum(ys)
-    sum_xy = sum(x * y for x, y in zip(xs, ys))
-    sum_x2 = sum(x * x for x in xs)
-
-    slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x * sum_x) if (n * sum_x2 - sum_x * sum_x) != 0 else 0
-
-    # 当前综合偏移
-    current = comprehensive_offset()["offset"]
-    threshold = _STAGE_THRESHOLD
-
-    if abs(slope) < 0.1:
-        return {"predicted": False, "eta_sands": -1, "confidence": 0,
-                "trend_slope": round(slope, 2), "insight": "趋势平缓，无切换信号"}
-
-    # 方向
-    if slope > 0 and current >= threshold:
-        return {"predicted": True, "eta_sands": 0, "confidence": 80,
-                "trend_slope": round(slope, 2), "insight": "已在切换中"}
-
-    if slope < 0 and current <= -threshold:
-        return {"predicted": True, "eta_sands": 0, "confidence": 80,
-                "trend_slope": round(slope, 2), "insight": "已在切换中"}
-
-    # 估算到达阈值所需的步数
-    if slope > 0:
-        steps_needed = max(0, (threshold - current) / slope)
-    else:
-        steps_needed = max(0, (-threshold - current) / slope)
-
-    steps_needed = int(steps_needed)
-    confidence = min(70, max(10, int(100 - abs(slope) * 20)))
-
-    return {
-        "predicted": steps_needed < 30,
-        "eta_sands": steps_needed,
-        "confidence": confidence,
-        "trend_slope": round(slope, 2),
-        "insight": f"按当前趋势，约需 {steps_needed} 条决策后到达切换阈值"
-        if steps_needed < 30
-        else f"按当前趋势，短期内不会切换（还需约 {steps_needed} 条决策）"
-    }
 
 def scene_stage_cross_validate() -> dict:
     """场景-阶段交叉验证。
@@ -1709,51 +1512,6 @@ def scene_stage_cross_validate() -> dict:
         if any(f.get("refined") for f in findings)
         else "当前标记在场景维度上一致"
     )}
-
-def scene_stage_matrix() -> dict:
-    """场景-阶段热力图。返回 {matrix: {stage: {scene: count}}, stages, scenes, insight}"""
-    history = scene_history()
-    if not history:
-        return {"matrix": {}, "stages": [], "scenes": [], "insight": "无数据"}
-
-    matrix = {}
-    all_scenes = set()
-    for h in history:
-        stage = h.get("stage", "?")
-        if stage not in matrix:
-            matrix[stage] = {}
-        for sc in h.get("scenes", []):
-            matrix[stage][sc] = matrix[stage].get(sc, 0) + 1
-            all_scenes.add(sc)
-
-    ordered_stages = sorted(matrix.keys())
-    ordered_scenes = sorted(all_scenes)
-
-    first_appear = {}
-    for sc in ordered_scenes:
-        for stage in ordered_stages:
-            if matrix[stage].get(sc, 0) > 0:
-                first_appear[sc] = stage
-                break
-
-    insight_parts = []
-    for sc, stage in first_appear.items():
-        if stage != (ordered_stages[0] if ordered_stages else ""):
-            insight_parts.append(sc + " 首次出现在 " + stage + " 阶段")
-
-    if len(ordered_stages) == 1:
-        # 单阶段：展示场景占比分布，更有信息量
-        stage_scenes = matrix[ordered_stages[0]]
-        total = sum(stage_scenes.values()) or 1
-        dist = [f"{sc} {stage_scenes[sc]/total:.0%}" for sc in ordered_scenes]
-        insight = " · ".join(dist)
-    elif insight_parts:
-        insight = "；".join(insight_parts)
-    else:
-        insight = "所有场景从初始阶段即存在"
-
-    return {"matrix": matrix, "stages": ordered_stages, "scenes": ordered_scenes,
-            "first_appear": first_appear, "insight": insight}
 
 def task_defer(task: str, trigger: str = "", note: str = "") -> dict:
     """记下一个延迟任务。trigger = 触发条件描述，如"沙漏系统完成后"。
@@ -1839,76 +1597,6 @@ def persona_maintain() -> dict:
                 "reason": "自动维护：" + str(fresh["since_sands"]) + "条新沙子，偏移稳定，画像已更新",
                 "result": result_path}
     return {"triggered": False, "reason": "更新失败"}
-
-def novel_scene_detect() -> dict:
-    """频率突变检测——突增+消退+停用词过滤+偏移率触发。纯统计，零依赖。"""
-    import re
-    from sandglass_vault import recent
-    recent_sands = recent(20)
-    hist_sands = recent(200)
-    if not recent_sands:
-        return {"novel": [], "fading": [], "insight": "数据不足"}
-
-    STOPWORDS = {'什么', '怎么', '这个', '那个', '可以', '就是', '然后', '但是',
-                 '因为', '所以', '如果', '虽然', '已经', '还是', '没有', '不是',
-                 '一个', '一下', '一些', '有点', '的话', '的时候', '这样', '那样',
-                 'the', 'and', 'for', 'this', 'that', 'with', 'from', 'have',
-                 'image', 'you', 'llm', 'user', 'time', 'your', 'all', 'are',
-                 'not', 'but', 'has', 'was', 'can', 'its', 'get', 'now'}
-    # 用户自定义停用词
-    sw_file = os.path.join(os.path.expanduser('~'), '.neurobase', 'stopwords.txt')
-    if os.path.exists(sw_file):
-        with open(sw_file, 'r', encoding='utf-8') as f:
-            STOPWORDS.update(w.strip() for w in f.read().split() if w.strip())
-
-    def _words(sands):
-        freq = {}
-        for _, _, text in sands:
-            for w in re.findall(r'[\u4e00-\u9fff]{2,}|[a-zA-Z]{3,}', text.lower()):
-                if w not in STOPWORDS:
-                    freq[w] = freq.get(w, 0) + 1
-        return freq
-
-    recent_freq = _words(recent_sands)
-    hist_freq = _words(hist_sands) if hist_sands else {}
-
-    # 突增检测（3倍以上）
-    emerging = []
-    for w, rc in recent_freq.items():
-        hc = hist_freq.get(w, 0)
-        if rc >= 2 and (hc == 0 or rc / max(hc, 1) >= 3):
-            emerging.append((w, rc, hc))
-
-    # 消退检测（历史高频但现在消失）
-    fading = []
-    for w, hc in hist_freq.items():
-        rc = recent_freq.get(w, 0)
-        if hc >= 3 and rc == 0 and w not in STOPWORDS:
-            fading.append((w, hc, rc))
-
-    # 偏移率触发器——突增+消退同时存在时自动触发
-    drift_trigger = False
-    if emerging and fading:
-        try:
-            comp = comprehensive_offset()
-            drift_trigger = abs(comp.get("offset", 0)) >= 30
-        except Exception:
-            pass
-
-    parts = []
-    if emerging:
-        top = sorted(emerging, key=lambda x: x[1]/max(x[2],1), reverse=True)[:5]
-        parts.append("🆕 " + ", ".join(f"{w}({rc}vs{hc})" for w, rc, hc in top))
-    if fading:
-        top = sorted(fading, key=lambda x: x[1], reverse=True)[:5]
-        parts.append("📉 " + ", ".join(f"{w}(曾{hc}次)" for w, hc, _ in top))
-    if drift_trigger:
-        parts.append("⚡ 频率突变触发偏移率检查")
-
-    return {"emerging": [{"word": w, "recent": rc, "historical": hc} for w, rc, hc in emerging],
-            "fading": [{"word": w, "historical": hc} for w, hc, _ in fading],
-            "drift_trigger": drift_trigger,
-            "insight": " | ".join(parts) if parts else "无显著变化"}
 
 def search_with_stage_label(query: str, limit: int = 5) -> list:
     """搜索并对每条结果标注阶段兼容性。"""
@@ -2416,163 +2104,6 @@ def _parse_time_range(query: str) -> list:
 # 蒸馏的线（你是谁） + 偏移率的线（你怎么变） + 时间检索的线（找什么）
 # 织布机不生产新数据，只合成已有数据。
 
-@_fail_open({})
-def weave_insight(topic: str) -> dict:
-    """织布：给定一个话题，从三个支柱分别取线，织成合成洞察。
-    返回 {persona_view, offset_view, search_view, synthesis}"""
-    result = {}
-
-    # 蒸馏的线：这个话题在画像里怎么说的
-    result["persona_view"] = ["画像不存在"]
-    if os.path.exists(_PERSONA):
-        with open(_PERSONA, "r", encoding="utf-8") as f:
-            persona_text = f.read()
-        relevant = []
-        for line in persona_text.split("\n"):
-            if any(w in line.lower() for w in topic.lower().split()):
-                relevant.append(line.strip())
-        result["persona_view"] = relevant[:5] if relevant else ["画像中无相关内容"]
-
-    # 偏移率的线：这个话题在决策日志里怎么走的
-    from sandglass_vault import search as vs
-    sands = vs(topic, limit=5)
-    offset_trajectory = cross_stage_offset(topic) if topic else {}
-    result["offset_view"] = {
-        "trajectory": offset_trajectory.get("trajectory", []),
-        "evolution": offset_trajectory.get("evolution", ""),
-        "recent_sands": [(ln, ts, txt[:80]) for ln, ts, txt in sands],
-    }
-
-    # 时间检索的线：这个话题搜出来的东西
-    search = search_with_stage_label(topic, limit=3)
-    result["search_view"] = search
-
-    # 织：三条线合成
-    synthesis = []
-    if result["persona_view"] and result["persona_view"][0] != "画像中无相关内容":
-        synthesis.append("画像说：" + result["persona_view"][0][:80])
-    if result["offset_view"]["evolution"]:
-        synthesis.append("偏移说：" + result["offset_view"]["evolution"])
-    if sands:
-        synthesis.append("沙子中有 " + str(len(sands)) + " 条相关记录")
-
-    result["synthesis"] = "；".join(synthesis) if synthesis else "数据不足，无法合成"
-    return result
-
-@_fail_open({})
-def weave_contradiction() -> dict:
-    """织布：检测三大支柱之间的自相矛盾。
-    返回 [{pillar_a, pillar_b, conflict, evidence}]"""
-    conflicts = []
-
-    # 矛盾1：画像说 frugal，偏移率说 spend
-    if os.path.exists(_PERSONA):
-        with open(_PERSONA, "r", encoding="utf-8") as f:
-            persona_text = f.read().lower()
-        persona_frugal = any(w in persona_text for w in _OFFSET_SIGNALS["frugal"])
-        persona_spend = any(w in persona_text for w in _OFFSET_SIGNALS["spend"])
-
-        comp = comprehensive_offset()
-        if persona_frugal and comp["direction"] == "spend" and abs(comp["offset"]) >= 30:
-            conflicts.append({
-                "pillar_a": "蒸馏（画像）", "pillar_b": "偏移率",
-                "conflict": "画像说你是省钱派，但最近决策偏向花钱",
-                "evidence": "画像词：" + str([w for w in _OFFSET_SIGNALS["frugal"] if w in persona_text][:3]) +
-                           "；偏移率：" + str(comp["offset"]) + "% " + comp["direction"],
-            })
-        elif persona_spend and comp["direction"] == "frugal" and abs(comp["offset"]) >= 30:
-            conflicts.append({
-                "pillar_a": "蒸馏（画像）", "pillar_b": "偏移率",
-                "conflict": "画像说你是花钱派，但最近决策偏向省钱",
-                "evidence": "偏移率：" + str(comp["offset"]) + "% " + comp["direction"],
-            })
-
-    # 矛盾2：场景占比变了但阶段没切
-    dom = scene_dominance()
-    if dom.get("shift"):
-        for s in dom["shift"]:
-            if abs(s["delta"]) >= 30:
-                conflicts.append({
-                    "pillar_a": "蒸馏（场景）", "pillar_b": "偏移率（阶段）",
-                    "conflict": s["scene"] + " 占比从 " + str(s["from_pct"]) + "% 变到 " + str(s["to_pct"]) + "%，但阶段未切换",
-                    "evidence": "偏移率趋势：" + comprehensive_offset()["trend"],
-                })
-
-    # 矛盾3：稳定性低但无切换预测
-    stab = decision_stability()
-    pred = stage_switch_prediction()
-    if stab["overall"]["volatility"] >= 40 and not pred.get("predicted"):
-        conflicts.append({
-            "pillar_a": "偏移率（稳定性）", "pillar_b": "偏移率（预测）",
-            "conflict": "决策波动" + str(stab["overall"]["volatility"]) + "，但预测说短期不切换",
-            "evidence": "波动值高但斜率不足",
-        })
-
-    # 矛盾4：3D 立体注解 vs 2D 偏移 —— 玻璃穿了，但看到的和记录的不一致
-    three_d = _latest_annotation()
-    if three_d and three_d.get("persona_type"):
-        comp = comprehensive_offset()
-        # 3D 说"成本敏感型"但最近在花 → 矛盾
-        if "成本" in three_d.get("persona_type", "") and comp["direction"] == "spend" and abs(comp["offset"]) >= 30:
-            conflicts.append({
-                "pillar_a": "3D 玻璃", "pillar_b": "2D 偏移",
-                "conflict": "3D 立体像说他是成本敏感型，但最近决策全部偏向花钱",
-                "evidence": f"3D: {three_d['persona_type']} | 偏移: {comp['offset']:+d}% {comp['direction']}",
-            })
-        # 3D 说"压力期"但画像没有放弃信号 → 内在矛盾
-        if "压力" in three_d.get("emotional_state", "") and comp["direction"] != "drift":
-            conflicts.append({
-                "pillar_a": "3D 玻璃", "pillar_b": "2D 偏移",
-                "conflict": "3D 感知到压力，但决策没出现放弃信号——可能在硬撑",
-                "evidence": f"3D: {three_d['emotional_state']} | 偏移: {comp['direction']}",
-            })
-        # 3D 提醒语气变了 → 画像偏移不一致
-        if three_d.get("reminder_tone") and three_d.get("prev_tone"):
-            if three_d["reminder_tone"] != three_d["prev_tone"]:
-                conflicts.append({
-                    "pillar_a": "3D 玻璃", "pillar_b": "3D 玻璃（上一阶段）",
-                    "conflict": f"提醒语气从「{three_d['prev_tone']}」变成了「{three_d['reminder_tone']}」——他变了",
-                    "evidence": f"当前阶段：{three_d.get('persona_type','?')}",
-                })
-
-    return {"conflicts": conflicts, "suggestion": (
-        "需要更新画像以消除认知偏差" if any("画像" in c["pillar_a"] for c in conflicts)
-        else "无矛盾" if not conflicts
-        else "存在 " + str(len(conflicts)) + " 处跨支柱矛盾，建议审视"
-    ), "interlinks": weave_links() if len(stage_list()) >= 2 else {"linked": False}}
-
-@_fail_open({})
-def weave_chain(start: str, depth: int = 3) -> dict:
-    """织布：从一个起点出发，沿着三大支柱往下追，看能牵出什么。
-    start 可以是：一个决策、一个画像声明、一个搜索关键词。
-    返回 {chain: [{step, pillar, found}], conclusion}"""
-    chain = []
-
-    # 第一步：时间检索
-    step1 = weave_insight(start)
-    chain.append({"step": 1, "pillar": "时间检索", "found": step1.get("search_view", [])})
-
-    if depth < 2:
-        return {"chain": chain, "conclusion": "浅度追索完成"}
-
-    # 第二步：偏移率
-    cross = cross_stage_offset(start)
-    chain.append({"step": 2, "pillar": "偏移率", "found": cross.get("trajectory", [])})
-
-    if depth < 3:
-        return {"chain": chain, "conclusion": cross.get("evolution", "无跨阶段变化")}
-
-    # 第三步：蒸馏画像对比
-    if os.path.exists(_PERSONA):
-        with open(_PERSONA, "r", encoding="utf-8") as f:
-            persona_text = f.read()
-        chain.append({"step": 3, "pillar": "蒸馏（画像）",
-                       "found": "画像 " + str(len(persona_text)) + " 字"})
-
-    return {"chain": chain,
-            "conclusion": cross.get("evolution", "追索完成") if cross.get("evolution")
-            else "该话题在三大支柱中无显著信号"}
-
 def weave_links() -> dict:
     """互链层——跨阶段关联自动发现并喂给当前画像。
     过去封存不动，变化规律长进现在的你。"""
@@ -2629,101 +2160,6 @@ def weave_links() -> dict:
         return {"linked": True, "links": links, "insight": insight}
 
     return {"linked": False, "insight": "无跨阶段变化"}
-
-def entropy_mirror(question: str) -> dict:
-    """
-    熵镜决策——主人面临选择，织布机照见过去的影子。
-    
-    流程：
-    ① 拆问题为关键词 → 搜沙子 → 找匹配的决策粒子
-    ② 搜历史决策模式 → 类似选择时主人怎么做的
-    ③ 读当前偏移率 → 影子现在往哪边倒
-    ④ 输出：过去的数据，不给结论
-    
-    返回 {past_decisions, similar_queries, current_trend, persona_hint}
-    """
-    from sandglass_vault import search, count as sv_count
-
-    result = {
-        "question": question,
-        "past_decisions": [],
-        "similar_queries": [],
-        "current_trend": "",
-        "persona_hint": "",
-    }
-
-    # ① 搜历史沙子
-    similar = search(question[:30], limit=10)
-    if similar:
-        result["similar_queries"] = [
-            f"[{ts[:10]}] {text[:80]}..." for _, ts, text in similar[:5]
-        ]
-
-    # ② 搜决策粒子
-    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
-    if os.path.exists(dp_path):
-        try:
-            with open(dp_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-            # 关键词匹配
-            keywords = set(question.lower().split())
-            matches = []
-            for line in lines[-100:]:
-                if any(kw in line.lower() for kw in keywords if len(kw) > 1):
-                    parts = line.strip().split(" | ")
-                    if len(parts) >= 4:
-                        matches.append({
-                            "ts": parts[0][:10],
-                            "options": parts[1] if len(parts) > 1 else "",
-                            "choice": parts[2] if len(parts) > 2 else "",
-                            "direction": parts[3] if len(parts) > 3 else "",
-                            "tags": parts[4] if len(parts) > 4 else "",
-                        })
-            if matches:
-                result["past_decisions"] = matches[-5:]
-        except Exception:
-            pass
-
-    # ③ 当前偏移趋势
-    try:
-        comp = comprehensive_offset()
-        if comp["sample"] >= 2:
-            direction_cn = {"frugal": "省钱", "spend": "愿意投入", "drift": "放弃倾向"}
-            d = direction_cn.get(comp["direction"], comp["direction"])
-            result["current_trend"] = f"影子偏向{d}（{comp['offset']:+d}%），{comp['sample']}次决策"
-    except Exception:
-        pass
-
-    # ④ 画像提示（有 LLM 时总结）
-    if _LLM_KEY and result["past_decisions"]:
-        try:
-            persona_text = ""
-            if os.path.exists(_PERSONA):
-                with open(_PERSONA, "r", encoding="utf-8") as f:
-                    persona_text = f.read()[:1500]
-
-            past_summary = "\n".join(
-                f"- {d['ts']}: {d['options']} → {d['choice']} ({d['direction']})"
-                for d in result["past_decisions"]
-            )
-
-            system = (
-                "你是决策镜子。你有用户画像 + 他过去面对类似选择时的历史。"
-                "不要说'应该选什么'——只总结他过去的模式和行为倾向。"
-                "一句话，15字以内。"
-            )
-
-            llm_result = _llm(
-                system,
-                f"问题：{question}\n画像：{persona_text}\n趋势：{result['current_trend']}\n\n过去类似决策：\n{past_summary}",
-                max_tokens=60,
-            )
-            if llm_result:
-                result["persona_hint"] = llm_result.strip()[:50]
-        except Exception:
-            pass
-
-    return result
 
 def stage_brief() -> str:
     """
@@ -2826,7 +2262,6 @@ def stage_brief() -> str:
         pass
 
 
-
     return "\n".join(lines)
 
 def distill(topic: str = "", save: bool = False) -> str:
@@ -2896,99 +2331,6 @@ def distill(topic: str = "", save: bool = False) -> str:
         pass
 
     return summary
-
-def weave_graph(question: str, max_hops: int = 3) -> dict:
-    """
-    因果图——回答"为什么"的问题。
-    
-    从沙子/决策粒子/标签三个源出发，用 CTE 递归追溯因果链。
-    零额外依赖——SQLite WITH RECURSIVE 内置。
-    
-    返回 {chains, root_causes, insight}
-    """
-    try:
-        from sandglass_sqlite import _get_db
-        db = _get_db()
-        cursor = db.cursor()
-        
-        # 拆问题为搜索词
-        keywords = [w for w in re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z]+', question) if len(w) > 1][:3]
-        if not keywords:
-            keywords = [question[:20]]
-        
-        # CTE 递归：从匹配关键词的沙子和决策粒子出发，追溯关联
-        chains = []
-        root_causes = set()
-        
-        for kw in keywords:
-            try:
-                cursor.execute("""
-                    WITH RECURSIVE trace(id, content, source, depth, path) AS (
-                        -- 起点：匹配关键词的沙子行
-                        SELECT rowid, content, 'sand', 0, content
-                        FROM sandglass_fts
-                        WHERE content LIKE '%' || ? || '%'
-                        LIMIT 10
-                        
-                        UNION ALL
-                        
-                        -- 第一跳：包含同一关键词的相邻沙子
-                        SELECT s.rowid, s.content, 'adjacent', trace.depth + 1,
-                               trace.path || ' -> ' || s.content
-                        FROM sandglass_fts s
-                        JOIN trace ON s.content LIKE '%' || ? || '%'
-                        WHERE trace.depth < ?
-                        LIMIT 5
-                    )
-                    SELECT depth, source, path FROM trace ORDER BY depth
-                """, (kw, kw, max_hops))
-                
-                for depth, source, path in cursor.fetchall():
-                    chains.append({"keyword": kw, "depth": depth, "source": source,
-                                   "path": path[:200] if path else ""})
-                    # 提取根源关键词
-                    if depth == max_hops and path:
-                        root_word = path.split(' -> ')[-1][:30]
-                        root_causes.add(root_word)
-            except Exception:
-                continue
-        
-        cursor.close()
-        
-        # 补充：从决策粒子标签追溯
-        dp_roots = set()
-        dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
-        if os.path.exists(dp_path):
-            with open(dp_path, "r", encoding="utf-8") as f:
-                dp_lines = f.readlines()[-30:]
-            for kw in keywords:
-                for line in dp_lines:
-                    if kw in line.lower():
-                        parts = line.strip().split(" | ")
-                        if len(parts) >= 5:
-                            dp_roots.add(parts[4][:50])  # 标签作为根源
-        
-        all_roots = root_causes | dp_roots
-        
-        # 生成洞察
-        insight_parts = []
-        if all_roots:
-            insight_parts.append(f"追溯到最后：{'、'.join(list(all_roots)[:5])}")
-        if chains:
-            insight_parts.append(f"共 {len(chains)} 跳因果链")
-        if not chains and not all_roots:
-            insight_parts.append("数据不足，多积累几天沙子就能追溯了")
-        
-        return {
-            "question": question,
-            "chains": chains[:10],
-            "root_causes": list(all_roots)[:10],
-            "total_hops": len(chains),
-            "insight": "；".join(insight_parts) if insight_parts else "暂无因果链",
-        }
-    except Exception:
-        return {"question": question, "chains": [], "root_causes": [], "total_hops": 0,
-                "insight": "织布机因果图暂不可用（需要 sandglass_sqlite FTS5 索引）"}
 
 def session_context(n: int = 5) -> str:
     """新会话启动时，返回：场景标签 + 当前阶段画布 + 可选历史阶段。
@@ -3171,115 +2513,6 @@ def _latest_annotation() -> dict:
     except Exception:
         return {}
 
-def entropy_ghost(question: str) -> dict:
-    """
-    幽灵决策——'如果我当时选了另一个选项会怎样？'
-    
-    本地优先（80分）:
-      ① 查历史类似决策的后续因果链（weave_graph）
-      ② 查同标签决策的后续偏移模式
-      ③ 基于历史数据推断
-    
-    LLM 增强（+120分）:
-      喂上下文 → LLM 推演虚拟分支
-    
-    不论 2D 还是 3D，都标注'幽灵决策——纯虚拟推演，未修改任何数据'
-    """
-    # dp_read unused — 直接读文件替代
-
-    result = {
-        "question": question,
-        "mode": "2D 本地",
-        "similar_patterns": [],
-        "causal_chain": [],
-        "inference": "",
-        "llm_enhanced": False,
-    }
-
-    # ① 查历史类似决策
-    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
-    if os.path.exists(dp_path):
-        try:
-            with open(dp_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-            keywords = set(question.lower().split())
-            matches = []
-            for line in lines[-100:]:
-                if any(kw in line.lower() for kw in keywords if len(kw) > 1):
-                    parts = line.strip().split(" | ")
-                    if len(parts) >= 5:
-                        matches.append({
-                            "ts": parts[0][:10],
-                            "options": parts[1],
-                            "choice": parts[2],
-                            "direction": parts[3],
-                            "tags": parts[4],
-                        })
-            result["similar_patterns"] = matches[-5:]
-        except Exception:
-            pass
-
-    # ② 查因果链（weave_graph 多跳追溯）
-    try:
-        graph = weave_graph(question[:20])
-        if graph.get("chains"):
-            result["causal_chain"] = [
-                f"{n['depth']}跳: {n['label']}" for n in graph["chains"][:5]
-            ]
-    except Exception:
-        pass
-
-    # ③ 本地推断——基于真实历史模式
-    if result["similar_patterns"]:
-        directions = [p["direction"] for p in result["similar_patterns"]]
-        tags_all = [p["tags"] for p in result["similar_patterns"]]
-        most_dir = max(set(directions), key=directions.count) if directions else "?"
-        if result["causal_chain"]:
-            result["inference"] = (
-                f"历史模式：类似决策的因果链显示→{result['causal_chain'][0]}。"
-                f"最常出现的后续方向是'{most_dir}'。"
-                f"镜像类比：如果当时这样选，画像可能会往'{most_dir}'方向移动。"
-            )
-        else:
-            result["inference"] = (
-                f"历史模式：类似决策后，最常出现的倾向是'{most_dir}'。"
-                f"数据不够做因果追溯，但方向可参考。"
-            )
-
-    # ④ LLM 增强（200分）
-    if _LLM_KEY and result["similar_patterns"]:
-        try:
-            persona_text = ""
-            if os.path.exists(_PERSONA):
-                with open(_PERSONA, "r", encoding="utf-8") as f:
-                    persona_text = f.read()[:2000]
-
-            past = "\n".join(
-                f"- {p['ts']}: {p['options']} → {p['choice']} ({p['direction']})"
-                for p in result["similar_patterns"]
-            )
-
-            system = (
-                "你是幽灵决策推演师——模拟'如果当时选了另一个选项会怎样'。"
-                "你有用户的完整画像和真实决策历史。"
-                "基于他的行为模式推演虚拟分支。不要说'应该选什么'。"
-                "标注这是纯虚拟推演。一句话，30字以内。"
-            )
-
-            llm_result = _llm(
-                system,
-                f"问题：{question}\n画像：{persona_text}\n历史类似决策：\n{past}\n本地推断：{result['inference']}",
-                max_tokens=80,
-            )
-            if llm_result:
-                result["inference"] = f"{llm_result.strip()}（幽灵决策——纯虚拟推演）"
-                result["llm_enhanced"] = True
-                result["mode"] = "3D LLM 增强"
-        except Exception:
-            pass
-
-    return result
-
 def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
     """
     3D 立体画像合成——永久注解模式。
@@ -3375,70 +2608,6 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
     except Exception:
         return {}
 
-def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str:
-    """
-    玻璃提醒——阶段注解 + 2D 兜底。
-
-    - 先读最新 3D 阶段注解 → 直接用（永久保存的）
-    - 触发条件满足 → 重新合成 3D
-    - 无 LLM → 2D 描述方向
-
-    不判对错，不说"该怎样"。
-    """
-    trigger = ""
-    if emotion_trigger:
-        trigger = "emotion_spike"
-
-    # ── 3D 路径：沙漏 ≥ 2000 条 + 有 LLM → 启用立体合成 ──
-    syn = {}
-    if _three_d_ready():
-        # 读最新注解或触发 3D 合成
-        syn = _latest_annotation()
-        if not syn or emotion_trigger:
-            should, reason = _should_synthesize()
-            if should or emotion_trigger:
-                syn = _synthesize_3d(force=bool(emotion_trigger), trigger=trigger)
-
-    if syn and "reminder_example" in syn:
-        direction_cn = {"frugal": "省钱", "spend": "愿意投入", "drift": "放弃倾向"}
-        d = syn.get("offset_direction", "")
-        contour = f"影子偏向{direction_cn.get(d, d)}（{syn.get('offset_value',0):+d}%）"
-        if syn.get("persona_type"):
-            contour += f"，{syn['persona_type']}"
-
-        annotation_hint = ""
-        if os.path.exists(_3D_ANNOTATIONS):
-            count = sum(1 for _ in open(_3D_ANNOTATIONS, "r", encoding="utf-8"))
-            if count > 1:
-                annotation_hint = f"（共 {count} 个阶段注解）"
-
-        return "\n".join([
-            f"🫧 玻璃：{contour} {annotation_hint}",
-            f"> {syn['reminder_example']}",
-        ])
-
-    # 回退 2D 玻璃
-    try:
-        from sandglass_vault import count
-        total = count()
-        if total < 5:
-            return ""
-        comp = comprehensive_offset()
-        if comp["sample"] < 2:
-            return ""
-        direction_cn = {"frugal": "省钱", "spend": "愿意投入", "drift": "放弃倾向", "neutral": ""}
-        d = direction_cn.get(comp["direction"], "")
-        if not d:
-            return ""
-        sensitivity = _WAVE_THRESHOLDS.get(comp["direction"], {}).get("contour", 50)
-        if comp["sample"] >= sensitivity:
-            desc = f"最近{comp['sample']}条决策里——{d}的影子叠了{comp['sample']}层，轮廓已经成形了"
-        else:
-            desc = f"最近{comp['sample']}条决策里——{d}的影子正在叠加（{comp['sample']}/{sensitivity}）"
-        return f"🫧 玻璃：{desc}"
-    except Exception:
-        return ""
-
 def _emotional_entropy(recent_n: int = 10) -> float:
     """
     香农熵——量化情绪波动程度。
@@ -3473,25 +2642,6 @@ def _emotional_entropy(recent_n: int = 10) -> float:
         if p > 0:
             entropy -= p * math.log(p)
     return round(entropy, 2)
-
-def entropy_reminder(user_message: str = "") -> str:
-    """
-    熵提醒——情绪熵驱动提醒语气。
-    高熵 → 陪伴式安静提醒     低熵 → 小二热情提醒
-    """
-    entropy = _emotional_entropy()
-
-    if entropy > 1.2:
-        tone = "安静的陪伴"
-        msg = "情绪波动比较大，我安静陪着。需要的时候叫我。"
-    elif entropy < 0.5:
-        tone = "小二热情"
-        msg = "状态很稳！有事尽管说。"
-    else:
-        tone = "平稳关注"
-        msg = "一切如常。有需要叫我。"
-
-    return f"🫧 熵 {entropy}（{tone}）\n> {msg}"
 
 def entropy_chart(recent_n: int = 10) -> str:
     """
@@ -3553,76 +2703,3 @@ def memory_migrate(output_path: str = "") -> str:
     
     size_kb = os.path.getsize(output_path) / 1024
     return f"✅ 记忆包已导出：{output_path}（{size_kb:.0f} KB）\n   解压到新电脑的 ~/.neurobase/ 即可恢复全部记忆。"
-
-def memo_mode() -> str:
-    """
-    回忆快闪——本地零依赖，一屏看完沙漏记住了什么。
-    
-    2D 离线（80分）:
-      - 画像摘要（persona.md 四层）
-      - 影子可视化（shadow_chart）
-      - 阶段简报（stage_brief）
-      - 最近决策（decision_particles）
-    
-    3D LLM（200分）:
-      - 加一段自然语言总结
-    """
-    lines = [f"🧬 沙漏画像记忆 — {datetime.now():%Y-%m-%d %H:%M}", ""]
-    
-    # 画像
-    lines.append("【你是谁】")
-    if os.path.exists(_PERSONA):
-        with open(_PERSONA, "r", encoding="utf-8") as f:
-            persona = f.read()
-        # 取前两段作为摘要
-        sections = [s.strip() for s in persona.split("\n## ") if s.strip()]
-        for s in sections[:2]:
-            first_line = s.split("\n")[0] if "\n" in s else s[:60]
-            lines.append(f"  {first_line[:80]}")
-    else:
-        lines.append("  （画像尚未生成）")
-    lines.append("")
-    
-    # 影子可视化
-    lines.append("【你的影子】")
-    try:
-        lines.append(shadow_chart())
-    except Exception:
-        lines.append("  （数据不足）")
-    lines.append("")
-    
-    # 阶段简报
-    lines.append("【当前阶段】")
-    try:
-        lines.append(stage_brief())
-    except Exception:
-        lines.append("  （数据不足）")
-    lines.append("")
-    
-    # 最近决策
-    lines.append("【最近决策粒子】")
-    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
-    if os.path.exists(dp_path):
-        with open(dp_path, "r", encoding="utf-8") as f:
-            particles = f.readlines()[-5:]
-        for p in particles:
-            lines.append(f"  {p.strip()[:100]}")
-    if len(lines) == 1:
-        lines.append("  （决策粒子尚未生成）")
-    lines.append("")
-    
-    # LLM 增强
-    if _LLM_KEY:
-        try:
-            ctx = "\n".join(lines)
-            result = _llm(
-                "你是记忆展示助手。用户想看沙漏记住了什么。总结一下画像+影子+阶段的关联。一句话，20字以内。",
-                ctx[:3000], max_tokens=60)
-            if result:
-                lines.append(f"💬 {result.strip()}")
-        except Exception:
-            pass
-    
-
-
-    return "\n".join(lines)
