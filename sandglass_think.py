@@ -975,7 +975,7 @@ def comprehensive_offset(scene: str = "") -> dict:
             weight_sum += weight
             directions[e["direction"]] += weight
 
-    avg = round(total / weight_sum)
+    avg = round(total / max(weight_sum, 1))
 
     last5 = [e["offset"] for e in entries[-5:]]
     if len(last5) >= 3:
@@ -1247,15 +1247,7 @@ def offset_chart(topic: str = "") -> str:
         lines.append(f"  {t['stage']:6s} {sign}{off:3d}% {bar}")
     if data.get("evolution"):
         lines.append(f"  → {data['evolution']}")
-    # 度量指标收集
-    try:
-        ml = os.path.join(os.path.expanduser("~"), ".neurobase", "metrics.log")
-        now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        metrics = f"[{now}] sands={total} offset={offset_result.get('offset',0):+d} direction={offset_result.get('direction','?')}"
-        with open(ml, "a", encoding="utf-8") as f:
-            f.write(metrics + "\n")
-    except Exception:
-        pass
+
 
     return "\n".join(lines)
 
@@ -2678,15 +2670,7 @@ def stage_brief() -> str:
     except Exception:
         pass
 
-    # 度量指标收集
-    try:
-        ml = os.path.join(os.path.expanduser("~"), ".neurobase", "metrics.log")
-        now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        metrics = f"[{now}] sands={total} offset={offset_result.get('offset',0):+d} direction={offset_result.get('direction','?')}"
-        with open(ml, "a", encoding="utf-8") as f:
-            f.write(metrics + "\n")
-    except Exception:
-        pass
+
 
     return "\n".join(lines)
 
@@ -2902,15 +2886,7 @@ def session_context(n: int = 5) -> str:
     lines = ["## 最近对话"]
     for ln, ts, text in latest:
         lines.append(f"- [{ts}] {text[:100]}")
-    # 度量指标收集
-    try:
-        ml = os.path.join(os.path.expanduser("~"), ".neurobase", "metrics.log")
-        now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        metrics = f"[{now}] sands={total} offset={offset_result.get('offset',0):+d} direction={offset_result.get('direction','?')}"
-        with open(ml, "a", encoding="utf-8") as f:
-            f.write(metrics + "\n")
-    except Exception:
-        pass
+
 
     return "\n".join(lines)
 
@@ -3492,14 +3468,6 @@ def memo_mode() -> str:
         except Exception:
             pass
     
-    # 度量指标收集
-    try:
-        ml = os.path.join(os.path.expanduser("~"), ".neurobase", "metrics.log")
-        now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        metrics = f"[{now}] sands={total} offset={offset_result.get('offset',0):+d} direction={offset_result.get('direction','?')}"
-        with open(ml, "a", encoding="utf-8") as f:
-            f.write(metrics + "\n")
-    except Exception:
-        pass
+
 
     return "\n".join(lines)
