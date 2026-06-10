@@ -349,7 +349,25 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
                 if results:
                     return results
 
-            return _mmap_search(query, limit, month)
+            # mmap 全量暴力 → FTS5 精排(≤200) → 兜底
+            mmap_results = _mmap_search(query, 200, month)
+            if mmap_results:
+                from sandglass_sqlite import search_in, sync_incremental
+                sync_incremental()
+                line_nums = [r[0] for r in mmap_results[:200]]
+                ranked = search_in(line_nums, query)
+                if ranked:
+                    line_nums = [r[0] for r in ranked[:limit]]
+                    results = []
+                    with open(_SANDGLASS, "r", encoding="utf-8") as f:
+                        for n, line in enumerate(f, 1):
+                            if n in line_nums:
+                                ts, sender, text = _parse_line(line)
+                                if ts and text:
+                                    results.append((n, ts, text))
+                                    if len(results) >= limit: break
+                    if results: return results
+            return []
         except Exception:
             pass
         if not os.path.exists(_IDX):
