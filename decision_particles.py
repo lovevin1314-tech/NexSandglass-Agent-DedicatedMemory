@@ -498,6 +498,14 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
 
     feed_all(resolved, tags, direction)
 
+    # 幽灵灵魂——每次落粒子都投射影子画像（基于情感风持续生长）
+    try:
+        from sandglass_think import persona_project, comprehensive_offset
+        off = comprehensive_offset()
+        if off.get("direction") and off["direction"] != "neutral":
+            persona_project(off["direction"], off.get("offset", 0))
+    except: pass
+
     # 回音折回读——落粒子时读取情感残留
     try:
         echo_path = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
