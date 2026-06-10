@@ -827,14 +827,33 @@ def persona_project(direction: str, offset: int) -> dict:
     opposites = {"frugal": "花钱", "spend": "省钱", "drift": "坚持"}
     reverse = opposites.get(direction, "相反方向")
     
-    # 读决策粒子——提取反向选择的模拟
+    # 情感风——缩小影子选择范围
+    wind_direction = 0  # 正=开心/自信，负=焦虑/放弃
+    try:
+        echo_path = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
+        if os.path.exists(echo_path):
+            with open(echo_path, "r", encoding="utf-8") as ef:
+                for eline in ef:
+                    try:
+                        rec = json.loads(eline.strip())
+                        if rec.get("sentiment") == "正面":
+                            wind_direction += rec.get("spread_weight", 1.3)
+                        elif rec.get("sentiment") == "负面":
+                            wind_direction -= rec.get("spread_weight", 0.8)
+                    except: pass
+        from sandglass_think import _sentiment_wind
+        wind_direction += _sentiment_wind()
+    except: pass
+
+    # 读决策粒子——用情感风缩小反向选择范围
     shadow_lines = []
     with open(dp_path, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split(" | ")
             if len(parts) >= 5:
-                dir_tag = parts[3]  # emotion + direction
-                # 收集相反方向的决策粒子
+                dir_tag = parts[3]
+                emotion_tag = parts[4] if len(parts) > 4 else ""
+                # 情感风优先：风正→影子偏向花钱/自信选择，风负→影子偏向省钱/安全选择
                 if direction in ("frugal", "spend") and (
                     (direction == "frugal" and any(w in dir_tag.lower() for w in ["spend","花钱","买","付费"])) or
                     (direction == "spend" and any(w in dir_tag.lower() for w in ["frugal","省钱","免费","开源"])) or
@@ -854,7 +873,14 @@ def persona_project(direction: str, offset: int) -> dict:
         causal_hint = ""
 
     shadow = f"影子灵魂——如果当初选择{reverse}（偏移{offset:+d}%）:\n"
-    shadow += f"  交叉决策: {len(shadow_lines)}条\n"
+    shadow += f"  交叉决策: {len(shadow_lines)}条"
+    # 情感风信号
+    wind_signal = ""
+    if wind_direction > 0.5:
+        wind_signal = f"  情感风: 正面({wind_direction:+.1f}) → 影子偏向自信路径\n"
+    elif wind_direction < -0.5:
+        wind_signal = f"  情感风: 负面({wind_direction:+.1f}) → 影子偏向安全路径\n"
+    shadow += wind_signal
     for s in shadow_lines[:3]:
         shadow += f"  - {s}\n"
     if causal_hint and "数据不足" not in str(causal_hint):
@@ -1053,16 +1079,10 @@ def comprehensive_offset(scene: str = "") -> dict:
     }
     if scene:
         result["scene"] = scene
-    # 偏移超过阈值 → 自动织造 + 幽灵决策 + 影子画像
+    # 偏移超过阈值 → 自动织造
     if abs(avg) >= 30:
         try:
             weave_contradiction()
-        except: pass
-        try:
-            from sandglass_think import entropy_ghost, persona_project
-            if direction in ("frugal", "spend", "drift"):
-                entropy_ghost(f"如果选择相反的{['省钱','花钱','放弃'][['frugal','spend','drift'].index(direction)]}方向会怎样")
-                persona_project(direction, avg)
         except: pass
     return result
 
