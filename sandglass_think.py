@@ -845,7 +845,7 @@ def persona_project(direction: str, offset: int) -> dict:
         wind_direction += _sentiment_wind()
     except: pass
 
-    # 读决策粒子——用情感风缩小反向选择范围
+    # 读决策粒子——用回音折缩小反向选择范围
     shadow_lines = []
     with open(dp_path, "r", encoding="utf-8") as f:
         for line in f:
@@ -853,7 +853,7 @@ def persona_project(direction: str, offset: int) -> dict:
             if len(parts) >= 5:
                 dir_tag = parts[3]
                 emotion_tag = parts[4] if len(parts) > 4 else ""
-                # 情感风优先：风正→影子偏向花钱/自信选择，风负→影子偏向省钱/安全选择
+                # 回音折优先：风正→影子偏向花钱/自信选择，风负→影子偏向省钱/安全选择
                 if direction in ("frugal", "spend") and (
                     (direction == "frugal" and any(w in dir_tag.lower() for w in ["spend","花钱","买","付费"])) or
                     (direction == "spend" and any(w in dir_tag.lower() for w in ["frugal","省钱","免费","开源"])) or
@@ -889,12 +889,12 @@ def persona_project(direction: str, offset: int) -> dict:
     divergence = min(abs(offset) * 2, 100)
     insight = f"影子灵魂: 如果选择{reverse}，偏移差值约{divergence}%。{'差距在拉大——你现在走的这条路正在塑造一个不同的你' if divergence > 50 else '影子还很淡——你和另一个选择差距不大'}"
 
-    # 写入影子画像
+    # 写入影子灵魂
     shadow_path = os.path.join(_PERSONA_DIR, "persona.shadow.md")
     with open(shadow_path, "w", encoding="utf-8") as f:
-        f.write(f"# 影子画像 — {reverse}方向\n>\n> 触发偏移: {offset:+d}% ({direction})\n>\n{shadow}")
+        f.write(f"# 影子灵魂 — {reverse}方向\n>\n> 触发偏移: {offset:+d}% ({direction})\n>\n{shadow}")
 
-    # 回音折写回——影子本身产生情感风，影响未来的幽灵决策
+    # 回音折写回——影子本身产生回音折，影响未来的幽灵决策
     try:
         echo_path = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
         echo_entry = {
