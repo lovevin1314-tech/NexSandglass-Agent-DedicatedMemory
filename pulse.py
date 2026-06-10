@@ -158,6 +158,7 @@ def pulse(user_message: str = "") -> str:
         pass
 
     # 对比今昔——搜过去相关的话题
+    from sandglass_vault import count as sv_count, search
     total = sv_count()
     if total > 50 and user_message and random.random() < 0.10:
         old = search(user_message[:20], limit=3)
