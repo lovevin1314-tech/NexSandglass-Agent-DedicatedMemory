@@ -154,7 +154,7 @@ for q in conv.get("qa", []):
     
     # ═══ API搜索（关键词+语义+滤镜） ═══
     try:
-        for _, _, tx in api_search(qt, 3)[:3]:
+        for _, _, tx in api_search(qt, 3, month='2023')[:3]:
             ctx.append(("[搜索]", tx[:300], 5))
     except: pass
     try:
