@@ -11,12 +11,24 @@
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![Lines](https://img.shields.io/badge/Lines-5098-lightgrey)]()
 [![Size](https://img.shields.io/badge/Size-57KB-brightgreen)]()
+[![Benchmark](https://img.shields.io/badge/Benchmark-16/16-success)]()
 
 > **Soul Distillation (灵魂蒸馏):** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity (偏移率)**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories——we forge a unique, evolving soul that resonates with the user.
 
 ---
 
-## 为什么做这个
+## 📊 V1.7.6 基准测试结果
+
+| 层 | 指标 | 成绩 | 
+|----|------|------|
+| L1 写 | 写入速度 | 0.9ms/条, 1047条/秒 |
+| L2 搜 | 中文关键词搜索 | ✅ 100%召回 |
+| L3 思 | 偏移率方向准确率 | 83% |
+| L3 思 | 情绪检测准确率 | 100% |
+| L3 思 | composite_rerank排序 | ✅ 权重生效 |
+| L3 思 | full_sanity体检 | 4/4层, 10项全绿 |
+
+> 💡 以上结果来自 **纯合成数据集（50条），零真实沙漏数据**。运行 `python benchmark_full.py` 复现。
 
 现有 AI 记忆方案普遍有两个问题：
 
