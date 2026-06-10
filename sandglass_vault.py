@@ -237,7 +237,7 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
                             if len(results) >= limit * 3:  # 多取些给权重排序
                                 break
                     if results:
-                        # 四维权重排序（场景+画像+阶段+决策粒子）
+                        # 五维权重排序（场景+画像+阶段+粒子+偏移方向）
                         try:
                             from sandglass_think import search_filter
                             sf = search_filter(query)
