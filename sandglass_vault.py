@@ -1,5 +1,5 @@
 """
-NexSandglass — 第二层：米粒索引 + 解密读取
+NexSandglass — 第二层：投石问路 + 解密读取
 ===========================================
 import sandglass_vault
 results = sandglass_vault.search("关键词")
@@ -29,7 +29,7 @@ _idx_mtime: float = 0
 
 
 # ═══════════════════════════════════════════════
-# 米粒索引
+# 投石问路
 # ═══════════════════════════════════════════════
 
 def _tokenize(text: str) -> set:
@@ -104,7 +104,7 @@ def _write_idx(idx):
 
 
 def rebuild_index() -> int:
-    """全量重建米粒索引（基于解密后文本）。原子写。返回词条数。"""
+    """全量重建投石问路（基于解密后文本）。原子写。返回词条数。"""
     global _idx_cache
     _idx_cache = None
     try:
@@ -207,13 +207,54 @@ def _sync_index() -> dict:
 # ═══════════════════════════════════════════════
 
 def search(query: str, limit: int = 10, month: str = "") -> list:
-    """搜索沙漏。返回 [(行号, 时间, 明文), ...]。month 可选 '2026-06'。
-    V1.4.4：优先 SQLite FTS5 加速，失败降级倒排索引。"""
+    """搜索沙漏。投石问路优先→FTS5→mmap降级。
+    返回 [(行号, 时间, 明文), ...]。month 可选 '2026-06'。"""
     try:
         if not os.path.exists(_SANDGLASS):
             return []
 
-        # ── 双模式搜索 ──
+        # ── 投石问路优先（第二层主力） ──
+        try:
+            idx = _sync_index()
+            if not idx:
+                rebuild_index()
+                idx = _sync_index()
+            if idx:
+                q_tokens = _query_tokens(query)
+                candidate_lines = set()
+                for token in q_tokens:
+                    if token in idx:
+                        candidate_lines.update(idx[token])
+                if candidate_lines:
+                    # 读解密原文按行号返回
+                    results = []
+                    with open(_SANDGLASS, "r", encoding="utf-8") as f:
+                        for n, line in enumerate(f, 1):
+                            if n in candidate_lines:
+                                ts, sender, text = _parse_line(line)
+                                if ts and text:
+                                    results.append((n, ts, text))
+                            if len(results) >= limit * 3:  # 多取些给权重排序
+                                break
+                    if results:
+                        # 四维权重排序（场景+画像+阶段+决策粒子）
+                        try:
+                            from sandglass_think import search_filter
+                            sf = search_filter(query)
+                            weights = sf.get("weights", {})
+                            if weights:
+                                scored = []
+                                for ln, ts, text in results:
+                                    score = sum(weights.get(w, 1.0) for w in _query_tokens(text) if w in weights)
+                                    scored.append((score, (ln, ts, text)))
+                                scored.sort(key=lambda x: x[0], reverse=True)
+                                results = [item for _, item in scored]
+                        except: pass
+                        return results[:limit]
+        except Exception:
+            pass
+
+        # ── 双模式搜索（FTS5 + mmap） ──
         try:
             from sandglass_think import search_filter, offset_guide
             filt = search_filter(query)

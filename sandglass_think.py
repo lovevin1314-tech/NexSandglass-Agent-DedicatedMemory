@@ -3450,7 +3450,7 @@ def memory_migrate(output_path: str = "") -> str:
     
     打包内容：
       sandglass.txt / sandglass.backup（沙子+阴影）
-      sandglass.idx（米粒索引）
+      sandglass.idx（投石问路）
       persona/（画像+阶段+时间线）
       decision_particles.txt（决策粒子）
       search_weights.txt / echo_wind.jsonl（搜索权重+回音折风）
