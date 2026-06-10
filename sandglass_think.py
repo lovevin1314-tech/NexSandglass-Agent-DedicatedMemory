@@ -413,6 +413,16 @@ def _local_persona_extract() -> str:
             lines.append(f"## {cat}")
             for item in items: lines.append(f"- {item}")
             lines.append("")
+    # 度量指标收集
+    try:
+        ml = os.path.join(os.path.expanduser("~"), ".neurobase", "metrics.log")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        metrics = f"[{now}] sands={total} offset={offset_result.get('offset',0):+d} direction={offset_result.get('direction','?')}"
+        with open(ml, "a", encoding="utf-8") as f:
+            f.write(metrics + "\n")
+    except Exception:
+        pass
+
     return "\n".join(lines) if results else "数据不足"
 
 _CANVAS_DIR = os.path.join(_VAULT, "persona")
@@ -1213,6 +1223,16 @@ def offset_chart(topic: str = "") -> str:
         lines.append(f"  {t['stage']:6s} {sign}{off:3d}% {bar}")
     if data.get("evolution"):
         lines.append(f"  → {data['evolution']}")
+    # 度量指标收集
+    try:
+        ml = os.path.join(os.path.expanduser("~"), ".neurobase", "metrics.log")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        metrics = f"[{now}] sands={total} offset={offset_result.get('offset',0):+d} direction={offset_result.get('direction','?')}"
+        with open(ml, "a", encoding="utf-8") as f:
+            f.write(metrics + "\n")
+    except Exception:
+        pass
+
     return "\n".join(lines)
 
 def shadow_chart(sensitivity: dict = None) -> str:
@@ -1664,6 +1684,11 @@ def novel_scene_detect() -> dict:
                  'the', 'and', 'for', 'this', 'that', 'with', 'from', 'have',
                  'image', 'you', 'llm', 'user', 'time', 'your', 'all', 'are',
                  'not', 'but', 'has', 'was', 'can', 'its', 'get', 'now'}
+    # 用户自定义停用词
+    sw_file = os.path.join(os.path.expanduser('~'), '.neurobase', 'stopwords.txt')
+    if os.path.exists(sw_file):
+        with open(sw_file, 'r', encoding='utf-8') as f:
+            STOPWORDS.update(w.strip() for w in f.read().split() if w.strip())
 
     def _words(sands):
         freq = {}
@@ -2629,6 +2654,16 @@ def stage_brief() -> str:
     except Exception:
         pass
 
+    # 度量指标收集
+    try:
+        ml = os.path.join(os.path.expanduser("~"), ".neurobase", "metrics.log")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        metrics = f"[{now}] sands={total} offset={offset_result.get('offset',0):+d} direction={offset_result.get('direction','?')}"
+        with open(ml, "a", encoding="utf-8") as f:
+            f.write(metrics + "\n")
+    except Exception:
+        pass
+
     return "\n".join(lines)
 
 def distill(topic: str = "", save: bool = False) -> str:
@@ -2843,6 +2878,16 @@ def session_context(n: int = 5) -> str:
     lines = ["## 最近对话"]
     for ln, ts, text in latest:
         lines.append(f"- [{ts}] {text[:100]}")
+    # 度量指标收集
+    try:
+        ml = os.path.join(os.path.expanduser("~"), ".neurobase", "metrics.log")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        metrics = f"[{now}] sands={total} offset={offset_result.get('offset',0):+d} direction={offset_result.get('direction','?')}"
+        with open(ml, "a", encoding="utf-8") as f:
+            f.write(metrics + "\n")
+    except Exception:
+        pass
+
     return "\n".join(lines)
 
 # 2D 离线 = 玻璃曲面，沙自然累积 → 轮廓渐清（小标签）
@@ -3423,4 +3468,14 @@ def memo_mode() -> str:
         except Exception:
             pass
     
+    # 度量指标收集
+    try:
+        ml = os.path.join(os.path.expanduser("~"), ".neurobase", "metrics.log")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        metrics = f"[{now}] sands={total} offset={offset_result.get('offset',0):+d} direction={offset_result.get('direction','?')}"
+        with open(ml, "a", encoding="utf-8") as f:
+            f.write(metrics + "\n")
+    except Exception:
+        pass
+
     return "\n".join(lines)
