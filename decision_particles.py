@@ -496,6 +496,14 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
     with open(_PARTICLES, "a", encoding="utf-8") as f:
         f.write(f"{ts} | {record}\n")
 
+    # 影子沙同步
+    try:
+        from shadow_sand import shadow_index
+        with open(_PARTICLES, "r", encoding="utf-8") as f:
+            line_num = sum(1 for _ in f)
+        shadow_index(choice, line_num, "decision", tags)
+    except: pass
+
     feed_all(resolved, tags, direction)
 
     # 幽灵灵魂——每次落粒子都投射影子画像（基于情感风持续生长）
