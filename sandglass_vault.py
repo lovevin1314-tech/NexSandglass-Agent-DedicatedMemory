@@ -33,9 +33,18 @@ _idx_mtime: float = 0
 # ═══════════════════════════════════════════════
 
 def _tokenize(text: str) -> set:
-    """通用分词：中文2字词+英文2+字母。不索引单汉字（高频噪音）。"""
+    """通用分词：中文2字词+英文2+字母+英文3-4字符滑动窗口（n-gram）。
+    不索引单汉字（高频噪音）。"""
     tokens = set()
-    tokens.update(re.findall(r"[a-zA-Z0-9_]{2,}", text.lower()))
+    t = text.lower()
+    # 英文词（2+字母）
+    tokens.update(re.findall(r"[a-zA-Z0-9_]{2,}", t))
+    # 英文字符滑动窗口——2到4字窗口，覆盖"sup/up/port/grou/oup"等子串
+    eng = "".join(re.findall(r"[a-z0-9]", t))
+    for n in (2, 3, 4):
+        for i in range(len(eng) - n + 1):
+            tokens.add(eng[i:i + n])
+    # 中文2字词
     chars = "".join(re.findall(r"[\u4e00-\u9fff]", text))
     for i in range(len(chars) - 1):
         tokens.add(chars[i : i + 2])
