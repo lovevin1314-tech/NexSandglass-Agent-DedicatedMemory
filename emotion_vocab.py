@@ -116,6 +116,9 @@ def learn(word: str, mood: str, lang: str = "zh") -> bool:
 
 def detect(message: str) -> dict:
     """检测情绪：返回 {mood, emitter, keywords, strategy, priority}。"""
+    # 静默模式
+    if os.environ.get("NX_MODE") == "neutral":
+        return {"mood": "", "emitter": "自我", "keywords": [], "strategy": "", "priority": "低"}
     # ── 否定词列表 ──
     _NEGATION = ["不", "没", "不是", "不太", "并不", "并不太",
                  "not ", "don't ", "doesn't ", "isn't ", "aren't ",

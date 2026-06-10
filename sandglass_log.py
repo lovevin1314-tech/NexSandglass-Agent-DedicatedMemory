@@ -13,6 +13,8 @@ import base64
 import hashlib
 import os
 import platform
+import tempfile
+import shutil
 from datetime import datetime
 
 _SANDGLASS = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.txt")
@@ -41,10 +43,35 @@ def log_message(text: str, sender: str = "agent") -> bool:
     """写入一条消息到沙漏。任何 Agent 调用此函数落沙。
     返回 True 表示写入成功。"""
     try:
+        # 净化器插件
+        sanitizer = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plugins", "sanitize.py")
+        if os.path.exists(sanitizer):
+            try:
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("sanitize", sanitizer)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                text = mod.sanitize(text)
+            except Exception:
+                pass
+
         os.makedirs(os.path.dirname(_SANDGLASS), exist_ok=True)
         encrypted = _encrypt(text)
-        with open(_SANDGLASS, "a", encoding="utf-8") as f:
-            f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} | {sender} | {encrypted}\n")
+        # 原子写入——临时文件+替换，防并发冲突
+        line = f"{datetime.now():%Y-%m-%d %H:%M:%S} | {sender} | {encrypted}\n"
+        tmpfd, tmpname = tempfile.mkstemp(suffix='.tmp', dir=os.path.dirname(_SANDGLASS))
+        try:
+            if os.path.exists(_SANDGLASS):
+                with open(_SANDGLASS, 'rb') as src:
+                    os.write(tmpfd, src.read())
+            os.write(tmpfd, line.encode('utf-8'))
+            os.close(tmpfd)
+            shutil.move(tmpname, _SANDGLASS)
+        except Exception:
+            if os.path.exists(tmpname):
+                os.unlink(tmpname)
+            os.close(tmpfd) if 'tmpfd' in dir() else None
+            raise
         return True
     except Exception:
         return False
