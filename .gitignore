@@ -12,3 +12,4 @@ decision_particles_backup.txt
 *.sqlite
 .env
 
+.aider*

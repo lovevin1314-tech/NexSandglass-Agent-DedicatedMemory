@@ -1,3 +1,0 @@
-
-# 2026-06-10 12:20:24.928315
-+Review all Python files in this directory for bugs, logic errors, and code quality issues. Focus on sandglass_think.py, sandglass_vault.py, sandglass_mcp.py, decision_particles.py, emotion_vocab.py. Report every finding with file:line and severity.
