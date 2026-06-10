@@ -51,6 +51,8 @@ from scene_l3 import *
 from weave_l3 import *
 from emotion_l3 import *
 
+# persona_l3 and offset_l3 extracted — available as standalone modules
+
 from discipline import iron_rules, iron_rules_set
 
 logger = logging.getLogger(__name__)
