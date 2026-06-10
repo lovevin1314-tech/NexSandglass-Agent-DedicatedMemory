@@ -30,7 +30,7 @@ except Exception:
     _UNIVERSAL = False
 try:
     from sandglass_think import persona_build, persona_update, offset_check, comprehensive_offset
-    from sandglass_think import search_filter, search_semantic, task_pending, full_sanity, stage_brief
+    from sandglass_think import search_filter, search_semantic, task_pending, full_sanity, stage_brief, _current_stage
     _L3 = True
 except Exception:
     _L3 = False

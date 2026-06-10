@@ -2868,7 +2868,7 @@ def entropy_ghost(question: str) -> dict:
     
     不论 2D 还是 3D，都标注'幽灵决策——纯虚拟推演，未修改任何数据'
     """
-    from decision_particles import read as dp_read
+    # dp_read unused — 直接读文件替代
 
     result = {
         "question": question,
@@ -2905,7 +2905,7 @@ def entropy_ghost(question: str) -> dict:
     # ② 查因果链（weave_graph 多跳追溯）
     try:
         graph = weave_graph(question[:20])
-        if graph.get("nodes"):
+        if graph.get("chains"):
             result["causal_chain"] = [
                 f"{n['depth']}跳: {n['label']}" for n in graph["nodes"][:5]
             ]
