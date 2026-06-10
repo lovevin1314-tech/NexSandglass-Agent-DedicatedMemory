@@ -118,10 +118,13 @@ def shadow_boost(candidate_lines: set, limit: int = 10) -> list:
 
 # ═══════════════════ 写入（落沙后同步） ═══════════════════
 
-def shadow_index(text: str, line_num: int, category: str = "general", tags: str = "") -> None:
-    """落沙后同步——提取实体 + 标签写入影子沙。"""
+def shadow_index(text: str, category: str = "general", tags: str = "") -> None:
+    """落沙后同步——自增ID，不读沙漏文件。"""
     db = _get_conn()
     with _lock:
+        # 自增ID = 当前信任表行数（=沙漏行数）
+        line_num = db.execute("SELECT COUNT(*) FROM trust").fetchone()[0] + 1
+        
         # 提取实体
         for m in _ENTITY_RE.finditer(text):
             name = m.group(1) or m.group(2) or m.group(3) or ""
