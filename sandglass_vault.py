@@ -350,7 +350,7 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
                     return results
 
             # mmap 全量暴力 → FTS5 精排(≤200) → 兜底
-            mmap_results = _mmap_search(query, 200, month)
+            mmap_results = _mmap_search(query, 200, month, stage_filter=True)
             if mmap_results:
                 from sandglass_sqlite import search_in, sync_incremental
                 sync_incremental()
@@ -447,10 +447,21 @@ def count() -> int:
         return 0
 
 
-def _mmap_search(query: str, limit: int, month: str) -> list:
-    """三级降级：mmap 直接内存搜索。"""
+def _mmap_search(query: str, limit: int, month: str, stage_filter: bool = False) -> list:
+    """三级降级：mmap 直接内存搜索。stage_filter=True 时只扫当前阶段+上一阶段。"""
     results = []
     try:
+        # 阶段过滤——缩小扫描范围
+        scan_months = [month]
+        if stage_filter:
+            try:
+                from sandglass_think import _current_stage, stage_list
+                current = _current_stage()
+                scan_months = [current]
+                stages = stage_list()
+                if len(stages) >= 2:
+                    scan_months.append(stages[-2].get("name", current))
+            except: pass
         with open(_SANDGLASS, "rb") as f:
             with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                 line_start = 0; line_num = 0
