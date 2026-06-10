@@ -14,6 +14,22 @@ def set_shadow_path(path: str):
     """重定向影子沙路径——基准测试用。"""
     global _SHADOW_DB, _conn
     if _conn: _conn.close(); _conn = None
+def shadow_mbti() -> str:
+    """读取最近记录的MBTI类型。影子沙——会变，不属于画像。"""
+    try:
+        db = _get_conn()
+        db.execute("CREATE TABLE IF NOT EXISTS mbti (mbti TEXT, ts TEXT DEFAULT (datetime('now')))")
+        row = db.execute("SELECT mbti FROM mbti ORDER BY ts DESC LIMIT 1").fetchone()
+        return row[0] if row else ""
+    except: return ""
+
+def shadow_mbti_set(mbti: str) -> None:
+    """记录MBTI变更。"""
+    db = _get_conn()
+    db.execute("CREATE TABLE IF NOT EXISTS mbti (mbti TEXT, ts TEXT DEFAULT (datetime('now')))")
+    db.execute("INSERT INTO mbti (mbti) VALUES (?)", (mbti.upper(),))
+    db.commit()
+
     _SHADOW_DB = path
 
 _SCHEMA = """
@@ -49,6 +65,22 @@ _ENTITY_RE = re.compile(
 )
 
 _conn = None
+def shadow_mbti() -> str:
+    """读取最近记录的MBTI类型。影子沙——会变，不属于画像。"""
+    try:
+        db = _get_conn()
+        db.execute("CREATE TABLE IF NOT EXISTS mbti (mbti TEXT, ts TEXT DEFAULT (datetime('now')))")
+        row = db.execute("SELECT mbti FROM mbti ORDER BY ts DESC LIMIT 1").fetchone()
+        return row[0] if row else ""
+    except: return ""
+
+def shadow_mbti_set(mbti: str) -> None:
+    """记录MBTI变更。"""
+    db = _get_conn()
+    db.execute("CREATE TABLE IF NOT EXISTS mbti (mbti TEXT, ts TEXT DEFAULT (datetime('now')))")
+    db.execute("INSERT INTO mbti (mbti) VALUES (?)", (mbti.upper(),))
+    db.commit()
+
 _lock = threading.Lock()
 
 
