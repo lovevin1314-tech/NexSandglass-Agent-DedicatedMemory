@@ -92,7 +92,7 @@ _TOOL_SCHEMAS = [
             },
         },
     },
-]    {
+    {
         "type": "function",
         "function": {
             "name": "sandglass_echo",

@@ -36,9 +36,10 @@ CREATE TABLE IF NOT EXISTS fact_tags (
 """
 
 _ENTITY_RE = re.compile(
-    r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b|'   # 大写多词 "John Doe"
-    r'"([^"]+)"|'                                 # 双引号
-    r"'([^']+)'"                                    # 单引号
+    r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b|'   # 英文大写多词
+    r'"([^"]+)"|'                                   # 双引号
+    r"'([^']+)'|"                                   # 单引号
+    r'([\u4e00-\u9fff]{2,4})'                     # 中文2-4字（人名/术语）
 )
 
 _conn = None
