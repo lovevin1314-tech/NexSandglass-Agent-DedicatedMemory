@@ -12,7 +12,7 @@ sys.path.insert(0, r"C:\Users\NeuroBase\Backboard-Locomo-Benchmark")
 
 with open(r"C:\Users\NeuroBase\Backboard-Locomo-Benchmark\locomo_dataset.json") as f:
     raw = json.load(f)
-conv = raw[0]
+conv = raw[1]
 print(f"LoCoMo: {conv.get('sample_id','?')}")
 
 # ═══════════════ 隔离环境 ═══════════════
