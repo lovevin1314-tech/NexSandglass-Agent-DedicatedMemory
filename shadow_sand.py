@@ -46,13 +46,23 @@ _conn = None
 _lock = threading.Lock()
 
 
+_commit_pending = 0
+
 def _get_conn():
     global _conn
     if _conn is None:
         _conn = sqlite3.connect(_SHADOW_DB, check_same_thread=False)
+        _conn.execute("PRAGMA journal_mode=WAL")
         _conn.executescript(_SCHEMA)
         _conn.commit()
     return _conn
+
+def _maybe_commit():
+    global _commit_pending
+    _commit_pending += 1
+    if _commit_pending >= 3:
+        _get_conn().commit()
+        _commit_pending = 0
 
 
 # ═══════════════════ 查询（脱口而出层） ═══════════════════
@@ -158,7 +168,7 @@ def shadow_index(text: str, category: str = "general", tags: str = "") -> None:
                 (line_num, category, tags)
             )
 
-        db.commit()
+        _maybe_commit()
 
 
 # ═══════════════════ 反馈 ═══════════════════
@@ -185,7 +195,7 @@ def shadow_feedback(line_num: int, helpful: bool) -> dict:
             f"UPDATE trust SET score = ?, {col} = {col} + 1, updated_at = datetime('now') WHERE line_num = ?",
             (new_score, line_num)
         )
-        db.commit()
+        _maybe_commit()
         return {"line_num": line_num, "old_trust": old_score, "new_trust": new_score}
 
 
@@ -200,4 +210,4 @@ def shadow_retrieval_bump(line_nums: list) -> None:
             f"UPDATE trust SET retrievals = retrievals + 1 WHERE line_num IN ({placeholders})",
             line_nums
         )
-        db.commit()
+        _maybe_commit()
