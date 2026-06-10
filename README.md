@@ -1,4 +1,4 @@
-# NexSandglass 沙漏记忆系统⏳ V1.7.7 — 稳定版
+# NexSandglass 沙漏记忆系统⏳ V1.7.8 — 认知操作系统
 
 > **是记住。是理解。是懂你。是想你。**
 
@@ -10,8 +10,19 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![Lines](https://img.shields.io/badge/Lines-5242-lightgrey)]()
-[![Size](https://img.shields.io/badge/Size-57KB-brightgreen)]()
 [![Benchmark](https://img.shields.io/badge/Benchmark-16/16-success)]()
+
+---
+
+## 🧠 V1.7.8 核心架构
+
+| 层 | 名称 | 功能 |
+|----|------|------|
+| L0 | 影子沙 | SQLite脱口而出层——实体/信任分/标签，<1ms |
+| L1 | 沙子 | DPAPI加密原文存储，不可变 |
+| L2 | 投石问路 | 倒排索引→FTS5精排→五维权重（场景+画像+阶段+粒子+偏移） |
+| L3 | 织布机 | 偏移率+画像溯源+影子灵魂+回音折+情绪熵+场景矩阵 |
+| 🔌 | MemoryProvider | Hermes插件——替代Holographic，零API Key，6工具 |
 
 > **Soul Distillation (灵魂蒸馏):** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity (偏移率)**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories——we forge a unique, evolving soul that resonates with the user.
 
