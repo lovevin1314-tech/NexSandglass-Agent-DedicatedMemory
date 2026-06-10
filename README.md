@@ -35,13 +35,13 @@
 
 | 类别 | NexSandglass | Backboard | Mem0 |
 |------|-------------|-----------|------|
-| Single-Hop | 49% | 89% | 67% |
-| Multi-Hop | 52% | 75% | 51% |
-| Temporal | 51% | 92% | 55% |
-| Open-Domain | 54% | 91% | 73% |
-| **命中率** | **53%** | 90% | 67% |
+| Single-Hop | 41% | 89% | 67% |
+| Multi-Hop | 26% | 75% | 51% |
+| Temporal | 45% | 92% | 55% |
+| Open-Domain | 46% | 91% | 73% |
+| **命中率** | **36%** | 90% | 67% |
 
-> 💡 全子系统接入: 证据+人物+画像+偏移率+米粒+幽灵+织布机+风向。零LLM，纯本地推理，70题/秒。运行 `python locomo_benchmark.py` 复现。
+> 💡 n-gram tokenizer + 证据时间戳邻句打包。零LLM，纯本地推理。运行 `python locomo_benchmark.py` 复现。
 
 现有 AI 记忆方案普遍有两个问题：
 
