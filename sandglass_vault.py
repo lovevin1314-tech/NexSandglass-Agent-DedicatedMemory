@@ -18,6 +18,12 @@ _IDX = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.idx")
 
 logger = logging.getLogger(__name__)
 
+
+def set_idx_path(path: str):
+    """重定向投石问路索引路径——基准测试用。"""
+    global _IDX
+    _IDX = path
+
 try:
     from win32crypt import CryptUnprotectData
 except ImportError:

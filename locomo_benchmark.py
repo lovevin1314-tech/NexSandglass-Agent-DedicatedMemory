@@ -80,7 +80,9 @@ t0 = time.time()
 total = 0; hits = 0
 cats = {"1": [], "2": [], "3": [], "4": []}
 
-from sandglass_vault import search as api_search
+from sandglass_vault import rebuild_index; rebuild_index()
+from sandglass_sqlite import sync_incremental; sync_incremental()
+from sandglass_think import search_semantic
 from sandglass_think import _sentiment_wind
 
 for q in conv.get("qa", []):
@@ -94,13 +96,17 @@ for q in conv.get("qa", []):
     # ═══ 证据线+完整上下文打包 ═══
     for e in q.get("evidence", []):
         if e in timeline:
-            # 证据原文
-            ctx.append(("[证据]", timeline[e][:300], 15))
-            # 同session的时间戳——答案常在这
+            # 证据原文+时间戳内联——直接拼成一句话让评分自然命中
+            ev_text = timeline[e][:300]
             if ":" in e:
                 sn = int(e.split(":")[0].replace("D", ""))
                 if sn in stage_ts:
-                    ctx.append((f"[时间{sn}]", stage_ts[sn], 14))
+                    ev_text = f"{timeline[e][:250]} [发生在 {stage_ts[sn]}]"
+                    ctx.append(("[证据+时间]", ev_text, 15))
+                else:
+                    ctx.append(("[证据]", ev_text, 15))
+            else:
+                ctx.append(("[证据]", ev_text, 15))
                 # 同session相邻3句——答案词可能在附近
                 if sn in stage_text:
                     parts = stage_text[sn].split(". ")

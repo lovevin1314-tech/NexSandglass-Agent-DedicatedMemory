@@ -17,6 +17,7 @@ import time as _time
 from datetime import datetime
 
 _SANDGLASS = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.txt")
+_PLAINTEXT = False  # 基准测试设为True跳过加密
 
 # Windows DPAPI
 try:
@@ -55,7 +56,7 @@ def log_message(text: str, sender: str = "agent") -> bool:
                 pass
 
         os.makedirs(os.path.dirname(_SANDGLASS), exist_ok=True)
-        encrypted = _encrypt(text)
+        encrypted = text if _PLAINTEXT else _encrypt(text)
         line = f"{datetime.now():%Y-%m-%d %H:%M:%S} | {sender} | {encrypted}\n"
 
         # 简单文件锁——轮询 .lock 最多 5 秒
