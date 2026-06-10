@@ -213,6 +213,27 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
         if not os.path.exists(_SANDGLASS):
             return []
 
+        # ── 影子沙优先（脱口而出层） ──
+        try:
+            from shadow_sand import shadow_search as _shadow_search, shadow_retrieval_bump
+            shadow_hits = _shadow_search(query, limit)
+            if shadow_hits:
+                results = []
+                with open(_SANDGLASS, "r", encoding="utf-8") as f:
+                    for n, line in enumerate(f, 1):
+                        for score, ln in shadow_hits:
+                            if n == ln:
+                                ts, sender, text = _parse_line(line)
+                                if ts and text:
+                                    results.append((ln, ts, text))
+                        if len(results) >= limit:
+                            break
+                if results:
+                    shadow_retrieval_bump([ln for _, ln in shadow_hits[:limit]])
+                    return results
+        except Exception:
+            pass
+
         # ── 投石问路优先（第二层主力） ──
         try:
             idx = _sync_index()
