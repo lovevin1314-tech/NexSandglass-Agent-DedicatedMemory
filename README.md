@@ -9,7 +9,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Lines](https://img.shields.io/badge/Lines-5098-lightgrey)]()
+[![Lines](https://img.shields.io/badge/Lines-5242-lightgrey)]()
 [![Size](https://img.shields.io/badge/Size-57KB-brightgreen)]()
 [![Benchmark](https://img.shields.io/badge/Benchmark-16/16-success)]()
 

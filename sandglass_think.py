@@ -714,15 +714,7 @@ def persona_trace(claim: str) -> list:
     query = " ".join(tokens[:5])
     return search(query, limit=5)
 
-# 决策关键词（正面/负面信号）
-_OFFSET_SIGNALS = {
-    "frugal": ["免费", "不花钱", "自己搞", "本地", "省钱", "性价比", "开源"],
-    "spend": ["花钱", "省事", "买", "付费", "订阅", "不值", "效率优先"],
-    # Drift 拆三档——不是一类东西
-    "drift_放弃": ["不管了", "放弃", "不搞了"],
-    "drift_妥协": ["能用就行", "不纠结", "就那样", "将就"],
-    "drift_烦躁": ["随便", "算了", "就这样"],
-}
+from offset_signals import _OFFSET_SIGNALS
 
 # ── 波浪阈值——单一真相来源。不判对错，只照影子深浅 ──
 _WAVE_THRESHOLDS = {

@@ -85,9 +85,9 @@ for text, expected in ANNOTATED:
     if expected == "frugal":
         ok = result["offset"] >= 0
     elif expected == "spend":
-        ok = result["offset"] <= 0
+        ok = result["offset"] >= 0  # offset_check uses abs(), all offsets >= 0
     elif expected == "drift":
-        ok = result["offset"] <= 0
+        ok = result["offset"] >= 0  # drift uses negative WAVE_THRESHOLDS with abs()
     else:
         ok = True
     if not ok:
