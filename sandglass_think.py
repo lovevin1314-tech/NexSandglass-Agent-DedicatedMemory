@@ -972,26 +972,25 @@ def offset_check(decision_text: str, user_persisted: bool = False) -> dict:
     # 玻璃——曲面有倒影，不清晰但3D。沙够多，轮廓自然立体
     dimensions = {}
     if drift_hits > 0:
-        # 按最高档取权重
         if drift_giveup > 0:
-            offset = _WAVE_THRESHOLDS["drift"]["放弃"]
+            offset = -_WAVE_THRESHOLDS["drift"]["放弃"]
             matched = [w for w in _OFFSET_SIGNALS["drift_放弃"] if w in text]
             key = "放弃的影子（深）"
             hints = ["放弃信号浮起来了——" + "、".join(matched[:2]) + "。影子不用怕，留着观察"]
         elif drift_tradeoff > 0:
-            offset = _WAVE_THRESHOLDS["drift"]["妥协"]
+            offset = -_WAVE_THRESHOLDS["drift"]["妥协"]
             matched = [w for w in _OFFSET_SIGNALS["drift_妥协"] if w in text]
             key = "权衡的影子（中）"
             hints = ["理性权衡——" + "、".join(matched[:2]) + "。不是放弃，是计算"]
         else:
-            offset = _WAVE_THRESHOLDS["drift"]["烦躁"]
+            offset = -_WAVE_THRESHOLDS["drift"]["烦躁"]
             matched = [w for w in _OFFSET_SIGNALS["drift_烦躁"] if w in text]
             key = "烦躁的影子（浅）"
             hints = ["暂时的情绪——" + "、".join(matched[:2]) + "。可能只是累了"]
         direction = "drift"
         dimensions[key] = matched
     elif spend_hits > frugal_hits:
-        offset = abs(spend_hits - frugal_hits) * 20
+        offset = -(abs(spend_hits - frugal_hits) * 20)
         direction = "spend"
         matched_spend = [w for w in _OFFSET_SIGNALS["spend"] if w in text]
         dimensions["花钱的轮廓"] = matched_spend
