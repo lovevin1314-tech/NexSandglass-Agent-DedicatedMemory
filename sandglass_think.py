@@ -2498,7 +2498,7 @@ def stage_brief() -> str:
         if os.path.exists(last_distill):
             with open(last_distill) as f:
                 since = total - int(f.read().strip() or 0)
-        if since >= 50:
+        if since >= 200:
             lines.append(f"\n🔄 自动蒸馏触发（+{since}条新对话）")
             distill("自动蒸馏", save=True)
             with open(last_distill, "w") as f:
