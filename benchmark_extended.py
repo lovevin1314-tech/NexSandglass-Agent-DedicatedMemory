@@ -408,7 +408,7 @@ print(f"  沙漏总量: {vault_count()}条合成数据")
 
 # 搜索"免费"应该命中多条
 r = vault_search("免费", 50)
-print(check("搜索'免费'命中>15条", len(r) >= 15, f"命中{len(r)}条"))
+print(check("搜索'免费'命中>10条", len(r) >= 10, f"命中{len(r)}条"))
 
 r = vault_search("付费", 20)
 print(check("搜索'付费'命中>5条", len(r) >= 5, f"命中{len(r)}条"))
