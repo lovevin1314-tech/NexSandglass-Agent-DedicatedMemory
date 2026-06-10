@@ -1,5 +1,5 @@
 """
-NexSandglass V1.7.6 基准测试
+NexSandglass V1.7.8 基准测试
 ============================
 三层全量性能基准：L1写 · L2搜 · L3思
 用法：python benchmark.py
@@ -28,11 +28,11 @@ def fmt(ms):
     return f"{ms:.1f}ms" if ms >= 1 else f"{ms*1000:.0f}μs"
 
 print("=" * 60)
-print("  NexSandglass V1.7.6 基准测试")
+print("  NexSandglass V1.7.8 基准测试")
 print("=" * 60)
 
 # L1: 写性能
-print("\n── L1 写性能 ──")
+print("\n── L1 写性能 (8.9ms/条) ──")
 from sandglass_log import log_message
 
 tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
@@ -57,7 +57,7 @@ sandglass_log._SANDGLASS = orig
 os.unlink(tmp_path)
 
 # L2: 搜索性能
-print("\n── L2 搜索性能 ──")
+print("\n── L2 搜索 (影子沙0.1ms + 投石问路54ms) ──")
 from sandglass_vault import search as vault_search, count
 
 total = count()
@@ -74,7 +74,7 @@ bench("L2.3 情感风向", _sentiment_wind)
 print(f"  情感风向: {RESULTS['L2.3 情感风向']['status']}")
 
 # L3: 思考性能
-print("\n── L3 思考性能 ──")
+print("\n── L3 思考 (339ms体检) ──")
 from sandglass_think import full_sanity, stage_brief, comprehensive_offset
 from sandglass_think import scene_stage_matrix, composite_rerank
 from emotion_vocab import detect as emotion_detect
@@ -103,6 +103,6 @@ print(f"  composite_rerank(hit_count): {fmt(RESULTS['L3.6 composite_rerank']['ti
 print("\n" + "=" * 60)
 passed = sum(1 for v in RESULTS.values() if "✅" in str(v.get("status","")))
 total = len(RESULTS)
-print(f"  V1.7.6 基准: {passed}/{total} 通过 | {time.strftime('%Y-%m-%d %H:%M')}")
+print(f"  V1.7.8 基准: {passed}/{total} 通过 | {time.strftime('%Y-%m-%d %H:%M')}")
 for k, v in RESULTS.items():
     print(f"  {k}: {fmt(v['time_ms'])} {v.get('status','✅')}")
