@@ -13,8 +13,7 @@ import base64
 import hashlib
 import os
 import platform
-import tempfile
-import shutil
+import time as _time
 from datetime import datetime
 
 _SANDGLASS = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.txt")
@@ -43,7 +42,7 @@ def log_message(text: str, sender: str = "agent") -> bool:
     """写入一条消息到沙漏。任何 Agent 调用此函数落沙。
     返回 True 表示写入成功。"""
     try:
-        # 净化器插件
+        # 净化器插件（可选）
         sanitizer = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plugins", "sanitize.py")
         if os.path.exists(sanitizer):
             try:
@@ -57,21 +56,30 @@ def log_message(text: str, sender: str = "agent") -> bool:
 
         os.makedirs(os.path.dirname(_SANDGLASS), exist_ok=True)
         encrypted = _encrypt(text)
-        # 原子写入——临时文件+替换，防并发冲突
         line = f"{datetime.now():%Y-%m-%d %H:%M:%S} | {sender} | {encrypted}\n"
-        tmpfd, tmpname = tempfile.mkstemp(suffix='.tmp', dir=os.path.dirname(_SANDGLASS))
+
+        # 简单文件锁——轮询 .lock 最多 5 秒
+        lock = _SANDGLASS + ".lock"
+        deadline = _time.time() + 5
+        while _time.time() < deadline:
+            try:
+                fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.close(fd)
+                break
+            except FileExistsError:
+                _time.sleep(0.01)
+        else:
+            pass  # 锁超时，裸写
+
         try:
-            if os.path.exists(_SANDGLASS):
-                with open(_SANDGLASS, 'rb') as src:
-                    os.write(tmpfd, src.read())
-            os.write(tmpfd, line.encode('utf-8'))
-            os.close(tmpfd)
-            shutil.move(tmpname, _SANDGLASS)
-        except Exception:
-            if os.path.exists(tmpname):
-                os.unlink(tmpname)
-            os.close(tmpfd) if 'tmpfd' in dir() else None
-            raise
+            with open(_SANDGLASS, "a", encoding="utf-8") as f:
+                f.write(line)
+        finally:
+            try:
+                os.unlink(lock)
+            except OSError:
+                pass
+
         return True
     except Exception:
         return False
