@@ -323,8 +323,19 @@ def persona_build() -> str:
         os.makedirs(os.path.dirname(_PERSONA), exist_ok=True)
         m = re.search(r"```(?:markdown)?\s*\n(.*?)```", result, re.DOTALL)
         content = m.group(1).strip() if m else result.strip()
+        # 保存旧版本用于diff
+        import shutil
+        prev = os.path.join(_PERSONA_DIR, "persona.prev.md")
+        if os.path.exists(_PERSONA):
+            shutil.copy2(_PERSONA, prev)
         with open(_PERSONA, "w", encoding="utf-8") as f:
             f.write(content)
+        # 自动画像diff
+        try:
+            diff = persona_diff()
+            logger.info(f"persona_diff: {diff['insight']}")
+        except Exception:
+            pass
         return _PERSONA
 
     # LLM 不可用 → 本地关键词提取兜底（V1.3 自生长能力）
@@ -713,6 +724,87 @@ def persona_trace(claim: str) -> list:
     tokens = re.findall(r"[\u4e00-\u9fff]{2,}|[a-zA-Z]{3,}", claim)
     query = " ".join(tokens[:5])
     return search(query, limit=5)
+
+def persona_verify() -> dict:
+    """一键验证画像所有声明。扫描 [src:hash:L行号] 标签，批量验证 hash。"""
+    import hashlib, re
+    p = os.path.join(_VAULT, "persona", "persona.md")
+    if not os.path.exists(p):
+        return {"verified": 0, "failed": 0, "total": 0, "details": [], "insight": "画像不存在"}
+
+    with open(p, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    sg = os.path.join(_VAULT, "sandglass.txt")
+    if not os.path.exists(sg):
+        return {"verified": 0, "failed": 0, "total": 0, "details": [], "insight": "沙漏不存在"}
+
+    # 读沙漏行号索引
+    sg_lines = {}
+    with open(sg, "r", encoding="utf-8") as f:
+        for i, line in enumerate(f, 1):
+            sg_lines[i] = line.strip()
+
+    details = []
+    verified = 0
+    failed = 0
+
+    for m in re.finditer(r'\[src:([a-f0-9]+):L?(\d+)\]', content):
+        expected_hash = m.group(1)
+        line_num = int(m.group(2))
+        if line_num in sg_lines:
+            actual_hash = hashlib.sha256(sg_lines[line_num][:300].encode()).hexdigest()[:8]
+            if actual_hash == expected_hash:
+                verified += 1
+                details.append({"line": line_num, "status": "ok", "hash": expected_hash})
+            else:
+                failed += 1
+                details.append({"line": line_num, "status": "mismatch",
+                               "expected": expected_hash, "actual": actual_hash})
+        else:
+            failed += 1
+            details.append({"line": line_num, "status": "missing", "warning": "行号不存在"})
+
+    insight = f"✅ {verified}/{verified+failed} 溯源验证通过" if verified+failed > 0 else "画像中无溯源标签"
+    if failed > 0:
+        insight += f"，{failed}条异常（{'幻觉行号' if any(d.get('status')=='missing' for d in details) else '源内容已变'}）"
+    return {"verified": verified, "failed": failed, "total": verified+failed,
+            "details": details, "insight": insight}
+
+def persona_diff() -> dict:
+    """对比新旧画像变更——新增/消失/不变的声明。用于persona_update后自动追踪。"""
+    import re
+    backup = os.path.join(_PERSONA_DIR, "persona.prev.md")
+    current = os.path.join(_PERSONA_DIR, "persona.md")
+
+    if not os.path.exists(current):
+        return {"added": 0, "removed": 0, "unchanged": 0, "insight": "画像不存在"}
+    if not os.path.exists(backup):
+        # 首次——保存当前为基准
+        import shutil
+        shutil.copy2(current, backup)
+        return {"added": 0, "removed": 0, "unchanged": 0, "insight": "首次——已保存基线"}
+
+    with open(backup, "r", encoding="utf-8") as f:
+        old = f.read()
+    with open(current, "r", encoding="utf-8") as f:
+        new = f.read()
+
+    # 提取 [src:...] 标签作为声明ID
+    def extract_src(text):
+        return set(re.findall(r'\[src:([a-f0-9]+):L\d+\]', text))
+
+    old_srcs = extract_src(old)
+    new_srcs = extract_src(new)
+
+    added = new_srcs - old_srcs
+    removed = old_srcs - new_srcs
+    unchanged = old_srcs & new_srcs
+
+    return {"added": len(added), "removed": len(removed), "unchanged": len(unchanged),
+            "added_hashes": list(added)[:10], "removed_hashes": list(removed)[:10],
+            "insight": f"🆕 {len(added)}新增 💨 {len(removed)}消失 ✅ {len(unchanged)}不变" if added or removed else "无变化"}
+
 
 from offset_signals import _OFFSET_SIGNALS
 
@@ -1558,41 +1650,69 @@ def persona_maintain() -> dict:
     return {"triggered": False, "reason": "更新失败"}
 
 def novel_scene_detect() -> dict:
-    """频率突变检测新场景——不用关键词，纯统计。"""
+    """频率突变检测——突增+消退+停用词过滤+偏移率触发。纯统计，零依赖。"""
     import re
     from sandglass_vault import recent
     recent_sands = recent(20)
     hist_sands = recent(200)
     if not recent_sands:
-        return {"novel": [], "insight": "数据不足"}
+        return {"novel": [], "fading": [], "insight": "数据不足"}
 
-    # 简单分词：2字以上中文词+3字以上英文词
+    STOPWORDS = {'什么', '怎么', '这个', '那个', '可以', '就是', '然后', '但是',
+                 '因为', '所以', '如果', '虽然', '已经', '还是', '没有', '不是',
+                 '一个', '一下', '一些', '有点', '的话', '的时候', '这样', '那样',
+                 'the', 'and', 'for', 'this', 'that', 'with', 'from', 'have',
+                 'image', 'you', 'llm', 'user', 'time', 'your', 'all', 'are',
+                 'not', 'but', 'has', 'was', 'can', 'its', 'get', 'now'}
+
     def _words(sands):
         freq = {}
         for _, _, text in sands:
             for w in re.findall(r'[\u4e00-\u9fff]{2,}|[a-zA-Z]{3,}', text.lower()):
-                freq[w] = freq.get(w, 0) + 1
+                if w not in STOPWORDS:
+                    freq[w] = freq.get(w, 0) + 1
         return freq
 
     recent_freq = _words(recent_sands)
     hist_freq = _words(hist_sands) if hist_sands else {}
 
-    # 频率突增3倍以上 = 新场景信号
-    novel_words = []
+    # 突增检测（3倍以上）
+    emerging = []
     for w, rc in recent_freq.items():
         hc = hist_freq.get(w, 0)
         if rc >= 2 and (hc == 0 or rc / max(hc, 1) >= 3):
-            novel_words.append((w, rc, hc))
+            emerging.append((w, rc, hc))
 
-    if not novel_words:
-        return {"novel": [], "insight": "无新场景"}
+    # 消退检测（历史高频但现在消失）
+    fading = []
+    for w, hc in hist_freq.items():
+        rc = recent_freq.get(w, 0)
+        if hc >= 3 and rc == 0 and w not in STOPWORDS:
+            fading.append((w, hc, rc))
 
-    novel_words.sort(key=lambda x: x[1]/max(x[2],1), reverse=True)
-    top = novel_words[:5]
-    insight = "发现 " + str(len(top)) + " 个频率突增词: " + ", ".join(
-        f"{w}({rc}vs{hc})" for w, rc, hc in top) + "。可能是新话题。"
-    return {"novel": [{"word": w, "recent": rc, "historical": hc} for w, rc, hc in top],
-            "insight": insight}
+    # 偏移率触发器——突增+消退同时存在时自动触发
+    drift_trigger = False
+    if emerging and fading:
+        try:
+            comp = comprehensive_offset()
+            drift_trigger = abs(comp.get("offset", 0)) >= 30
+        except Exception:
+            pass
+
+    parts = []
+    if emerging:
+        top = sorted(emerging, key=lambda x: x[1]/max(x[2],1), reverse=True)[:5]
+        parts.append("🆕 " + ", ".join(f"{w}({rc}vs{hc})" for w, rc, hc in top))
+    if fading:
+        top = sorted(fading, key=lambda x: x[1], reverse=True)[:5]
+        parts.append("📉 " + ", ".join(f"{w}(曾{hc}次)" for w, hc, _ in top))
+    if drift_trigger:
+        parts.append("⚡ 频率突变触发偏移率检查")
+
+    return {"emerging": [{"word": w, "recent": rc, "historical": hc} for w, rc, hc in emerging],
+            "fading": [{"word": w, "historical": hc} for w, hc, _ in fading],
+            "drift_trigger": drift_trigger,
+            "insight": " | ".join(parts) if parts else "无显著变化"}
 
 def search_with_stage_label(query: str, limit: int = 5) -> list:
     """搜索并对每条结果标注阶段兼容性。"""
@@ -1738,18 +1858,19 @@ def _search_with_fallback(expanded, vs, limit=10, weights=None):
 
 
 def _sentiment_wind() -> float:
-    """从最近沙子读情绪风向。>0正面 <0负面。零新文件——复用L3情绪熵。"""
+    """20条EMA加权情绪风向。越近权重越高。>0正面 <0负面。"""
     from sandglass_vault import recent
     from emotion_vocab import detect as emotion_detect
-    sands = recent(5)
+    sands = recent(20)
     if not sands: return 0.0
     mood_scores = {"开心": 1, "意外": 0.5, "困惑": -0.5,
                    "悲伤": -1, "焦虑": -1, "愤怒": -1, "放弃": -1}
     scores = []
-    for _, _, text in sands:
+    for i, (_, _, text) in enumerate(sands):
         det = emotion_detect(text)
         if det.get("mood"):
-            scores.append(mood_scores.get(det["mood"], 0))
+            weight = (i + 1) / len(sands)  # 最近权重最高
+            scores.append(mood_scores.get(det["mood"], 0) * weight)
     return round(sum(scores) / max(len(scores), 1), 2)
 
 
@@ -1770,11 +1891,17 @@ def sentiment_rerank(results, wind: float):
         pos = sum(1 for w in positive_words if w in text)
         neg = sum(1 for w in negative_words if w in text)
         sentiment_score = (pos - neg) / max(len(text.split()), 1)
-        # 正面风→推正面内容   负面风→抑制负面，中性/正面浮到上面
         if wind > 0:
             boost = sentiment_score * wind * 0.2
+        elif wind < 0:
+            if sentiment_score > 0:
+                boost = -sentiment_score * abs(wind) * 0.2  # 负面风压正面
+            elif sentiment_score < 0:
+                boost = sentiment_score * abs(wind) * 0.1   # 轻微压负面
+            else:
+                boost = abs(wind) * 0.15  # 中性浮上来
         else:
-            boost = min(sentiment_score, 0) * abs(wind) * 0.15  # 负面内容被压下
+            boost = 0
         scored.append((boost, item))
     scored.sort(key=lambda x: x[0], reverse=True)
     return [item for _, item in scored]
