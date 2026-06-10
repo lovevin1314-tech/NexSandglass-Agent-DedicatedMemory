@@ -44,6 +44,28 @@ _CANVAS = os.path.join(_VAULT, "profile", "canvas.md")
 _PATTERNS = os.path.join(_VAULT, "profile", "thinking-patterns.md")
 _INSIGHTS = os.path.join(_VAULT, "memory", "insights.md")
 
+
+# ═══════════════════════════════════════════════
+# 纪律因子 — L3铁律约束
+# ═══════════════════════════════════════════════
+
+_IRON_RULES = os.path.join(_VAULT, "iron_rules.txt")
+
+def iron_rules() -> list:
+    """读取用户设定的铁律——绝不违反的规则。最多5条。"""
+    if not os.path.exists(_IRON_RULES):
+        return []
+    with open(_IRON_RULES, "r", encoding="utf-8") as f:
+        return [l.strip() for l in f.readlines() if l.strip()][:5]
+
+def iron_rules_set(rules: list) -> bool:
+    """设定铁律。覆盖写入，最多5条。"""
+    os.makedirs(os.path.dirname(_IRON_RULES), exist_ok=True)
+    with open(_IRON_RULES, "w", encoding="utf-8") as f:
+        for r in rules[:5]:
+            f.write(r[:200] + "\n")
+    return True
+
 logger = logging.getLogger(__name__)
 
 # ── LLM 配置 ──
