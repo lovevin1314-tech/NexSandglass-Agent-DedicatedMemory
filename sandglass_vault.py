@@ -215,7 +215,7 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
 
         # ── 影子沙优先（脱口而出层） ──
         try:
-            from shadow_sand import shadow_search as _shadow_search, shadow_retrieval_bump
+            from shadow_sand import shadow_search as _shadow_search, shadow_retrieval_bump, shadow_boost, shadow_boost
             shadow_hits = _shadow_search(query, limit)
             if shadow_hits:
                 results = []
