@@ -13,3 +13,4 @@ decision_particles_backup.txt
 .env
 
 .aider*
+node_modules/
