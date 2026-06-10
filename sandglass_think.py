@@ -816,6 +816,61 @@ def persona_diff() -> dict:
             "insight": f"🆕 {len(added)}新增 💨 {len(removed)}消失 ✅ {len(unchanged)}不变" if added or removed else "无变化"}
 
 
+def persona_project(direction: str, offset: int) -> dict:
+    """影子灵魂——基于当前偏移方向，模拟「如果选相反方向会变成怎样」。
+    读取决策粒子历史，构建反向投影画像，和当前画像对比。
+    返回 {shadow_persona, divergence, insight}"""
+    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+    if not os.path.exists(dp_path):
+        return {"shadow_persona": "", "divergence": 0, "insight": "无决策粒子数据"}
+
+    opposites = {"frugal": "花钱", "spend": "省钱", "drift": "坚持"}
+    reverse = opposites.get(direction, "相反方向")
+    
+    # 读决策粒子——提取反向选择的模拟
+    shadow_lines = []
+    with open(dp_path, "r", encoding="utf-8") as f:
+        for line in f:
+            parts = line.strip().split(" | ")
+            if len(parts) >= 5:
+                dir_tag = parts[3]  # emotion + direction
+                # 收集相反方向的决策粒子
+                if direction in ("frugal", "spend") and (
+                    (direction == "frugal" and any(w in dir_tag.lower() for w in ["spend","花钱","买","付费"])) or
+                    (direction == "spend" and any(w in dir_tag.lower() for w in ["frugal","省钱","免费","开源"])) or
+                    (direction == "drift" and any(w in dir_tag.lower() for w in ["坚持","继续","不放弃"]))):
+                    shadow_lines.append(parts[2][:100])
+
+    if not shadow_lines:
+        return {"shadow_persona": "", "divergence": 0,
+                "insight": f"影子灵魂: 如果选择{reverse}…数据不足，等待更多交叉决策"}
+
+    # 用织布机追溯影子路径
+    try:
+        from sandglass_think import weave_graph
+        wg = weave_graph(f"{reverse} 方案", max_hops=2)
+        causal_hint = wg.get("insight", "") if wg else ""
+    except:
+        causal_hint = ""
+
+    shadow = f"影子灵魂——如果当初选择{reverse}（偏移{offset:+d}%）:\n"
+    shadow += f"  交叉决策: {len(shadow_lines)}条\n"
+    for s in shadow_lines[:3]:
+        shadow += f"  - {s}\n"
+    if causal_hint and "数据不足" not in str(causal_hint):
+        shadow += f"  因果追溯: {causal_hint}\n"
+
+    divergence = min(abs(offset) * 2, 100)
+    insight = f"影子灵魂: 如果选择{reverse}，偏移差值约{divergence}%。{'差距在拉大——你现在走的这条路正在塑造一个不同的你' if divergence > 50 else '影子还很淡——你和另一个选择差距不大'}"
+
+    # 写入影子画像
+    shadow_path = os.path.join(_PERSONA_DIR, "persona.shadow.md")
+    with open(shadow_path, "w", encoding="utf-8") as f:
+        f.write(f"# 影子画像 — {reverse}方向\n>\n> 触发偏移: {offset:+d}% ({direction})\n>\n{shadow}")
+
+    return {"shadow_persona": shadow[:500], "divergence": divergence, "insight": insight}
+
+
 from offset_signals import _OFFSET_SIGNALS
 
 # ── 波浪阈值——单一真相来源。不判对错，只照影子深浅 ──
@@ -998,10 +1053,16 @@ def comprehensive_offset(scene: str = "") -> dict:
     }
     if scene:
         result["scene"] = scene
-    # 偏移超过阈值 → 自动织造
+    # 偏移超过阈值 → 自动织造 + 幽灵决策 + 影子画像
     if abs(avg) >= 30:
         try:
             weave_contradiction()
+        except: pass
+        try:
+            from sandglass_think import entropy_ghost, persona_project
+            if direction in ("frugal", "spend", "drift"):
+                entropy_ghost(f"如果选择相反的{['省钱','花钱','放弃'][['frugal','spend','drift'].index(direction)]}方向会怎样")
+                persona_project(direction, avg)
         except: pass
     return result
 
