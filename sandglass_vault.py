@@ -213,8 +213,21 @@ def _sync_index() -> dict:
 # ═══════════════════════════════════════════════
 
 def search(query: str, limit: int = 10, month: str = "") -> list:
-    """搜索沙漏。投石问路优先→FTS5→mmap降级。
-    返回 [(行号, 时间, 明文), ...]。month 可选 '2026-06'。"""
+    """搜索沙漏。返回 [(行号, 时间, 明文), ...]。
+    委托给 SearchRouter 三层架构——影子沙→投石问路→mmap。"""
+    try:
+        from search_router import SearchRouter, ShadowSearch, IdxFtsSearch, MmapFallback
+        router = SearchRouter(
+            ShadowSearch(_SANDGLASS),
+            IdxFtsSearch(_SANDGLASS, _IDX),
+            MmapFallback(_SANDGLASS)
+        )
+        return router.search(query, limit)
+    except Exception:
+        return _legacy_search(query, limit, month)
+
+
+def _legacy_search(query, limit, month):
     try:
         if not os.path.exists(_SANDGLASS):
             return []

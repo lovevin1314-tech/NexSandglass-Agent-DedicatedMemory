@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@athenaflow/plugin-matt-pocock-skills": "^0.1.8"
+  }
+}
