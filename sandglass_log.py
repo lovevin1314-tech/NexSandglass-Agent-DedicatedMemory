@@ -80,13 +80,10 @@ def log_message(text: str, sender: str = "agent") -> bool:
             except OSError:
                 pass
 
-        # 影子沙——落沙后同步索引实体+信任分
+        # 影子沙——落沙后同步索引（自增ID，不读文件）
         try:
             from shadow_sand import shadow_index
-            # 行号 = 沙漏当前行数
-            with open(_SANDGLASS, "r", encoding="utf-8") as f:
-                line_num = sum(1 for _ in f)
-            shadow_index(text, line_num)
+            shadow_index(text)
         except Exception:
             pass
 

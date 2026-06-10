@@ -499,9 +499,7 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
     # 影子沙同步
     try:
         from shadow_sand import shadow_index
-        with open(_PARTICLES, "r", encoding="utf-8") as f:
-            line_num = sum(1 for _ in f)
-        shadow_index(choice, line_num, "decision", tags)
+        shadow_index(choice, "decision", tags)
     except: pass
 
     feed_all(resolved, tags, direction)
