@@ -234,7 +234,9 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
         except Exception:
             pass
 
-        # ── 投石问路优先（第二层主力） ──
+        # ── 投石问路 → FTS5精排（第二层串联） ──
+        # idx 快速定位候选行号，FTS5/五维权重精排
+        candidate_lines = set()
         try:
             idx = _sync_index()
             if not idx:
@@ -242,36 +244,9 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
                 idx = _sync_index()
             if idx:
                 q_tokens = _query_tokens(query)
-                candidate_lines = set()
                 for token in q_tokens:
                     if token in idx:
                         candidate_lines.update(idx[token])
-                if candidate_lines:
-                    # 读解密原文按行号返回
-                    results = []
-                    with open(_SANDGLASS, "r", encoding="utf-8") as f:
-                        for n, line in enumerate(f, 1):
-                            if n in candidate_lines:
-                                ts, sender, text = _parse_line(line)
-                                if ts and text:
-                                    results.append((n, ts, text))
-                            if len(results) >= limit * 3:  # 多取些给权重排序
-                                break
-                    if results:
-                        # 五维权重排序（场景+画像+阶段+粒子+偏移方向）
-                        try:
-                            from sandglass_think import search_filter
-                            sf = search_filter(query)
-                            weights = sf.get("weights", {})
-                            if weights:
-                                scored = []
-                                for ln, ts, text in results:
-                                    score = sum(weights.get(w, 1.0) for w in _query_tokens(text) if w in weights)
-                                    scored.append((score, (ln, ts, text)))
-                                scored.sort(key=lambda x: x[0], reverse=True)
-                                results = [item for _, item in scored]
-                        except: pass
-                        return results[:limit]
         except Exception:
             pass
 
@@ -287,6 +262,39 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
             except Exception:
                 pass
             has_llm = filt.get("source", "").startswith("LLM")
+
+            # 投石问路先行——如果有候选行号，FTS5只在候选行内精排
+            if candidate_lines:
+                try:
+                    from sandglass_sqlite import search_in, sync_incremental
+                    sync_incremental()
+                    ranked = search_in(list(candidate_lines), query)
+                    if ranked:
+                        line_nums = [r[0] for r in ranked[:limit]]
+                        # 五维权重排序
+                        results = []
+                        with open(_SANDGLASS, "r", encoding="utf-8") as f:
+                            for n, line in enumerate(f, 1):
+                                if n in line_nums:
+                                    ts, sender, text = _parse_line(line)
+                                    if ts and text:
+                                        results.append((n, ts, text))
+                        if results:
+                            try:
+                                from sandglass_think import search_filter
+                                sf = search_filter(query)
+                                weights = sf.get("weights", {})
+                                if weights:
+                                    scored = []
+                                    for ln, ts, text in results:
+                                        score = sum(weights.get(w, 1.0) for w in _query_tokens(text) if w in weights)
+                                        scored.append((score, (ln, ts, text)))
+                                    scored.sort(key=lambda x: x[0], reverse=True)
+                                    results = [item for _, item in scored]
+                            except: pass
+                            return results[:limit]
+                except Exception:
+                    pass  # 投石问路+FTS5失败，继续走全量FTS5
 
             # 默认搜近一年——缩小范围加速
             if not month:
