@@ -182,7 +182,7 @@ def _read_context() -> str:
         with open(persona_path, "r", encoding="utf-8") as f:
             content = f.read()
         # 只取最关键的段落——认知内核和交互协议
-        for section in ["🟡 交互协议", "🔴 认知内核", "基础锚点"]:
+        for section in ["🟡 交互协议", "🔴 认知内核", "🟢 基础锚点"]:
             start = content.find(f"## {section}")
             if start >= 0:
                 end = content.find("\n## ", start + 10)
@@ -631,5 +631,7 @@ def _weave_check(tags: str, direction: str) -> None:
         with open(wl, "a", encoding="utf-8") as f:
             for c in contra:
                 f.write(f"[{datetime.now():%Y-%m-%d %H:%M}] {c}\n")
-        os.utime(last_alert, None) if not os.path.exists(last_alert) else None
-        with open(last_alert, "a"): pass  # touch
+        # 更新冷却时间戳（touch + mtime）
+        if not os.path.exists(last_alert):
+            with open(last_alert, "w") as f: pass
+        os.utime(last_alert, None)
