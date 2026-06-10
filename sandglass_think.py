@@ -827,7 +827,7 @@ def persona_project(direction: str, offset: int) -> dict:
     opposites = {"frugal": "花钱", "spend": "省钱", "drift": "坚持"}
     reverse = opposites.get(direction, "相反方向")
     
-    # 情感风——缩小影子选择范围
+    # 回音折——缩小影子选择范围
     wind_direction = 0  # 正=开心/自信，负=焦虑/放弃
     try:
         echo_path = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
@@ -874,12 +874,12 @@ def persona_project(direction: str, offset: int) -> dict:
 
     shadow = f"影子灵魂——如果当初选择{reverse}（偏移{offset:+d}%）:\n"
     shadow += f"  交叉决策: {len(shadow_lines)}条"
-    # 情感风信号
+    # 回音折信号
     wind_signal = ""
     if wind_direction > 0.5:
-        wind_signal = f"  情感风: 正面({wind_direction:+.1f}) → 影子偏向自信路径\n"
+        wind_signal = f"  回音折: 正面({wind_direction:+.1f}) → 影子偏向自信路径\n"
     elif wind_direction < -0.5:
-        wind_signal = f"  情感风: 负面({wind_direction:+.1f}) → 影子偏向安全路径\n"
+        wind_signal = f"  回音折: 负面({wind_direction:+.1f}) → 影子偏向安全路径\n"
     shadow += wind_signal
     for s in shadow_lines[:3]:
         shadow += f"  - {s}\n"
