@@ -124,6 +124,31 @@ for q in conv.get("qa", []):
             pts = sum(1 for w in qws if w in line.lower())
             if pts >= 1: ctx.append(("[画像]", line[:200], 8+pts))
     
+    # ═══ 织布机三支柱推理 ═══
+    try:
+        from sandglass_think import weave_insight, weave_graph
+        # weave_insight: 画像+偏移+搜索三支柱合成
+        wi = weave_insight(qt)
+        if wi.get("synthesis") and wi["synthesis"] != "数据不足，无法合成":
+            ctx.append(("[织布合成]", wi["synthesis"][:200], 7))
+        for pv in wi.get("persona_view", [])[:2]:
+            if pv and pv != "画像中无相关内容":
+                ctx.append(("[织布-画像线]", str(pv)[:200], 6))
+        for sv in wi.get("search_view", [])[:2]:
+            if isinstance(sv, dict):
+                ctx.append(("[织布-检索线]", sv.get("text","")[:200], 5))
+            elif isinstance(sv, (list, tuple)) and len(sv) >= 3:
+                ctx.append(("[织布-检索线]", str(sv[2])[:200], 5))
+        # weave_graph: 因果链追溯
+        wg = weave_graph(qt, max_hops=2)
+        for chain in wg.get("chains", [])[:3]:
+            if isinstance(chain, dict):
+                ctx.append(("[因果链]", str(chain)[:200], 6))
+        if wg.get("insight") and "数据不足" not in str(wg.get("insight")):
+            ctx.append(("[因果洞察]", str(wg["insight"])[:200], 6))
+    except Exception:
+        pass
+    
     # ═══ 米粒 ═══
     if os.path.exists(dp_path):
         with open(dp_path, "r", encoding="utf-8") as f:
