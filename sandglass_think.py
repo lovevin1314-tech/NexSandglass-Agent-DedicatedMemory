@@ -894,6 +894,21 @@ def persona_project(direction: str, offset: int) -> dict:
     with open(shadow_path, "w", encoding="utf-8") as f:
         f.write(f"# 影子画像 — {reverse}方向\n>\n> 触发偏移: {offset:+d}% ({direction})\n>\n{shadow}")
 
+    # 回音折写回——影子本身产生情感风，影响未来的幽灵决策
+    try:
+        echo_path = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
+        echo_entry = {
+            "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "sentiment": "正面" if divergence < 40 else "负面",
+            "options": f"影子投影:{direction}→{reverse}",
+            "spread_weight": round(1.0 + abs(offset) / 200, 2),
+            "source": "persona_project"
+        }
+        os.makedirs(os.path.dirname(echo_path), exist_ok=True)
+        with open(echo_path, "a", encoding="utf-8") as ef:
+            ef.write(json.dumps(echo_entry, ensure_ascii=False) + "\n")
+    except: pass
+
     return {"shadow_persona": shadow[:500], "divergence": divergence, "insight": insight}
 
 
