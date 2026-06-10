@@ -9,7 +9,13 @@ import os, re, sqlite3, threading
 
 _DB = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.db")
 _lock = threading.Lock()
-_last_sync_mtime = 0  # 记录上次同步时的 sandglass.txt 修改时间
+_last_sync_mtime = 0
+
+
+def set_db_path(path: str):
+    """重定向FTS5数据库路径——基准测试用临时沙漏时调用。"""
+    global _DB
+    _DB = path  # 记录上次同步时的 sandglass.txt 修改时间
 
 
 def _tokenize(text: str) -> str:

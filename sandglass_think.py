@@ -12,6 +12,22 @@ import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
+# ═══════════════════ 场景感知 ═══════════════════
+_SCENE_MODE = None  # None=自动, 'exam'=考试, 'normal'=日常
+
+def scene_mode(mode: str = None) -> str:
+    """设置/读取场景模式。'exam'只走影子沙，'normal'全开L3。"""
+    global _SCENE_MODE
+    if mode: _SCENE_MODE = mode
+    if _SCENE_MODE: return _SCENE_MODE
+    # 自动检测: 最近5条沙子全是英文QA→考试场景
+    try:
+        from sandglass_vault import recent
+        sands = recent(5)
+        en_count = sum(1 for _,_,t in sands if t and sum(1 for c in t if 'a'<=c.lower()<='z')>len(t)*0.4)
+        return 'exam' if en_count >= 4 else 'normal'
+    except: return 'normal'
+
 from sandglass_vault import _tokenize
 
 _VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")

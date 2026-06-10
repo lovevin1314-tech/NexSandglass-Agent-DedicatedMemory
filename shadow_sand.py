@@ -10,6 +10,12 @@ from collections import defaultdict
 
 _SHADOW_DB = os.path.join(os.path.expanduser("~"), ".neurobase", "shadow_sand.db")
 
+def set_shadow_path(path: str):
+    """重定向影子沙路径——基准测试用。"""
+    global _SHADOW_DB, _conn
+    if _conn: _conn.close(); _conn = None
+    _SHADOW_DB = path
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS trust (
     line_num    INTEGER PRIMARY KEY,  -- 对应sandglass.txt行号
@@ -129,6 +135,10 @@ def shadow_boost(candidate_lines: set, limit: int = 10) -> list:
 # ═══════════════════ 写入（落沙后同步） ═══════════════════
 
 def shadow_index(text: str, category: str = "general", tags: str = "") -> None:
+    try:
+        from sandglass_think import scene_mode
+        if scene_mode() == 'exam': category = 'exam_' + category
+    except: pass
     """落沙后同步——自增ID，不读沙漏文件。"""
     db = _get_conn()
     with _lock:
