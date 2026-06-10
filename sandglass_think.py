@@ -893,6 +893,25 @@ def _read_decision_log(limit: int = 20) -> list:
     return entries[-limit:]
 
 @_fail_open({})
+
+def _metrics_feedback() -> dict:
+    """读取最近度量指标，返回调整建议。"""
+    ml = os.path.join(_VAULT, "metrics.log")
+    if not os.path.exists(ml): return {}
+    try:
+        with open(ml, "r", encoding="utf-8") as f:
+            lines = f.readlines()[-100:]
+        if len(lines) < 10: return {}
+        offsets = []
+        for line in lines:
+            m = re.search(r'offset=([+-]?\d+)', line)
+            if m: offsets.append(int(m.group(1)))
+        if not offsets: return {}
+        avg_offset = sum(offsets[-10:]) / len(offsets[-10:])
+        return {"avg_offset": avg_offset, "sample": len(offsets),
+                "drift_accelerating": len(offsets) > 20 and abs(sum(offsets[-5:])/5) > abs(sum(offsets[-20:-5])/15)}
+    except: return {}
+
 def comprehensive_offset(scene: str = "") -> dict:
     """综合偏移率——滚动窗口加权平均。可选按场景过滤。
     scene 参数匹配场景标签列表中的任意一项。"""
@@ -979,6 +998,11 @@ def comprehensive_offset(scene: str = "") -> dict:
     }
     if scene:
         result["scene"] = scene
+    # 偏移超过阈值 → 自动织造
+    if abs(avg) >= 30:
+        try:
+            weave_contradiction()
+        except: pass
     return result
 
 def _maybe_switch_stage(direction: str) -> str | None:
