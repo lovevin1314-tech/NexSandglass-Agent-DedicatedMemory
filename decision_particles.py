@@ -483,13 +483,38 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
     else:
         resolved = choice
 
-    record = f"{options} | {resolved} | {direction} | {tags}"
+    # 情绪标记
+    emotion_tag = "neutral"
+    try:
+        from emotion_vocab import detect as emotion_detect
+        det = emotion_detect(question + " " + choice)
+        if det.get("mood"): emotion_tag = det["mood"]
+    except: pass
+    record = f"{options} | {resolved} | {direction} | {emotion_tag} | {tags}"
 
     os.makedirs(os.path.dirname(_PARTICLES), exist_ok=True)
     with open(_PARTICLES, "a", encoding="utf-8") as f:
         f.write(f"{ts} | {record}\n")
 
     feed_all(resolved, tags, direction)
+
+    # 回音折回读——落粒子时读取情感残留
+    try:
+        echo_path = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
+        if os.path.exists(echo_path):
+            qwords = set(question.lower().split())
+            with open(echo_path, "r", encoding="utf-8") as ef:
+                for eline in ef:
+                    try:
+                        rec = json.loads(eline.strip())
+                        ow = set(rec.get("options", "").lower().split())
+                        if len(qwords & ow) >= 2 and rec.get("sentiment"):
+                            # 回音残留——追加到决策粒子
+                            with open(_PARTICLES, "a", encoding="utf-8") as af:
+                                af.write(f"{ts} | echo_wind | {rec['sentiment']}({rec.get('spread_weight',1.0)}) | echo | 回音折残留\n")
+                            break
+                    except: pass
+    except: pass
 
 
 def _has_llm() -> bool:
