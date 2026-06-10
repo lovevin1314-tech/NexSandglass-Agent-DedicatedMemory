@@ -4,3 +4,11 @@ __pycache__/
 *.rej
 *.orig
 *.zip
+sandglass.txt
+sandglass.idx
+decision_particles.txt
+decision_particles_backup.txt
+*.db
+*.sqlite
+.env
+
