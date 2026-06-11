@@ -456,21 +456,44 @@ def _legacy_search(query, limit, month):
 
 
 def recent(n: int = 10) -> list:
-    """最近 N 条。[(行号, 时间, 明文), ...]"""
+    """最近 N 条。[(行号, 时间, 明文), ...]。V2.3.9: seek逆向流式，O(N)内存。"""
     try:
         if n <= 0 or not os.path.exists(_SANDGLASS):
             return []
-        from collections import deque
-        with open(_SANDGLASS, "r", encoding="utf-8") as f:
-            all_lines = f.readlines()
-        total = len(all_lines)
-        last_lines = deque(all_lines, n)
+        
+        # 逆向读取文件尾部——只加载最后几KB，不读全文件
+        chunk_size = 4096
+        with open(_SANDGLASS, "rb") as f:
+            f.seek(0, 2)  # 跳到文件末尾
+            file_size = f.tell()
+            
+            lines_found = []
+            buffer = b""
+            pos = file_size
+            
+            while pos > 0 and len(lines_found) < n:
+                read_size = min(chunk_size, pos)
+                pos -= read_size
+                f.seek(pos)
+                chunk = f.read(read_size)
+                buffer = chunk + buffer
+                lines_found = buffer.split(b"\n")
+                # 保留最后N+1行（最后一行可能是空）
+                if len(lines_found) > n + 1:
+                    lines_found = lines_found[-(n + 1):]
+                buffer = b"" if lines_found[0] == b"" else b""
+            
+            # 取最后n行非空行
+            lines_found = [l for l in lines_found if l.strip()][-n:]
+        
+        total = sum(1 for _ in open(_SANDGLASS, "rb"))
         results = []
-        for i, line in enumerate(last_lines):
-            ts, sender, text = _parse_line(line)
+        for i, line in enumerate(lines_found):
+            decoded = line.decode("utf-8", errors="ignore").strip()
+            ts, sender, text = _parse_line(decoded)
             if not ts:
                 continue
-            ln = total - len(last_lines) + i + 1
+            ln = total - len(lines_found) + i + 1
             results.append((ln, ts, text))
         return results
     except Exception:
