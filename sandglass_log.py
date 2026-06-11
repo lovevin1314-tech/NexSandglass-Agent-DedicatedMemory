@@ -58,18 +58,6 @@ def log_message(text: str, sender: str = "agent") -> bool:
         if sender == "agent" and _estimate_info_value(text) < 0.3:
             return False
 
-        # 净化器插件（可选）
-        sanitizer = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plugins", "sanitize.py")
-        if os.path.exists(sanitizer):
-            try:
-                import importlib.util
-                spec = importlib.util.spec_from_file_location("sanitize", sanitizer)
-                mod = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(mod)
-                text = mod.sanitize(text)
-            except Exception:
-                pass
-
         os.makedirs(os.path.dirname(_SANDGLASS), exist_ok=True)
         line = f"{datetime.now():%Y-%m-%d %H:%M:%S} | {sender} | {text}\n"
 
