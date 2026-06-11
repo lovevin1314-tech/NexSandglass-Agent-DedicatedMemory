@@ -510,7 +510,8 @@ def search_semantic(query: str, limit: int = 10) -> list:
     # 2.5级：SimHash语义搜索（V2.0.1，零依赖纯本地）
     try:
         from l3_search_core import simhash_search
-        wide = vs(query, limit=200)
+        from sandglass_vault import recent
+        wide = [(ln, ts, text) for ln, ts, text in recent(200)]
         if wide:
             semantic = simhash_search(query, wide, limit=limit * 2)
             if semantic:
