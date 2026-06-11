@@ -132,7 +132,8 @@ def main():
             elif method == "initialize":
                 print(_rpc_response(tid, {
                     "protocolVersion": "2024-11-05",
-                    "serverInfo": {"name": "NexSandglass", "version": "2.2.0"}
+                    "capabilities": {"tools": {}},
+                    "serverInfo": {"name": "NexSandglass", "version": "2.3.4"}
                 }), flush=True)
 
             else:
