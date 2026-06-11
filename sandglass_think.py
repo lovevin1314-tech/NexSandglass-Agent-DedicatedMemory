@@ -1,13 +1,10 @@
 """NeuroBase Sandglass L3 -- 蒸馏·偏移率·搜索滤镜。完整架构见 CLAUDE.md / README。"""
 
-import json
 import hashlib
+import json
 import logging
 import os
 import re
-import statistics
-import urllib.request
-import urllib.error
 from datetime import datetime
 
 from sandglass_vault import _tokenize
