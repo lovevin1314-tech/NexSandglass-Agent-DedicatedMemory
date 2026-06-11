@@ -640,18 +640,36 @@ def search_filter(query: str) -> dict:
     # ── 影子沙注入（脱口而出层的实体标签 → 搜索权重）──
     try:
         from shadow_sand import shadow_search
+        db = __import__('shadow_sand')._get_conn()
         sh = shadow_search(query, 5)
         if sh:
-            db = __import__('shadow_sand')._get_conn()
-            for score, ln in sh[:3]:
-                row = db.execute("SELECT tags FROM trust WHERE line_num = ?", (ln,)).fetchone()
-                if row and row[0]:
-                    for tag in row[0].split(","):
-                        tag = tag.strip()
-                        if tag and tag not in result["keywords"]:
+            line_nums = [ln for _, ln in sh[:3]]
+            # 读取实体的标签/类别
+            for ln in line_nums:
+                row = db.execute("SELECT category, tags FROM fact_tags WHERE line_num = ?", (ln,)).fetchone()
+                if row:
+                    if row[0] and row[0] != 'general':
+                        tag = row[0]
+                        if tag not in result["keywords"]:
                             result["keywords"].append(tag)
-                            result["weights"][tag] = 1.5  # 影子沙标签加权
-            result["shadow_context"] = f"影子沙命中{len(sh)}条"
+                            result["weights"][tag] = 1.5
+                    if row[1]:
+                        for tag in row[1].split(","):
+                            tag = tag.strip()
+                            if tag and tag not in result["keywords"]:
+                                result["keywords"].append(tag)
+                                result["weights"][tag] = 1.3
+            # 实体名注入
+            entities = db.execute(
+                "SELECT name FROM entities WHERE line_nums LIKE ? LIMIT 5",
+                (f'%{line_nums[0]}%',)
+            ).fetchall() if line_nums else []
+            for (name,) in entities:
+                if name.lower() not in [k.lower() for k in result["keywords"]]:
+                    result["keywords"].append(name)
+                    result["weights"][name] = 1.6  # 实体名最高权重
+            if sh or entities:
+                result["shadow_context"] = f"影子沙命中{len(sh)}条, 实体{len(entities)}个"
     except Exception:
         pass
 
