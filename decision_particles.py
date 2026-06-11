@@ -11,9 +11,9 @@ NexSandglass 决策粒子 — 第三层通用燃料 V2
 import os, json
 from datetime import datetime
 
-_PARTICLES = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
-_VOCAB = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_vocab.txt")
-_NB = os.path.expanduser("~/.neurobase")
+_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+_PARTICLES = os.path.join(_NB, "decision_particles.txt")
+_VOCAB = os.path.join(_NB, "decision_vocab.txt")
 
 # ═══════════════════════════════════════════════
 # 本地标签词库
@@ -429,7 +429,7 @@ def _infer_resolution(chain: list[str]) -> str:
     return _infer_local(chain)
 
 
-_ECHO_WIND = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
+_ECHO_WIND = os.path.join(_NB, "echo_wind.jsonl")
 
 def _infer_sentiment(question: str) -> str:
     """从决策粒子上下文推断情感风。"""
@@ -514,7 +514,7 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
 
     # 回音折回读——落粒子时读取情感残留
     try:
-        echo_path = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
+        echo_path = os.path.join(_NB, "echo_wind.jsonl")
         if os.path.exists(echo_path):
             qwords = set(question.lower().split())
             with open(echo_path, "r", encoding="utf-8") as ef:
