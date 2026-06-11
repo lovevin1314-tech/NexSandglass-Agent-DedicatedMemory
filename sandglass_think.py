@@ -40,11 +40,8 @@ from offset_l3 import (
     stage_mark, stage_marks,
 )
 
-# ── LLM 配置 ──
-_LLM_KEY = os.environ.get("DEEPSEEK_API_KEY", "") or os.environ.get("OPENROUTER_API_KEY", "")
-_deepseek_key = bool(os.environ.get("DEEPSEEK_API_KEY"))
-_LLM_ENDPOINT = "https://api.deepseek.com/v1/chat/completions" if _deepseek_key else "https://openrouter.ai/api/v1/chat/completions"
-_LLM_MODEL = "deepseek-v4-flash" if _deepseek_key else "deepseek/deepseek-v4-flash"
+# ── LLM 配置（单一来源：offset_signals）──
+from offset_signals import _LLM_KEY, _LLM_ENDPOINT, _LLM_MODEL
 
 logger = logging.getLogger(__name__)
 

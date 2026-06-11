@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__)
 
 from offset_signals import _OFFSET_SIGNALS
 
-_LLM_KEY = os.environ.get("DEEPSEEK_API_KEY","") or os.environ.get("OPENROUTER_API_KEY","")
-_LLM_ENDPOINT = "https://api.deepseek.com/v1/chat/completions" if os.environ.get("DEEPSEEK_API_KEY") else "https://openrouter.ai/api/v1/chat/completions"
-_LLM_MODEL = "deepseek-v4-flash" if os.environ.get("DEEPSEEK_API_KEY") else "deepseek/deepseek-v4-flash"
+from offset_signals import _LLM_KEY, _LLM_ENDPOINT, _LLM_MODEL
 
 # Lazy imports — avoid circular dependency
 _fail_open = None; _llm = None; _extract_md_section = None
