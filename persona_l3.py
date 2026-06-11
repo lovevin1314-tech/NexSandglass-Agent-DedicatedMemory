@@ -284,8 +284,6 @@ def _local_persona_extract() -> str:
                  (r"I (?:like|love|prefer|enjoy)\s+(.{2,60})", 15), (r"I (?:hate|dislike|don't like)\s+(.{2,60})", 15)],
         "决策": [(r"(免费|不花钱|自己搞|省钱|性价比|开源)", 10), (r"(花钱|省事|付费|买|效率优先)", 10),
                  (r"(free|open.source|diy|cheap|cost.effective)", 10), (r"(pay|buy|subscribe|premium)", 10)],
-        "关注": [(r"(?:聊|讨论|说|问)(?:了|过)?(.{2,40})", 8),
-                 (r"(?:talk|discuss|ask)(?:ed|ing)?\s+(?:about\s+)?(.{2,60})", 8)],
     }
 
     results = {}
