@@ -18,6 +18,7 @@ import hashlib
 # ═══════════════════════════════════════════════════════
 
 _SIMHASH_BITS = 128
+_simhash_cache = {}  # V2.0.5: 预计算缓存，key=text[:500], val=fingerprint
 
 
 def _tokenize_simhash(text: str) -> list:
@@ -31,10 +32,15 @@ def _tokenize_simhash(text: str) -> list:
 
 
 def simhash(text: str, bits: int = _SIMHASH_BITS) -> int:
-    """文本→SimHash指纹。零依赖。空文本返回-1。"""
+    """文本→SimHash指纹。零依赖。空文本返回-1。结果缓存。"""
+    cache_key = text[:500]
+    if cache_key in _simhash_cache:
+        return _simhash_cache[cache_key]
+    
     tokens = _tokenize_simhash(text)
     if not tokens:
-        return -1  # 空文本标记，避免碰撞为0
+        _simhash_cache[cache_key] = -1
+        return -1
     v = [0] * bits
     for token in tokens:
         h = int(hashlib.md5(token.encode()).hexdigest(), 16)
@@ -47,6 +53,7 @@ def simhash(text: str, bits: int = _SIMHASH_BITS) -> int:
     for i in range(bits):
         if v[i] > 0:
             fp |= (1 << i)
+    _simhash_cache[cache_key] = fp
     return fp
 
 
