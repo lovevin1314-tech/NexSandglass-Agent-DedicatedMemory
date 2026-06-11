@@ -316,16 +316,6 @@ _PERSONA_SYSTEM = """# 🧬 人格架构师 — 渐进演化协议
 ```
 """
 
-def _load_scenes() -> list:
-    """加载当前场景标签列表。"""
-    if not os.path.exists(_SCENE_FILE):
-        return []
-    try:
-        with open(_SCENE_FILE, "r", encoding="utf-8") as f:
-            return json.loads(f.read())
-    except Exception:
-        return []
-
 def _metrics_feedback() -> dict:
     """读取最近度量指标，返回调整建议。"""
     ml = os.path.join(_VAULT, "metrics.log")
