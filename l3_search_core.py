@@ -51,20 +51,28 @@ def simhash(text: str, bits: int = _SIMHASH_BITS) -> int:
 
 
 def _hamming(a: int, b: int) -> int:
-    """汉明距离"""
+    """汉明距离。任一为-1(空文本)返回MAX。"""
+    if a == -1 or b == -1:
+        return _SIMHASH_BITS  # 最大距离=完全不同
     return (a ^ b).bit_count()
 
 
-def simhash_search(query: str, candidates: list, limit: int = 20, threshold: int = 60) -> list:
+def simhash_search(query: str, candidates: list, limit: int = 20, threshold: int = None) -> list:
     """SimHash语义搜索——从候选文档中返回最相似的limit条。
     candidates: [(line_no, timestamp, text), ...]
-    threshold: 汉明距离上限（越小越严格），默认60(128bit下≈53%相似度)
+    threshold: 自适应——短查询(≤5 tokens)用30, 长查询用50
     """
     if not candidates:
         return []
     q_fp = simhash(query)
     if q_fp == -1:  # 空文本查询，无法语义搜索
         return []
+    
+    # 自适应阈值：token太少时较严(但不过严)，token多时宽松
+    q_tokens = _tokenize_simhash(query)
+    if threshold is None:
+        threshold = 40 if len(q_tokens) <= 5 else 55
+    
     scored = []
     for ln, ts, text in candidates:
         d_fp = simhash(text[:500])

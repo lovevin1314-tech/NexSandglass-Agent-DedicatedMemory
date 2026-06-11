@@ -532,7 +532,12 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
 
 
 def _has_llm() -> bool:
-    return bool(os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENROUTER_API_KEY"))
+    """统一LLM检测——从offset_signals获取。"""
+    try:
+        from offset_signals import _LLM_KEY
+        return bool(_LLM_KEY)
+    except ImportError:
+        return bool(os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENROUTER_API_KEY"))
 
 
 # ═══════════════════════════════════════════════
