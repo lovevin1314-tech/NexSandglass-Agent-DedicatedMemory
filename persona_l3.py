@@ -276,10 +276,16 @@ def _local_persona_extract() -> str:
     all_text = "\n".join(t[2] for t in sands)
 
     patterns = {
-        "角色": [(r"我是(.+?)(?:[，。！\n]|$)", 12), (r"我做(.+?)(?:[，。！\n]|$)", 12)],
-        "工具": [(r"(?:用|装|配|跑)(?:了|过)?\s*([A-Za-z][A-Za-z0-9._\-\s]{2,20})", 8)],
-        "偏好": [(r"我(?:喜欢|偏好|习惯|爱)\s*(.{2,30})", 15), (r"我(?:不喜欢|讨厌|烦)\s*(.{2,30})", 15)],
-        "决策": [(r"(免费|不花钱|自己搞|省钱|性价比|开源)", 10), (r"(花钱|省事|付费|买|效率优先)", 10)],
+        "角色": [(r"我是(.+?)(?:[，。！\n]|$)", 12), (r"我做(.+?)(?:[，。！\n]|$)", 12),
+                (r"I am (.+?)(?:[.,!?\n]|$)", 12), (r"I work as (.+?)(?:[.,!?\n]|$)", 12)],
+        "工具": [(r"(?:用|装|配|跑)(?:了|过)?\s*([A-Za-z][A-Za-z0-9._\-\s]{2,20})", 8),
+                 (r"(?:using?|running?|installed?)\s+([A-Za-z][A-Za-z0-9._\-]{2,20})", 8)],
+        "偏好": [(r"我(?:喜欢|偏好|习惯|爱)\s*(.{2,30})", 15), (r"我(?:不喜欢|讨厌|烦)\s*(.{2,30})", 15),
+                 (r"I (?:like|love|prefer|enjoy)\s+(.{2,60})", 15), (r"I (?:hate|dislike|don't like)\s+(.{2,60})", 15)],
+        "决策": [(r"(免费|不花钱|自己搞|省钱|性价比|开源)", 10), (r"(花钱|省事|付费|买|效率优先)", 10),
+                 (r"(free|open.source|diy|cheap|cost.effective)", 10), (r"(pay|buy|subscribe|premium)", 10)],
+        "关注": [(r"(?:聊|讨论|说|问)(?:了|过)?(.{2,40})", 8),
+                 (r"(?:talk|discuss|ask)(?:ed|ing)?\s+(?:about\s+)?(.{2,60})", 8)],
     }
 
     results = {}
@@ -302,7 +308,9 @@ def _local_persona_extract() -> str:
     try:
         ml = os.path.join(os.path.expanduser("~"), ".neurobase", "metrics.log")
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        metrics = f"[{now}] sands={total} offset={offset_result.get('offset',0):+d} direction={offset_result.get('direction','?')}"
+        from sandglass_vault import count
+        total = count()
+        metrics = f"[{now}] sands={total} local_extract"
         with open(ml, "a", encoding="utf-8") as f:
             f.write(metrics + "\n")
     except Exception:
