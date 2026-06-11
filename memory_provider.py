@@ -150,6 +150,8 @@ class NexSandglassProvider(MemoryProvider):
                 sys.path.insert(0, nb_scripts)
 
             from sandglass_vault import rebuild_index
+            from sandglass_paths import validate
+            validate()
             rebuild_index()
             self._initialized = True
             logger.info("NexSandglass MemoryProvider initialized")

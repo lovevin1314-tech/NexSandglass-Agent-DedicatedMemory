@@ -22,3 +22,19 @@ _DECISION_VOCAB = os.path.join(_NB, "decision_vocab.txt")
 _ECHO_WIND = os.path.join(_NB, "echo_wind.jsonl")
 _EMOTION_VOCAB = os.path.join(_NB, "emotion_vocab.jsonl")
 _IRON_RULES = os.path.join(_NB, "iron_rules.txt")
+
+# 启动时必须存在的目录
+_REQUIRED_DIRS = [_NB, _SCRIPTS, _PERSONA, _ARCHIVE]
+
+
+def validate() -> dict:
+    """启动时路径验证——创建缺失目录，返回状态报告。"""
+    created = []
+    existed = []
+    for d in _REQUIRED_DIRS:
+        if not os.path.exists(d):
+            os.makedirs(d, exist_ok=True)
+            created.append(d)
+        else:
+            existed.append(d)
+    return {"nb": _NB, "created": created, "existed": existed, "ok": True}
