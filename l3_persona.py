@@ -63,6 +63,23 @@ def persona_project(direction: str, offset: int) -> dict:
                     (direction == "drift" and any(w in dir_tag.lower() for w in ["坚持","继续","不放弃"]))):
                     shadow_lines.append(parts[2][:100])
 
+    # 回音折写回——即使无交叉决策也写(风向数据本身有价值)
+    try:
+        echo_path = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
+        echo_entry = {
+            "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "sentiment": "正面" if wind_direction >= 0 else "负面",
+            "options": f"影子投影:{direction}→{reverse}",
+            "spread_weight": round(1.0 + abs(offset) / 200, 2),
+            "source": "persona_project",
+            "cross_decisions": len(shadow_lines),
+        }
+        os.makedirs(os.path.dirname(echo_path), exist_ok=True)
+        with open(echo_path, "a", encoding="utf-8") as ef:
+            ef.write(json.dumps(echo_entry, ensure_ascii=False) + "\n")
+    except Exception as e:
+        logger.warning(f"persona_project: 回音折写回失败: {e}")
+
     if not shadow_lines:
         return {"shadow_persona": "", "divergence": 0,
                 "insight": f"影子灵魂: 如果选择{reverse}…数据不足，等待更多交叉决策"}
@@ -97,21 +114,5 @@ def persona_project(direction: str, offset: int) -> dict:
     shadow_path = os.path.join(_PERSONA_DIR, "persona.shadow.md")
     with open(shadow_path, "w", encoding="utf-8") as f:
         f.write(f"# 影子灵魂 — {reverse}方向\n>\n> 触发偏移: {offset:+d}% ({direction})\n>\n{shadow}")
-
-    # 回音折写回——影子本身产生回音折，影响未来的幽灵决策
-    try:
-        echo_path = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
-        echo_entry = {
-            "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "sentiment": "正面" if divergence < 40 else "负面",
-            "options": f"影子投影:{direction}→{reverse}",
-            "spread_weight": round(1.0 + abs(offset) / 200, 2),
-            "source": "persona_project"
-        }
-        os.makedirs(os.path.dirname(echo_path), exist_ok=True)
-        with open(echo_path, "a", encoding="utf-8") as ef:
-            ef.write(json.dumps(echo_entry, ensure_ascii=False) + "\n")
-    except Exception as e:
-        logger.warning(f"persona_project: 回音折写回失败: {e}")
 
     return {"shadow_persona": shadow[:500], "divergence": divergence, "insight": insight}
