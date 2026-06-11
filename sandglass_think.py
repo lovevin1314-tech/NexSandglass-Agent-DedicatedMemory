@@ -5,7 +5,6 @@ import hashlib
 import logging
 import os
 import re
-import shutil
 import statistics
 import urllib.request
 import urllib.error

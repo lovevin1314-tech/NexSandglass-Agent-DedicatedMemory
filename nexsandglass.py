@@ -16,7 +16,6 @@ import sys
 import re
 import platform
 from datetime import datetime
-from pathlib import Path
 
 # 确保能 import sandglass_log
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
