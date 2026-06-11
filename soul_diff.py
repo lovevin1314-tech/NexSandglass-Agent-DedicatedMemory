@@ -15,7 +15,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from sandglass_paths import _NB
+from sandglass_paths import _NB, __version__
 
 SOUL_DIFF = os.path.join(_NB, "soul_diff.json")
 
@@ -24,7 +24,7 @@ def export_soul(output: str = "") -> str:
     """导出灵魂差分——偏移率+决策链+回音折残留。"""
     path = output or SOUL_DIFF
     soul = {
-        "version": "2.3.16",
+        "version": __version__,
         "exported_at": datetime.now().isoformat(),
         "drift": {},
         "decisions": [],
