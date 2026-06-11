@@ -72,6 +72,15 @@ def _handle_tool(name, args, request_id):
             r = entropy_ghost(args.get("question", "如果选另一个选项"))
             return _rpc_response(request_id, r)
 
+        elif name == "sandglass_chart":
+            from sandglass_think import entropy_chart
+            return _rpc_response(request_id, {"chart": entropy_chart(args.get("n", 10))})
+
+        elif name == "sandglass_migrate":
+            from sandglass_think import memory_migrate
+            path = memory_migrate(args.get("output", ""))
+            return _rpc_response(request_id, {"exported": path})
+
         else:
             return _rpc_error(request_id, -32601, f"Unknown tool: {name}")
 
@@ -98,6 +107,8 @@ def main():
                     {"name": "sandglass_tasks", "description": "待办事项列表"},
                     {"name": "sandglass_echo", "description": "当前回音折风向"},
                     {"name": "sandglass_dream", "description": "幽灵决策——'如果选另一个选项会怎样'"},
+                    {"name": "sandglass_chart", "description": "情绪熵 ASCII 可视化图表"},
+                    {"name": "sandglass_migrate", "description": "一键导出全部记忆数据为 tar.gz"},
                 ]
                 print(_rpc_response(tid, {"tools": tools}), flush=True)
 

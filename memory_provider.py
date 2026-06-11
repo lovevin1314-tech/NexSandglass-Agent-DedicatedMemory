@@ -162,12 +162,14 @@ class NexSandglassProvider(MemoryProvider):
             from sandglass_vault import count
             from sandglass_think import comprehensive_offset, _current_stage, task_pending
             from sandglass_think import iron_rules, _emotional_entropy, _sentiment_wind
+            from sandglass_think import session_context
 
             total = count()
             off = comprehensive_offset()
             stage = _current_stage()
             ent = _emotional_entropy()
             wind = _sentiment_wind()
+            ctx = session_context(3)  # 最近3轮上下文
 
             # MBTI（影子沙，会变）
             mbti = ""
@@ -205,6 +207,7 @@ class NexSandglassProvider(MemoryProvider):
 沙漏: {total}条 | 阶段: {stage}
 偏移: {off_d} | 情绪: {mood}
 {"待办: " + tasks if tasks else ""}
+{ctx[:200] if ctx else ""}
 {mbti and 'MBTI: ' + mbti + chr(10) or ''}—纪律
 {rules_lines or '未设定'}"""
             return note.strip()

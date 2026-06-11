@@ -961,6 +961,13 @@ def stage_brief() -> str:
             lines.append(f"\n⚡ 频率突变触发偏移率检查: {off['direction']} {off['offset']:+d}%")
         if novel.get("novel"):
             lines.append(f"\n🆕 新场景: {novel['insight']}")
+
+        # 阶段交叉验证
+        cross = scene_stage_cross_validate()
+        if cross.get("findings"):
+            for f in cross["findings"][:2]:
+                if f.get("refined"):
+                    lines.append(f"\n🔍 阶段验证: {f.get('stage','?')}需细化")
     except Exception:
         pass
 

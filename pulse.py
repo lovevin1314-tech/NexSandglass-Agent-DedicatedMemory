@@ -229,6 +229,16 @@ def pulse(user_message: str = "") -> str:
                 except Exception as e:
                     logger.warning(f"里程碑200: offset失败: {e}")
 
+            elif total >= 200 and total % 200 == 0:
+                # 自动画像维护
+                try:
+                    from sandglass_think import persona_maintain
+                    r = persona_maintain()
+                    if r.get("triggered"):
+                        signals.insert(0, f"🧬 画像自动维护: {r.get('reason','')[:40]}")
+                except Exception as e:
+                    logger.warning(f"里程碑维护: {e}")
+
             elif total == 500:
                 # 波浪开始成形
                 signals.insert(0, "🌊 沙漏满500条——小波浪开始累积，影子轮廓成形")
