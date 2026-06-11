@@ -318,8 +318,6 @@ def novel_scene_detect() -> dict:
             "drift_trigger": drift_trigger,
             "insight": " | ".join(parts) if parts else "无显著变化"}
 
-_SCENE_TIMELINE = os.path.join(_PERSONA_DIR, "scene-timeline.jsonl")
-
 
 def _log_scene_timeline(scenes: list) -> None:
     """记录场景快照。去重：如果和上次完全一样，不记。"""
