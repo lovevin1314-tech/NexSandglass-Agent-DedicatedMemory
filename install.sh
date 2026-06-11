@@ -1,9 +1,9 @@
 #!/bin/bash
-# NexSandglass V2.3.7 — macOS/Linux 安装脚本
+# NexSandglass V2.3.16 — macOS/Linux 安装脚本
 set -e
 
 echo "╔══════════════════════════════════╗"
-echo "║  NexSandglass V2.3.7 安装程序    ║"
+echo "║  NexSandglass V2.3.16 安装程序    ║"
 echo "╚══════════════════════════════════╝"
 echo ""
 
@@ -54,7 +54,7 @@ if [ ! -f "$HOME/.hermes/.env" ]; then
 fi
 
 echo ""
-echo "✅ NexSandglass V2.3.7 安装完成！"
+echo "✅ NexSandglass V2.3.16 安装完成！"
 echo ""
 echo "📂 核心: 21模块 + MemoryProvider插件"
 echo "🔐 加密: macOS/Linux base64 (Windows DPAPI)"

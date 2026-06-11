@@ -133,7 +133,7 @@ def main():
                 print(_rpc_response(tid, {
                     "protocolVersion": "2024-11-05",
                     "capabilities": {"tools": {}},
-                    "serverInfo": {"name": "NexSandglass", "version": "2.3.4"}
+                    "serverInfo": {"name": "NexSandglass", "version": "2.3.16"}
                 }), flush=True)
 
             else:

@@ -117,6 +117,6 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "wrap":
         wrap_command()
     else:
-        print("NexSandglass V2.3.8 — TTY Wrapper")
+        print("NexSandglass V2.3.16 — TTY Wrapper")
         print("用法: python nexsandglass.py wrap [command] [args...]")
         sys.exit(1)
