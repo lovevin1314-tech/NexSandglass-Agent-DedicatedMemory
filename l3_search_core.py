@@ -198,14 +198,16 @@ def composite_rerank(results, weights, text_w=0.6, ext_w=0.4):
         ext_w_val = weights.get(kw, 1.0)
         scores.append((hit_count, ext_w_val, item))
 
-    # Min-Max归一化
+    # Min-Max归一化——均匀值时跳过，只用ext权重排序
     t_vals = [s[0] for s in scores]
     w_vals = [s[1] for s in scores]
     t_min, t_max = min(t_vals), max(t_vals)
     w_min, w_max = min(w_vals), max(w_vals)
 
     def norm(v, lo, hi):
-        return (v - lo) / (hi - lo) if hi > lo else 0.5
+        if hi == lo:
+            return 0.0  # 均匀值→不做文本分，全交给ext权重
+        return (v - lo) / (hi - lo)
 
     composites = [(norm(t, t_min, t_max) * text_w + norm(w, w_min, w_max) * ext_w, item)
                   for t, w, item in scores]
