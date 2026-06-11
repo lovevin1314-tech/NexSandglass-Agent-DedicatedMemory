@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 from sandglass_vault import recent, search as vs
 
 import os as _os
-_LLM_KEY = _os.environ.get("DEEPSEEK_API_KEY", "") or _os.environ.get("OPENROUTER_API_KEY", "")
+from offset_signals import _LLM_KEY, _LLM_ENDPOINT, _LLM_MODEL
 try:
     from sandglass_think import (
         _fail_open, _llm, _three_d_ready, _latest_annotation,

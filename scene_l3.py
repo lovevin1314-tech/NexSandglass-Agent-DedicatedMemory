@@ -37,10 +37,7 @@ def scene_mode(mode: str = None) -> str:
     except: return 'normal'
 
 # ── LLM 配置 ──
-_LLM_KEY = os.environ.get("DEEPSEEK_API_KEY", "") or os.environ.get("OPENROUTER_API_KEY", "")
-_deepseek_key = bool(os.environ.get("DEEPSEEK_API_KEY"))
-_LLM_ENDPOINT = "https://api.deepseek.com/v1/chat/completions" if _deepseek_key else "https://openrouter.ai/api/v1/chat/completions"
-_LLM_MODEL = "deepseek-v4-flash" if _deepseek_key else "deepseek/deepseek-v4-flash"
+from offset_signals import _LLM_KEY, _LLM_ENDPOINT, _LLM_MODEL
 
 def scene_add(tag: str) -> list:
     """添加一个场景标签。返回当前全部标签。"""

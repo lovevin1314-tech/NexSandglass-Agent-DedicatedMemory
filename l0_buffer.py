@@ -36,6 +36,9 @@ def l0_remember(text: str, speaker: str = "user") -> None:
             log_message(f"[L0-auto] {oldest['speaker']}: {oldest['text'][:300]}", oldest.get("speaker", "user"))
             from decision_particles import log as dp_log
             dp_log(oldest["text"][:100], f"L0_buffer_distill")
+            # 🆕 蒸馏即偏移检测——短期→长期时捕捉决策方向
+            from offset_l3 import offset_check
+            offset_check(oldest["text"][:100], user_persisted=False)
         except Exception:
             pass
 
