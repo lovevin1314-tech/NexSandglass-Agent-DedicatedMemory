@@ -47,8 +47,7 @@ from persona_l3 import (
     persona_build, persona_update, persona_canvas,
     persona_freshness, stage_list, stage_canvas,
     _current_stage, _load_persona, _local_persona_extract,
-    persona_trace, persona_verify, persona_diff,
-    persona_project, sand_since_update, stage_similarity,
+    sand_since_update, stage_similarity,
 )
 from persona_l3 import _WAVE_THRESHOLDS, _SEARCH_WEIGHTS
 from offset_l3 import (
