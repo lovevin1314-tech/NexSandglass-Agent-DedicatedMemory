@@ -19,6 +19,7 @@ import hashlib
 
 _SIMHASH_BITS = 128
 _simhash_cache = {}  # V2.0.5: 预计算缓存，key=text[:500], val=fingerprint
+_SIMHASH_CACHE_MAX = 10000  # V2.1.11: LRU上限，超过清空重建
 
 
 def _tokenize_simhash(text: str) -> list:
@@ -36,6 +37,10 @@ def simhash(text: str, bits: int = _SIMHASH_BITS) -> int:
     cache_key = text[:500]
     if cache_key in _simhash_cache:
         return _simhash_cache[cache_key]
+    
+    # LRU驱逐——超过上限清空重建
+    if len(_simhash_cache) >= _SIMHASH_CACHE_MAX:
+        _simhash_cache.clear()
     
     tokens = _tokenize_simhash(text)
     if not tokens:

@@ -256,14 +256,13 @@ class NexSandglassProvider(MemoryProvider):
 灵魂蒸馏：{mbti or 'MBTI未记录'}{persona_line}
 搜索滤镜：情绪熵-{mood} | 回音折-{echo_d or '平稳'}
 偏移率：{off_d}
-织布机：{tasks}，有点开心
+织布机：{tasks}
 —纪律如下
 {rules_lines}"""
             return note.strip()
         except Exception:
             # 全新安装——引导用户设定铁律
-            if total == 0:
-                return """NexSandglass记忆系统已就绪。这是你的第一次使用。
+            return """NexSandglass记忆系统已就绪。这是你的第一次使用。
 你可以设定铁律（绝不违反的规则），格式如下：
 铁律: 第一条规则
 铁律: 第二条规则
