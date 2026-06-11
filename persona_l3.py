@@ -2,9 +2,11 @@
 import os, re, json, hashlib, logging, shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from sandglass_vault import _tokenize, recent as sv_recent, search as sv_search, count as sv_count
+from sandglass_vault import _tokenize
+from sandglass_vault import recent as sv_recent, search as sv_search, count as sv_count
+from sandglass_paths import _NB
 
-_VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")
+_VAULT = _NB
 _PERSONA_DIR = os.path.join(_VAULT, "persona")
 _PERSONA = os.path.join(_PERSONA_DIR, "persona.md")
 _PERSONA_TIMELINE = os.path.join(_PERSONA_DIR, "persona-timeline.jsonl")
@@ -304,7 +306,7 @@ def _local_persona_extract() -> str:
             lines.append("")
     # 度量指标收集
     try:
-        ml = os.path.join(os.path.expanduser("~"), ".neurobase", "metrics.log")
+        ml = os.path.join(_NB, "metrics.log")
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
         from sandglass_vault import count
         total = count()
@@ -424,7 +426,7 @@ def persona_trace(claim: str) -> list:
         # 验证源行内容是否匹配
         results = search("", limit=1)
         # 直接读沙漏行验证 hash
-        sg = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.txt")
+        sg = os.path.join(_NB, "sandglass.txt")
         if os.path.exists(sg):
             with open(sg, "r", encoding="utf-8") as f:
                 for i, line in enumerate(f, 1):
@@ -531,7 +533,7 @@ def persona_project(direction: str, offset: int) -> dict:
     """影子灵魂——基于当前偏移方向，模拟「如果选相反方向会变成怎样」。
     读取决策粒子历史，构建反向投影画像，和当前画像对比。
     返回 {shadow_persona, divergence, insight}"""
-    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+    dp_path = os.path.join(_NB, "decision_particles.txt")
     if not os.path.exists(dp_path):
         return {"shadow_persona": "", "divergence": 0, "insight": "无决策粒子数据"}
 
@@ -541,7 +543,7 @@ def persona_project(direction: str, offset: int) -> dict:
     # 回音折——缩小影子选择范围
     wind_direction = 0  # 正=开心/自信，负=焦虑/放弃
     try:
-        echo_path = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
+        echo_path = os.path.join(_NB, "echo_wind.jsonl")
         if os.path.exists(echo_path):
             with open(echo_path, "r", encoding="utf-8") as ef:
                 for eline in ef:
@@ -607,7 +609,7 @@ def persona_project(direction: str, offset: int) -> dict:
 
     # 回音折写回——影子本身产生回音折，影响未来的幽灵决策
     try:
-        echo_path = os.path.join(os.path.expanduser("~"), ".neurobase", "echo_wind.jsonl")
+        echo_path = os.path.join(_NB, "echo_wind.jsonl")
         echo_entry = {
             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "sentiment": "正面" if divergence < 40 else "负面",

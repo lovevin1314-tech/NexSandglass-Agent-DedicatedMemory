@@ -4,9 +4,10 @@ NexSandglass V2.1.1 — 冷热分层存储
 冷沙(archive/): 超过30天，按月分文件，AI低价值丢弃
 """
 import os, re, shutil
+from sandglass_paths import _NB
 from datetime import datetime, timedelta
 
-_VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")
+_VAULT = _NB
 _ARCHIVE = os.path.join(_VAULT, "archive")
 _HOT_DAYS = 30
 

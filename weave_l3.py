@@ -1,10 +1,11 @@
 """NexSandglass L3 — weave_l3"""
 import os, re, json, logging
+from sandglass_paths import _NB
 from datetime import datetime, timezone
 from sandglass_vault import _tokenize
 from offset_signals import _OFFSET_SIGNALS
 
-_VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")
+_VAULT = _NB
 _PERSONA_DIR = os.path.join(_VAULT, "persona")
 _PERSONA = os.path.join(_PERSONA_DIR, "persona.md")
 _PERSONA_TIMELINE = os.path.join(_PERSONA_DIR, "persona-timeline.jsonl")
@@ -257,7 +258,7 @@ def weave_graph(question: str, max_hops: int = 3) -> dict:
         
         # 补充：从决策粒子标签追溯
         dp_roots = set()
-        dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+        dp_path = os.path.join(_NB, "decision_particles.txt")
         if os.path.exists(dp_path):
             with open(dp_path, "r", encoding="utf-8") as f:
                 dp_lines = f.readlines()[-30:]

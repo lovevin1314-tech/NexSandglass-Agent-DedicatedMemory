@@ -625,7 +625,7 @@ def _update_search_weights(tags: str) -> None:
 
 def _weave_check(tags: str, direction: str) -> None:
     """动态织布——从_OFFSET_SIGNALS源取信号，检测言行是否一致。"""
-    p = os.path.join(os.path.expanduser("~"), ".neurobase", "persona", "persona.md")
+    p = os.path.join(_NB, "persona", "persona.md")
     if not os.path.exists(p):
         return
     with open(p, "r", encoding="utf-8") as f:
@@ -664,11 +664,11 @@ def _weave_check(tags: str, direction: str) -> None:
 
     if contra:
         # 24h cooldown——drift告警不刷屏
-        last_alert = os.path.join(os.path.expanduser("~"), ".neurobase", ".last_drift_alert")
+        last_alert = os.path.join(_NB, ".last_drift_alert")
         if os.path.exists(last_alert):
             if datetime.now().timestamp() - os.path.getmtime(last_alert) < 86400:
                 return
-        wl = os.path.join(os.path.expanduser("~"), ".neurobase", "weave_alerts.txt")
+        wl = os.path.join(_NB, "weave_alerts.txt")
         with open(wl, "a", encoding="utf-8") as f:
             for c in contra:
                 f.write(f"[{datetime.now():%Y-%m-%d %H:%M}] {c}\n")

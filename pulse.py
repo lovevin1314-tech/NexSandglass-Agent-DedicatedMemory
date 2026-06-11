@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 sys_path = os.path.dirname(os.path.abspath(__file__))
 import sys; sys.path.insert(0, sys_path)
+from sandglass_paths import _NB
 
 
 def pulse(user_message: str = "") -> str:
@@ -23,7 +24,7 @@ def pulse(user_message: str = "") -> str:
     is_cn = any('\u4e00' <= c <= '\u9fff' for c in user_message) if user_message else True
 
     # ── 第零条消息：欢迎仪式 ──
-    _FIRST = os.path.join(os.path.expanduser("~"), ".neurobase", ".first_run")
+    _FIRST = os.path.join(_NB, ".first_run")
     if not os.path.exists(_FIRST):
         os.makedirs(os.path.dirname(_FIRST), exist_ok=True)
         with open(_FIRST, "w") as f:
@@ -200,7 +201,7 @@ def pulse(user_message: str = "") -> str:
 
         # 里程碑——沙子量级触发系统演化
         total = sv_count()
-        _MILESTONE_FLAG = os.path.join(os.path.expanduser("~"), ".neurobase", f".milestone_{total}")
+        _MILESTONE_FLAG = os.path.join(_NB, f".milestone_{total}")
         if total % 100 == 0 and total > 0 and not os.path.exists(_MILESTONE_FLAG):
             os.makedirs(os.path.dirname(_MILESTONE_FLAG), exist_ok=True)
             with open(_MILESTONE_FLAG, "w") as f: f.write("ok")
@@ -311,7 +312,7 @@ def echo(user_message: str, assistant_response: str = "") -> None:
 def _sync_shadow() -> None:
     """每次消息触发：主沙漏 → 阴影副本增量同步。只追加不替换。"""
     try:
-        _VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")
+        _VAULT = _NB
         master = os.path.join(_VAULT, "sandglass.txt")
         shadow = os.path.join(_VAULT, "sandglass.backup")
         if not os.path.exists(master):

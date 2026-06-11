@@ -13,12 +13,13 @@ NeuroBase Sandglass — 插件源码备份 + 解密工具
 import base64
 import logging
 import os
+from sandglass_paths import _NB
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-_SANDGLASS = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.txt")
-_ERRFLAG = os.path.join(os.path.expanduser("~"), ".neurobase", ".sandglass_error")
+_SANDGLASS = os.path.join(_NB, "sandglass.txt")
+_ERRFLAG = os.path.join(_NB, ".sandglass_error")
 
 try:
     from win32crypt import CryptProtectData, CryptUnprotectData

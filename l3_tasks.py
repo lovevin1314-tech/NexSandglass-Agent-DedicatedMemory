@@ -8,11 +8,12 @@ NexSandglass L3 — 任务追踪模块
 """
 
 import os
+from sandglass_paths import _NB
 import json
 import hashlib
 from datetime import datetime, timezone
 
-_VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")
+_VAULT = _NB
 _PERSONA_DIR = os.path.join(_VAULT, "persona")
 _TASK_LOG = os.path.join(_PERSONA_DIR, "task-log.jsonl")
 

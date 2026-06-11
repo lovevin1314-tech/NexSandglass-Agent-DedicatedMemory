@@ -11,8 +11,9 @@ NexSandglass — L0 短期记忆缓冲区
 """
 import os, json
 from datetime import datetime
+from sandglass_paths import _NB
 
-L0_PATH = os.path.join(os.path.expanduser("~"), ".neurobase", "l0_buffer.jsonl")
+L0_PATH = os.path.join(_NB, "l0_buffer.jsonl")
 L0_MAX = 5  # 最多保留5轮
 
 

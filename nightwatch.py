@@ -6,10 +6,11 @@ NeuroBase 守夜人 — 全系统 V1.0 守护
 """
 
 import os
+from sandglass_paths import _NB
 import sys
 from datetime import datetime
 
-_VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")
+_VAULT = _NB
 _SANDGLASS = os.path.join(_VAULT, "sandglass.txt")
 _IDX = os.path.join(_VAULT, "sandglass.idx")
 _ERROR = os.path.join(_VAULT, ".sandglass_error")

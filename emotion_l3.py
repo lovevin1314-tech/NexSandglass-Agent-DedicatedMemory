@@ -3,6 +3,7 @@ import os, re, json, logging
 from datetime import datetime, timezone
 from sandglass_vault import _tokenize
 from sandglass_paths import _NB
+from sandglass_paths import _NB
 
 _VAULT = _NB
 _PERSONA_DIR = os.path.join(_VAULT, "persona")
@@ -70,7 +71,7 @@ def entropy_mirror(question: str) -> dict:
         ]
 
     # ② 搜决策粒子
-    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+    dp_path = os.path.join(_NB, "decision_particles.txt")
     if os.path.exists(dp_path):
         try:
             with open(dp_path, "r", encoding="utf-8") as f:
@@ -161,7 +162,7 @@ def entropy_ghost(question: str) -> dict:
     }
 
     # ① 查历史类似决策
-    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+    dp_path = os.path.join(_NB, "decision_particles.txt")
     if os.path.exists(dp_path):
         try:
             with open(dp_path, "r", encoding="utf-8") as f:
@@ -377,7 +378,7 @@ def memo_mode() -> str:
     
     # 最近决策
     lines.append("【最近决策粒子】")
-    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+    dp_path = os.path.join(_NB, "decision_particles.txt")
     if os.path.exists(dp_path):
         with open(dp_path, "r", encoding="utf-8") as f:
             particles = f.readlines()[-5:]

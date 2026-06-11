@@ -8,11 +8,12 @@ persona_trace / persona_verify / persona_diff — SHA256溯源验证
 """
 
 import os
+from sandglass_paths import _NB
 import re
 import hashlib
 import shutil
 
-_VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")
+_VAULT = _NB
 _PERSONA_DIR = os.path.join(_VAULT, "persona")
 
 
