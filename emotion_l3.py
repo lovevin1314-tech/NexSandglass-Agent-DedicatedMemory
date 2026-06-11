@@ -2,8 +2,9 @@
 import os, re, json, logging
 from datetime import datetime, timezone
 from sandglass_vault import _tokenize
+from sandglass_paths import _NB
 
-_VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")
+_VAULT = _NB
 _PERSONA_DIR = os.path.join(_VAULT, "persona")
 _PERSONA = os.path.join(_PERSONA_DIR, "persona.md")
 _PERSONA_TIMELINE = os.path.join(_PERSONA_DIR, "persona-timeline.jsonl")

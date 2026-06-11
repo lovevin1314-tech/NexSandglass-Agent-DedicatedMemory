@@ -4,7 +4,7 @@ NexSandglass L3 — 纪律因子
 """
 import os
 
-_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+from sandglass_paths import _NB
 _IRON_RULES = os.path.join(_NB, "iron_rules.txt")
 
 

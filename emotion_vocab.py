@@ -7,7 +7,7 @@ NexSandglass 情绪词库 — 七大情绪分类
 
 import json, os, re
 
-_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+from sandglass_paths import _NB
 _VOCAB_FILE = os.path.join(_NB, "emotion_vocab.json")
 
 # ── 七大情绪分类 ──
