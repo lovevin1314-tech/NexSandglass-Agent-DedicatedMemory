@@ -142,7 +142,7 @@ class NexSandglassProvider(MemoryProvider):
         """始终可用——零API Key，纯本地。"""
         return True
 
-    def initialize(self) -> None:
+    def initialize(self, session_id: str = "", **kwargs) -> None:
         """设置沙漏路径、重建投石问路索引。"""
         with self._lock:
             if self._initialized:
