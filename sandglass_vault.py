@@ -478,15 +478,16 @@ def recent(n: int = 10) -> list:
                 chunk = f.read(read_size)
                 buffer = chunk + buffer
                 lines_found = buffer.split(b"\n")
-                # 保留最后N+1行（最后一行可能是空）
+                # 保留最后N+1行
                 if len(lines_found) > n + 1:
                     lines_found = lines_found[-(n + 1):]
-                buffer = b"" if lines_found[0] == b"" else b""
+                # 保留第一行残片到下次循环（跨chunk长行）
+                buffer = b"" if len(lines_found) == 1 and not lines_found[0] else (lines_found[0] if pos > 0 else b"")
             
             # 取最后n行非空行
             lines_found = [l for l in lines_found if l.strip()][-n:]
         
-        total = sum(1 for _ in open(_SANDGLASS, "rb"))
+        total = count()  # 用已有count()函数，不重复数文件
         results = []
         for i, line in enumerate(lines_found):
             decoded = line.decode("utf-8", errors="ignore").strip()
