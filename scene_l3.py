@@ -264,7 +264,7 @@ def novel_scene_detect() -> dict:
                  'image', 'you', 'llm', 'user', 'time', 'your', 'all', 'are',
                  'not', 'but', 'has', 'was', 'can', 'its', 'get', 'now'}
     # 用户自定义停用词
-    sw_file = os.path.join(os.path.expanduser('~'), '.neurobase', 'stopwords.txt')
+    sw_file = os.path.join(_NB, 'stopwords.txt')
     if os.path.exists(sw_file):
         with open(sw_file, 'r', encoding='utf-8') as f:
             STOPWORDS.update(w.strip() for w in f.read().split() if w.strip())
