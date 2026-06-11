@@ -1,51 +1,37 @@
 """
-NeuroBase Sandglass — 插件源码备份 + 解密工具
+NeuroBase Sandglass — 插件源码备份 + 读取工具
 ==============================================
+V2.4.0: 去掉DPAPI，明文存储。
 部署位置：
-  - plugins/sandglass/__init__.py  ← Gateway 插件（主实现）
-  - .neurobase/scripts/sandglass.py ← vault 备份（此文件，含 read/count）
+  - plugins/sandglass/__init__.py  ← Gateway 插件
+  - .neurobase/scripts/sandglass.py ← vault 备份
 
 用法：
   from sandglass import read, count
-  read(10)   # 解密读取最近10条
+  read(10)   # 读取最近10条
   count()    # 总行数
 """
-import base64
 import logging
 import os
-from sandglass_paths import _NB
 from datetime import datetime
+from sandglass_paths import _NB
 
 logger = logging.getLogger(__name__)
 
 _SANDGLASS = os.path.join(_NB, "sandglass.txt")
 _ERRFLAG = os.path.join(_NB, ".sandglass_error")
 
-try:
-    from win32crypt import CryptProtectData, CryptUnprotectData
-except ImportError:
-    CryptProtectData = None
-    CryptUnprotectData = None
 
-
-# ── 插件核心（与 plugins/sandglass/__init__.py 同步） ──
+# ── 插件核心 ──
 
 def _on_message(event, **_kw) -> None:
     """pre_gateway_dispatch 钩子——所有平台消息到达时落沙。"""
     try:
         os.makedirs(os.path.dirname(_SANDGLASS), exist_ok=True)
         sender = getattr(event.source, "user_id", "?") or "?"
-        text = getattr(event, "text", "") or ""
-        raw = (text or "(media)").encode("utf-8")
-        if CryptProtectData:
-            try:
-                raw = base64.b64encode(
-                    CryptProtectData(raw, None, None, None, None, 0)
-                ).decode()
-            except Exception:
-                raw = text or "(media)"
+        text = getattr(event, "text", "") or "(media)"
         with open(_SANDGLASS, "a", encoding="utf-8") as f:
-            f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} | {sender} | {raw}\n")
+            f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} | {sender} | {text}\n")
     except Exception:
         logger.exception("sandglass: FAILED")
         try:
@@ -59,10 +45,10 @@ def register(ctx) -> None:
     ctx.register_hook("pre_gateway_dispatch", _on_message)
 
 
-# ── 解密工具 ──
+# ── 读取工具 ──
 
 def read(limit: int = 10) -> list:
-    """解密读取最近 N 条沙漏消息。返回 [(时间戳, 发送人, 明文), ...]"""
+    """读取最近 N 条沙漏消息。返回 [(时间戳, 发送人, 明文), ...]"""
     path = _SANDGLASS
     if not os.path.exists(path):
         return []
@@ -76,16 +62,7 @@ def read(limit: int = 10) -> list:
         parts = line.split(" | ", 2)
         if len(parts) != 3:
             continue
-        ts, sender, ciphertext = parts
-        try:
-            if CryptUnprotectData:
-                encrypted = base64.b64decode(ciphertext.strip())
-                plaintext = CryptUnprotectData(encrypted, None, None, None, 0)[1].decode("utf-8", errors="replace")
-            else:
-                plaintext = ciphertext  # 无 DPAPI 时直接返回（已是明文或 base64）
-        except Exception:
-            plaintext = ciphertext  # 解密失败返回原始内容
-        results.append((ts, sender, plaintext))
+        results.append((parts[0], parts[1], parts[2]))
     return results
 
 

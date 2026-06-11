@@ -1,9 +1,9 @@
 #!/bin/bash
-# NexSandglass V2.3.18 — macOS/Linux 安装脚本
+# NexSandglass V2.4.0 — macOS/Linux 安装脚本
 set -e
 
 echo "╔══════════════════════════════════╗"
-echo "║  NexSandglass V2.3.18 安装程序    ║"
+echo "║  NexSandglass V2.4.0 安装程序    ║"
 echo "╚══════════════════════════════════╝"
 echo ""
 
@@ -22,7 +22,7 @@ mkdir -p "$HOME/.hermes/plugins/memory/nexsandglass"
 mkdir -p "$HOME/.hermes/plugins/sandglass"
 echo "✅ 目录已创建"
 
-# 复制核心脚本 (21个)
+# 复制核心脚本 (30个)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FILES=(
     sandglass_paths.py
@@ -54,10 +54,10 @@ if [ ! -f "$HOME/.hermes/.env" ]; then
 fi
 
 echo ""
-echo "✅ NexSandglass V2.3.18 安装完成！"
+echo "✅ NexSandglass V2.4.0 安装完成！"
 echo ""
 echo "📂 核心: 30模块 + MemoryProvider插件"
-echo "🔐 加密: macOS/Linux base64 (Windows DPAPI)"
+echo "🔐 存储: 明文 — OS层全盘加密保护（BitLocker/FileVault/LUKS）"
 echo "🌡️ 多profile: export NEXSANDBASE_HOME=~/.neurobase-custom"
 echo "🚀 重启 Hermes Gateway 即可自动落沙"
 echo ""

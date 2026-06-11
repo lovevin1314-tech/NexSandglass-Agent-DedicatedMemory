@@ -6,7 +6,6 @@ results = sandglass_vault.search("关键词")
 latest = sandglass_vault.recent(5)
 """
 
-import base64
 import logging
 import mmap
 import os
@@ -25,11 +24,6 @@ def set_idx_path(path: str):
     """重定向投石问路索引路径——基准测试用。"""
     global _IDX
     _IDX = path
-
-try:
-    from win32crypt import CryptUnprotectData
-except ImportError:
-    CryptUnprotectData = None
 
 # ── idx 内存缓存（偷师 memory-os：O(1) 查 token）──
 _idx_cache: dict | None = None
@@ -68,34 +62,15 @@ def _query_tokens(text: str) -> set:
     return tokens
 
 
-def _decrypt(text: str) -> str:
-    """DPAPI 解密。失败尝试 base64 解码（非 Windows 降级存储）。"""
-    text = text.strip()
-    if not text.startswith("AQAA"):
-        if CryptUnprotectData is None:
-            # 非 Windows：base64 编码存储，尝试解码
-            try:
-                return base64.b64decode(text).decode("utf-8")
-            except Exception:
-                return text
-        return text
-    if not CryptUnprotectData:
-        return text
-    try:
-        raw = base64.b64decode(text)
-        return CryptUnprotectData(raw, None, None, None, 0)[1].decode("utf-8")
-    except Exception:
-        return text
-
-
 def _parse_line(line: str) -> tuple:
-    """返回 (ts, sender, decrypted_text) 或 (None, None, None)。"""
+    """返回 (ts, sender, text) 或 (None, None, None)。
+    V2.4.0: 明文存储，直接返回原文。旧加密数据保持原样。"""
     if " | " not in line:
         return None, None, None
     parts = line.strip().split(" | ", 2)
     if len(parts) < 3:
         return None, None, None
-    return parts[0], parts[1], _decrypt(parts[2])
+    return parts[0], parts[1], parts[2].strip()
 
 
 def _write_idx(idx):

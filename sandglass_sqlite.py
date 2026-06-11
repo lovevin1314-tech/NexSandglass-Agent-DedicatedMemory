@@ -7,7 +7,7 @@ V1.4.4：sandglass.txt不动，SQLite分词FTS5平行加速。
 
 import os, re, sqlite3, threading
 
-_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+from sandglass_paths import _NB
 _DB = os.path.join(_NB, "sandglass.db")
 _lock = threading.Lock()
 _last_sync_mtime = 0  # 记录上次同步时的 sandglass.txt 修改时间
@@ -94,7 +94,7 @@ def search_in(line_ids: list, query: str, limit: int = 100) -> list:
         tokens = _tokenize(query)
         if not tokens.strip() or not line_ids:
             return []
-        ids_str = ",".join(str(i) for i in line_ids)
+        ids_str = ",".join(str(int(i)) for i in line_ids)
         with _lock:
             conn = _get_db()
             sql = f"SELECT s.id, s.ts, s.text FROM sandglass_fts f JOIN sandglass s ON s.id=f.rowid WHERE s.id IN ({ids_str}) AND sandglass_fts MATCH ? ORDER BY rank"
