@@ -98,7 +98,22 @@ class SearchRouter:
         # FTS5 全文搜索（主力，BM25精排）
         fts5_hits = self.fts5.search(query, max(limit * 3, 30))
         if not fts5_hits:
-            # FTS5没结果 → mmap兜底
+            # FTS5没结果 → 先看影子沙有没有
+            from shadow_sand import shadow_search, shadow_retrieval_bump
+            sh = shadow_search(query, limit)
+            if sh:
+                shadow_retrieval_bump([ln for _, ln in sh[:limit]])
+                results = []
+                with open(_SANDGLASS, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                for score, ln in sh[:limit]:
+                    if 0 < ln <= len(lines):
+                        ts, sender, text = _parse_line(lines[ln - 1])
+                        if ts and text:
+                            results.append((ln, ts, text))
+                if results:
+                    return results
+            # 都没有 → mmap兜底
             return self.mmapfallback.search(query, limit)
 
         # 影子沙 → 获取信任分（附加到 FTS5 结果上）

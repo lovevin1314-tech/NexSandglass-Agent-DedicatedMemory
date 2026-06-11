@@ -64,7 +64,7 @@ def _query_tokens(text: str) -> set:
 
 def _parse_line(line: str) -> tuple:
     """返回 (ts, sender, text) 或 (None, None, None)。
-    V2.4.0: 明文存储，直接返回原文。旧加密数据保持原样。"""
+    V2.4.0: 明文存储，直接返回原文。"""
     if " | " not in line:
         return None, None, None
     parts = line.strip().split(" | ", 2)

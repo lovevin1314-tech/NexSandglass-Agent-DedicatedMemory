@@ -127,7 +127,7 @@ def full_sanity() -> dict:
     沙漏记忆系统全面体检----三层健康 + 全接口冒烟。
     
     - L0（会话层）：Hermes alive check
-    - L1（写层）：沙漏文件 + 加密 + 插件
+    - L1（写层）：沙漏文件 + 明文 + 插件
     - L2（读层）：FTS5/idx/mmap/search
     - L3（思层）：偏移率/画像/情绪熵/织布机/决策粒子/搜索
 
@@ -745,7 +745,7 @@ def _llm_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage
 6. 返回 3-8 个关键词，一行一个
 
 示例：
-画像：性价比优先，偏好开源工具，关注本地加密
+画像：性价比优先，偏好开源工具，关注本地安全
 场景：NeuroBase开发
 阶段轨迹：2024年偏向省钱自研，2025年开始接受付费工具
 近期决策：成本观,动手派,独立性
