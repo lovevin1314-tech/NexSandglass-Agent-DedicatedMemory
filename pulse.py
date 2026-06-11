@@ -32,7 +32,7 @@ def pulse(user_message: str = "") -> str:
         return (
             "> 🧵 你好 / Hello\n"
             "> \n"
-            "> 🔐 每句话加密落沙 / Every word encrypted\n"
+            "> 📝 明文落沙 / Plaintext sandglass\n"
             "> 🧬 从沙子里捞画像 / Persona from the sand\n"
             "> 📊 偏移率追踪变化 / Drift tracking\n"
             "> 📋 跨会话待办提醒 / Cross-session reminders\n"

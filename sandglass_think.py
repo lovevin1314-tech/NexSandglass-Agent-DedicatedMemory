@@ -1,4 +1,4 @@
-"""NeuroBase Sandglass L3 — 蒸馏·偏移率·搜索滤镜。完整架构见 CLAUDE.md / README。"""
+"""NeuroBase Sandglass L3 -- 蒸馏·偏移率·搜索滤镜。完整架构见 CLAUDE.md / README。"""
 
 import json
 import hashlib
@@ -124,7 +124,7 @@ _HEALTH_REPORT = os.path.join(_NB, "health_report.json")
 
 def full_sanity() -> dict:
     """
-    沙漏记忆系统全面体检——三层健康 + 全接口冒烟。
+    沙漏记忆系统全面体检----三层健康 + 全接口冒烟。
     
     - L0（会话层）：Hermes alive check
     - L1（写层）：沙漏文件 + 加密 + 插件
@@ -168,7 +168,7 @@ def full_sanity() -> dict:
         report["layers"]["L2"] = f"❌ {e}"
     report["total"] += 1
 
-    # L3 — 全接口检查
+    # L3 -- 全接口检查
     try:
         from functools import lru_cache
         # 只测不会产生副作用的读接口
@@ -248,17 +248,17 @@ def full_sanity() -> dict:
 
     return report
 
-_PERSONA_SYSTEM = """# 🧬 人格架构师 — 渐进演化协议
+_PERSONA_SYSTEM = """# 🧬 人格架构师 -- 渐进演化协议
 
 你是 NeuroBase 的记忆系统。你需要从主人的对话沙子中提炼他的画像，写入 persona.md。
 
 ## ⛔ 铁律
 1. **只能从提供的对话沙子中提炼，禁止编造。**
-2. **每条声明必须注明 `[src:L行号]`——这叫"项链"，可追溯到 sandglass.txt。系统会自动加 SHA256 hash 防 LLM 幻觉。**
+2. **每条声明必须注明 `[src:L行号]`----这叫"项链"，可追溯到 sandglass.txt。系统会自动加 SHA256 hash 防 LLM 幻觉。**
 3. **首次生成用 write 模式全量写，增量更新只改变化部分。**
 4. **保持克制：信息不足的维度留空，不要臆测。**
 5. **中文输出。**
-6. **调用 glass_reminder() 读取当前玻璃画像——2D 曲面轮廓 + 3D 立体注解。画像生成过程中随时核对玻璃结果，确保一致。** 调用 persona_project() 读取影子灵魂——如果偏移方向暗示用户正在变化，在画像中标注趋势。**
+6. **调用 glass_reminder() 读取当前玻璃画像----2D 曲面轮廓 + 3D 立体注解。画像生成过程中随时核对玻璃结果，确保一致。** 调用 persona_project() 读取影子灵魂----如果偏移方向暗示用户正在变化，在画像中标注趋势。**
 
 ## 🔬 四层深度扫描
 
@@ -273,7 +273,7 @@ _PERSONA_SYSTEM = """# 🧬 人格架构师 — 渐进演化协议
 ### 🟡 第三层：交互协议
 扫描目标：沟通习惯、雷区、工作流偏好。
 提取：怎么跟他说话、什么会触怒他、他喜欢怎样交付结果。
-**这是最重要的层——教 Agent 如何正确服务主人。**
+**这是最重要的层----教 Agent 如何正确服务主人。**
 
 ### 🔴 第四层：认知内核
 扫描目标：决策逻辑、矛盾点、终极驱动力。
@@ -282,7 +282,7 @@ _PERSONA_SYSTEM = """# 🧬 人格架构师 — 渐进演化协议
 ## 📝 输出模板
 
 ```markdown
-# 主人画像 — 四层深度扫描
+# 主人画像 -- 四层深度扫描
 
 > 最后更新：{time}
 > 沙子来源：L{first_line} ~ L{last_line}（共 {total} 条）
@@ -334,7 +334,7 @@ def _metrics_feedback() -> dict:
     except: return {}
 
 def _current_stage() -> str:
-    """读当前阶段标签。O(1) — 只读最后一行。"""
+    """读当前阶段标签。O(1) -- 只读最后一行。"""
     if not os.path.exists(_PERSONA_TIMELINE):
         return "2026-06"
     try:
@@ -392,7 +392,7 @@ def decision_stability() -> dict:
 
 def scene_stage_cross_validate() -> dict:
     """场景-阶段交叉验证。
-    阶段标记说两个阶段相似，但按场景拆分后重新检查——相似只存在于某些场景。
+    阶段标记说两个阶段相似，但按场景拆分后重新检查----相似只存在于某些场景。
     返回 {findings, suggestion}"""
     marks = stage_marks()
     if isinstance(marks, list):
@@ -544,7 +544,7 @@ def search_semantic(query: str, limit: int = 10) -> list:
     return []
 
 def _llm_expand(query: str) -> list:
-    """LLM 语义扩展——把用户查询扩展为多个相关关键词。
+    """LLM 语义扩展----把用户查询扩展为多个相关关键词。
     返回 [原词, 扩展词1, 扩展词2, ...]"""
     system = """你是搜索关键词扩展器。用户给你一个查询，你返回一组相关的中文关键词。
 规则：
@@ -557,10 +557,10 @@ def _llm_expand(query: str) -> list:
 输出：
 怎么保护数据
 加密
-DPAPI
-数据安全
-隐私保护
-密钥"""
+权限保护
+本地安全
+数据隐私
+零依赖"""
 
     result = _llm(system, query, max_tokens=200)
     if not result:
@@ -575,7 +575,7 @@ DPAPI
     return keywords if keywords else [query]
 
 def decision_snapshot(decision_text: str, offset_result: dict = None) -> dict:
-    """决策全维度快照——点、线、面。传入offset_result可断递归。"""
+    """决策全维度快照----点、线、面。传入offset_result可断递归。"""
     if offset_result:
         point = offset_result
     else:
@@ -608,7 +608,7 @@ def search_filter(query: str) -> dict:
             persona = f.read()
         for dim, keywords in [("认知内核", ["决策", "核心价值", "驱动力"]),
                                ("偏好", ["喜欢", "偏好", "开源", "免费", "本地"]),
-                               ("工具", ["Python", "Hermes", "DPAPI"])]:
+                               ("工具", ["Python", "Hermes", "本地"])]:
             if any(kw in persona for kw in keywords):
                 result["persona_context"] = persona[:500]
                 break
@@ -678,7 +678,7 @@ def search_filter(query: str) -> dict:
         result.get("decision_bias", ""))
     if expanded and len(expanded) > 1:
         result["keywords"] = expanded
-        # 四维权重——场景/画像/阶段/粒子
+        # 四维权重----场景/画像/阶段/粒子
         base = _SEARCH_WEIGHTS["default"]
         persona_ctx_val = result.get("persona_context", "")
         weights = {}
@@ -690,7 +690,7 @@ def search_filter(query: str) -> dict:
                 w *= _SEARCH_WEIGHTS["persona_boost"]
             if result.get("decision_bias"):
                 w *= _SEARCH_WEIGHTS["particle_push"]
-            # 🆕 第 5 维：偏移方向——省钱的你搜到开源方案更靠前
+            # 🆕 第 5 维：偏移方向----省钱的你搜到开源方案更靠前
             if offset_dir:
                 if offset_dir == "frugal" and any(x in kw for x in ["免费","开源","本地","自己","省"]):
                     w *= 1.3
@@ -702,7 +702,7 @@ def search_filter(query: str) -> dict:
         result["weights"] = weights
         result["source"] = "LLM场景+阶段+决策粒子(4D权重)"
     else:
-        # 2D 离线也吃决策粒子权重——本地 80 分
+        # 2D 离线也吃决策粒子权重----本地 80 分
         alt_keywords = _synonym_expand(query)
         keywords = alt_keywords if alt_keywords else [query]
         weights = {}
@@ -741,7 +741,7 @@ def _llm_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage
 2. 结合画像，返回符合用户偏好的词
 3. 结合场景上下文，返回该场景下最可能相关的词
 4. 结合阶段轨迹，返回历史上该话题相关的词
-5. 结合近期决策倾向，推测用户真正在找什么——决策粒子揭示行为模式，搜索词只是表面意图
+5. 结合近期决策倾向，推测用户真正在找什么----决策粒子揭示行为模式，搜索词只是表面意图
 6. 返回 3-8 个关键词，一行一个
 
 示例：
@@ -752,11 +752,11 @@ def _llm_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage
 查询：加密
 输出：
 加密
-DPAPI
-本地加密
-沙漏安全
+本地安全
+权限保护
+沙漏隐私
 零依赖
-AES"""
+明文"""
 
     ctx = ""
     if persona_ctx:
@@ -821,7 +821,7 @@ def _parse_time_range(query: str) -> list:
 # 织布机不生产新数据，只合成已有数据。
 
 def weave_links() -> dict:
-    """互链层——跨阶段关联自动发现并喂给当前画像。
+    """互链层----跨阶段关联自动发现并喂给当前画像。
     过去封存不动，变化规律长进现在的你。"""
     stages = stage_list()
     if len(stages) < 2:
@@ -838,7 +838,7 @@ def weave_links() -> dict:
             "trajectory": cross.get("trajectory", []),
         })
 
-    # 全部吸收——小波浪自然累积成大波浪
+    # 全部吸收----小波浪自然累积成大波浪
     if links:
         first = links[0]
         last = links[-1]
@@ -849,7 +849,7 @@ def weave_links() -> dict:
                 total_drift += abs(t.get("offset", 0))
 
         sim_trend = "上升" if last["similarity"] > first["similarity"] else "下降"
-        summary = "波动如常——小波浪在累积" if total_drift < 30 * len(links) else f"累积偏移 {total_drift}%——影子已经很深了，轮廓快成形了"
+        summary = "波动如常----小波浪在累积" if total_drift < 30 * len(links) else f"累积偏移 {total_drift}%----影子已经很深了，轮廓快成形了"
         insight = (
             f"跨 {len(stages)} 个阶段，画像相似度{sim_trend}"
             f"（{first['similarity']:.0%}→{last['similarity']:.0%}）。{summary}。"
@@ -871,7 +871,7 @@ def weave_links() -> dict:
             if note_count >= 5 or total_drift >= 60:
                 persona_update()
                 return {"linked": True, "links": links, "insight": insight,
-                        "consolidated": True, "reason": f"累积{note_count+1}条笔记/偏移{total_drift}%——已重整画像"}
+                        "consolidated": True, "reason": f"累积{note_count+1}条笔记/偏移{total_drift}%----已重整画像"}
 
         return {"linked": True, "links": links, "insight": insight}
 
@@ -879,7 +879,7 @@ def weave_links() -> dict:
 
 def stage_brief() -> str:
     """
-    织布机——阶段简报。阶段切换时生成更新日志。
+    织布机----阶段简报。阶段切换时生成更新日志。
     不自动推送，主人手动调用。
     
     格式：阶段名、触发原因、偏移率、高权重标签、关键决策
@@ -892,13 +892,13 @@ def stage_brief() -> str:
     # 阶段信息
     try:
         sw = stage_switch_prediction()
-        lines.append(f"🧬 阶段简报 — {datetime.now():%Y-%m-%d}")
+        lines.append(f"🧬 阶段简报 -- {datetime.now():%Y-%m-%d}")
         lines.append("─" * 40)
         if sw.get("predicted"):
             lines.append(f"⚠ 预切换: {sw.get('eta_sands', '?')}条沙子后 (置信度{sw.get('confidence',0):.0%})")
             lines.append(f"趋势斜率: {sw.get('trend_slope', 0)}")
     except Exception:
-        lines.append(f"🧬 阶段简报 — {datetime.now():%Y-%m-%d}")
+        lines.append(f"🧬 阶段简报 -- {datetime.now():%Y-%m-%d}")
 
     # 偏移率
     try:
@@ -972,7 +972,7 @@ def stage_brief() -> str:
     except Exception:
         pass
 
-    # 自动蒸馏——每50条新沙子触发一次
+    # 自动蒸馏----每50条新沙子触发一次
     try:
         last_distill = os.path.join(_NB, ".last_distill")
         since = total
@@ -1008,7 +1008,7 @@ def distill(topic: str = "", save: bool = False) -> str:
 从主人的对话中提取结构化洞察。输出格式：
 
 ```markdown
-# 每日洞察 — {date}
+# 每日洞察 -- {date}
 
 ## 🎯 关键决策
 - [决策内容] (L行号)
@@ -1017,7 +1017,7 @@ def distill(topic: str = "", save: bool = False) -> str:
 - [如果影子往某个方向移动了，写下方向+幅度]
 
 ## 偏移的轮廓
-- [省钱/花钱/放弃的轮廓——哪个正在变深]
+- [省钱/花钱/放弃的轮廓----哪个正在变深]
 ```
 
 要求：
@@ -1034,7 +1034,7 @@ def distill(topic: str = "", save: bool = False) -> str:
 
     if not result:
         # LLM 不可用，降级为简单 dump
-        lines = [f"# 每日洞察 — {datetime.now():%Y-%m-%d %H:%M}",
+        lines = [f"# 每日洞察 -- {datetime.now():%Y-%m-%d %H:%M}",
                  f"## 主题: {topic or '最近对话'}",
                  "", "### 最近对话"]
         for ln, ts, text in latest[:10]:
@@ -1048,7 +1048,7 @@ def distill(topic: str = "", save: bool = False) -> str:
         with open(_INSIGHTS, "a", encoding="utf-8") as f:
             f.write(f"\n{summary}\n")
 
-    # 人格自动维护——检查是否需要触发更新
+    # 人格自动维护----检查是否需要触发更新
     try:
         maintain = persona_maintain()
         if maintain.get("triggered"):
@@ -1094,7 +1094,7 @@ def session_context(n: int = 5) -> str:
     if pending:
         parts.append(f"## 📋 待办（{len(pending)}项）")
         for t in pending[-5:]:
-            trig = (" — 触发条件：" + t.get("trigger", "")) if t.get("trigger") else ""
+            trig = (" -- 触发条件：" + t.get("trigger", "")) if t.get("trigger") else ""
             parts.append("- " + t.get("task", "") + trig)
         parts.append("")
 
@@ -1115,7 +1115,7 @@ def session_context(n: int = 5) -> str:
 
 # 2D 离线 = 玻璃曲面，沙自然累积 → 轮廓渐清（小标签）
 # 3D 在线 = LLM 吃进所有 2D 影子 → 合成立体像（大标签，永久保存）
-# 每个阶段可以有多个注解——阶段切了、偏移变了、沙子够了、情绪波动了 → 重新生成
+# 每个阶段可以有多个注解----阶段切了、偏移变了、沙子够了、情绪波动了 → 重新生成
 
 _3D_ANNOTATIONS = os.path.join(_NB, "3d_annotations.jsonl")
 
@@ -1190,12 +1190,12 @@ def _should_synthesize() -> tuple[bool, str]:
     if current >= last_count + 100:
         return True, f"sand_milestone:{last_count}→{current}"
 
-    # ④ 情绪波动 — 由 pulse.py 调用时传入
+    # ④ 情绪波动 -- 由 pulse.py 调用时传入
     # （这里只是信号检查，实际情绪由 emotion_vocab.detect 决定）
     return False, ""
 
 def _save_annotation(data: dict, trigger: str) -> None:
-    """保存阶段注解——永久追加，不替换旧注解。"""
+    """保存阶段注解----永久追加，不替换旧注解。"""
     try:
         current_stage = "?"
         from sandglass_vault import count as sv_count
@@ -1241,7 +1241,7 @@ def _latest_annotation() -> dict:
 
 def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
     """
-    3D 立体画像合成——永久注解模式。
+    3D 立体画像合成----永久注解模式。
     
     - 先检查 _should_synthesize() → 不需要生成则返回最新注解
     - 需要生成 → LLM 吃全量数据 → 保存为永久注解
@@ -1336,7 +1336,7 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
 
 def _emotional_entropy(recent_n: int = 10) -> float:
     """
-    香农熵——量化情绪波动程度。
+    香农熵----量化情绪波动程度。
     0 = 完全平静（全是同一种情绪）
     ~1.95 = 高熵（7种情绪均匀分布，波动大）
     """
@@ -1390,7 +1390,7 @@ def memory_migrate(output_path: str = "") -> str:
       decision_particles.txt（决策粒子）
       search_weights.txt / echo_wind.jsonl（搜索权重+回音折风）
     
-    不打包代码——只打包记忆本身。
+    不打包代码----只打包记忆本身。
     """
     import tarfile, os
     

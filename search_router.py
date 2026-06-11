@@ -6,7 +6,7 @@ search()拆为三层独立可测:
 每层<50行，依赖注入，独立可测
 """
 import os, re, mmap
-from sandglass_vault import (_SANDGLASS, _IDX, _parse_line, _decrypt,
+from sandglass_vault import (_SANDGLASS, _IDX, _parse_line,
                               _tokenize, _query_tokens, _sync_index, rebuild_index)
 
 # ═══════════════════ ShadowSearch ═══════════════════
@@ -119,12 +119,9 @@ class MmapFallback:
                             if " | " not in decoded: continue
                             parts = decoded.split(" | ", 2)
                             if len(parts) < 3: continue
-                            ts, sender, encrypted = parts
+                            ts, sender, text = parts
 
-                            # 降级解密
-                            try: text = _decrypt(encrypted)
-                            except: text = encrypted
-
+                            # V2.4.0: 明文存储，无需解密
                             # 阶段过滤
                             if scan_months and not any(ts.startswith(m) for m in scan_months):
                                 continue
