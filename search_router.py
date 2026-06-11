@@ -86,8 +86,8 @@ class MmapFallback:
 
 # ═══════════════════ SearchRouter ═══════════════════
 class SearchRouter:
-    """搜索路由器——两层并行 + 兜底。
-    影子沙(信任分) + FTS5(BM25) 并行 → 混合排序 → mmap兜底。"""
+    """搜索路由器——三级串联降级。
+    影子沙(脱口而出) → FTS5+搜索滤镜 → mmap兜底。"""
 
     def __init__(self, shadow=None, fts5=None, mmap=None):
         self.shadow = shadow or ShadowSearch()
@@ -95,61 +95,45 @@ class SearchRouter:
         self.mmapfallback = mmap or MmapFallback()
 
     def search(self, query: str, limit: int = 10) -> list:
-        # FTS5 全文搜索（主力，BM25精排）
-        fts5_hits = self.fts5.search(query, max(limit * 3, 30))
-        if not fts5_hits:
-            # FTS5没结果 → 先看影子沙有没有
-            from shadow_sand import shadow_search, shadow_retrieval_bump
-            sh = shadow_search(query, limit)
-            if sh:
-                shadow_retrieval_bump([ln for _, ln in sh[:limit]])
-                results = []
+        # Layer 1: 影子沙 — 脱口而出，命中即返回
+        from shadow_sand import shadow_search as _sh_search, shadow_retrieval_bump
+        shadow_hits = []
+        try:
+            shadow_hits = _sh_search(query, limit)
+        except: pass
+
+        if shadow_hits:
+            results = []
+            try:
                 with open(_SANDGLASS, "r", encoding="utf-8") as f:
                     lines = f.readlines()
-                for score, ln in sh[:limit]:
+                for score, ln in shadow_hits[:limit]:
                     if 0 < ln <= len(lines):
                         ts, sender, text = _parse_line(lines[ln - 1])
                         if ts and text:
                             results.append((ln, ts, text))
                 if results:
+                    shadow_retrieval_bump([ln for _, ln in shadow_hits[:limit]])
                     return results
-            # 都没有 → mmap兜底
-            return self.mmapfallback.search(query, limit)
+            except: pass
 
-        # 影子沙 → 获取信任分（附加到 FTS5 结果上）
-        shadow_scores = {}
-        try:
-            from shadow_sand import shadow_search, shadow_retrieval_bump
-            sh = shadow_search(query, limit * 2)
-            if sh:
-                shadow_scores = {ln: score for score, ln in sh}
-                shadow_retrieval_bump([ln for _, ln in sh[:limit]])
-        except: pass
+        # Layer 2: FTS5 + 搜索滤镜
+        fts5_hits = self.fts5.search(query, max(limit * 3, 30))
+        if fts5_hits:
+            # L3 搜索滤镜 — 五维权重统一排序
+            try:
+                from sandglass_think import search_filter
+                filt = search_filter(query)
+                weights = filt.get("weights", {})
+                keywords = filt.get("keywords", [])
+                if weights:
+                    def _score(item):
+                        _, _, text = item
+                        return sum(weights.get(kw, 1.0) for kw in keywords if kw.lower() in text.lower())
+                    ranked = sorted(fts5_hits, key=_score, reverse=True)
+                    return [(r[0], r[1], r[2]) for r in ranked[:limit]]
+            except: pass
+            return [(r[0], r[1], r[2]) for r in fts5_hits[:limit]]
 
-        # 合并：FTS5结果 × 影子沙信任分
-        candidates = {}
-        for rowid, ts, text in fts5_hits:
-            trust = shadow_scores.get(rowid, 0.5)
-            candidates[rowid] = (ts, text, trust)
-
-        # L3 搜索滤镜 — 五维权重统一排序
-        try:
-            from sandglass_think import search_filter
-            filt = search_filter(query)
-            weights = filt.get("weights", {})
-            keywords = filt.get("keywords", [])
-            if weights:
-                # 五维权重排序：场景×1.5 + 画像×1.3 + 阶段×0.7 + 粒子×1.2 + 偏移×1.3
-                def _score(item):
-                    ln, (ts, text, trust) = item
-                    w = sum(weights.get(kw, 1.0) for kw in keywords if kw.lower() in text.lower())
-                    return trust * 0.3 + w * 0.7  # 信任分30% + 搜索滤镜70%
-                ranked = sorted(candidates.items(), key=_score, reverse=True)
-                results = [(ln, ts, text) for ln, (ts, text, _) in ranked[:limit]]
-                return results
-        except Exception:
-            pass
-
-        # 无搜索滤镜时：信任分排序
-        ranked = sorted(candidates.items(), key=lambda x: x[1][2], reverse=True)
-        return [(ln, ts, text) for ln, (ts, text, _) in ranked[:limit]]
+        # Layer 3: mmap 兜底
+        return self.mmapfallback.search(query, limit)
