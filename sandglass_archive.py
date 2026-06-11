@@ -74,12 +74,31 @@ def cold_migration(dry_run: bool = False) -> dict:
             moved += 1
 
     if not dry_run and (moved > 0 or dropped > 0):
-        # 重写热沙
-        tmp = hot_file + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            for line in to_keep:
-                f.write(line + "\n")
-        os.replace(tmp, hot_file)
+        # 和落沙用同一把锁——O_CREAT|O_EXCL
+        import time as _time
+        lock = hot_file + ".lock"
+        deadline = _time.time() + 5
+        while _time.time() < deadline:
+            try:
+                fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.close(fd)
+                break
+            except FileExistsError:
+                _time.sleep(0.01)
+
+        try:
+            # 重写热沙
+            tmp = hot_file + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                for line in to_keep:
+                    f.write(line + "\n")
+            os.replace(tmp, hot_file)
+        finally:
+            try:
+                os.unlink(lock)
+            except OSError:
+                pass
+
         # 重建索引
         try:
             from sandglass_vault import rebuild_index
