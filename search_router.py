@@ -1,113 +1,55 @@
 """
-NexSandglass SearchRouter — Matt Pocock TDD风格
-================================================
-search()拆为三层独立可测:
-  ShadowSearch → IdxFtsSearch → MmapFallback
-每层<50行，依赖注入，独立可测
+NexSandglass SearchRouter V2.5 — 两层并行架构
+===============================================
+去加密后 idx 不再需要，FTS5 直接索引中文。
+影子沙(信任分) + FTS5(全文) 并行 → 混合排序 → mmap兜底。
 """
-import os, re, mmap
-from sandglass_vault import (_SANDGLASS, _IDX, _parse_line,
-                              _tokenize, _query_tokens, _sync_index, rebuild_index)
+import os, mmap
+from sandglass_vault import _SANDGLASS, _parse_line
+
 
 # ═══════════════════ ShadowSearch ═══════════════════
 class ShadowSearch:
-    """影子沙优先级——<1ms脱口而出层。独立可测。"""
+    """影子沙信任层——<1ms脱口而出。独立可测。"""
     def __init__(self, sandfile=None):
         self.sandfile = sandfile or _SANDGLASS
 
     def search(self, query: str, limit: int = 10) -> list:
+        """返回 [(score, line_num)] 信任分列表，不读原文。"""
         try:
-            from shadow_sand import shadow_search, shadow_retrieval_bump
-            hits = shadow_search(query, limit)
-            if not hits:
-                return []
-            results = []
-            with open(self.sandfile, "r", encoding="utf-8") as f:
-                for n, line in enumerate(f, 1):
-                    for score, ln in hits:
-                        if n == ln:
-                            ts, sender, text = _parse_line(line)
-                            if ts and text:
-                                results.append((ln, ts, text))
-                    if len(results) >= limit:
-                        break
-            if results:
-                shadow_retrieval_bump([ln for _, ln in hits[:limit]])
-            return results
-        except Exception as e:
-            return []  # 影子沙失败→降级
+            from shadow_sand import shadow_search
+            return shadow_search(query, limit)
+        except Exception:
+            return []
 
-# ═══════════════════ IdxFtsSearch ═══════════════════
-class IdxFtsSearch:
-    """投石问路→FTS5精排。独立可测。"""
-    def __init__(self, sandfile=None, idxfile=None, dbfile=None):
-        self.sandfile = sandfile or _SANDGLASS
-        self.idxfile = idxfile or _IDX
 
+# ═══════════════════ Fts5Search ═══════════════════
+class Fts5Search:
+    """FTS5全文搜索——内置倒排+BM25精排。独立可测。"""
     def search(self, query: str, limit: int = 10) -> list:
+        """返回 [(line_num, ts, text), ...]"""
         try:
-            idx = _sync_index()
-            if not idx:
-                rebuild_index()
-                idx = _sync_index()
-            if not idx:
-                return []
-
-            candidate_lines = set()
-            for token in _query_tokens(query):
-                if token in idx:
-                    candidate_lines.update(idx[token])
-            if not candidate_lines:
-                return []
-
-            from sandglass_sqlite import search_in, sync_incremental
+            from sandglass_sqlite import search as fts5_search, sync_incremental
             sync_incremental()
-            ranked = search_in(list(candidate_lines), query)
-            if not ranked:
-                return []
-
-            results = []
-            with open(self.sandfile, "r", encoding="utf-8") as f:
-                for n, line in enumerate(f, 1):
-                    if n in set(r[0] for r in ranked[:limit]):
-                        ts, sender, text = _parse_line(line)
-                        if ts and text:
-                            results.append((n, ts, text))
-                    if len(results) >= limit:
-                        break
-
-            # 五维权重排序
-            try:
-                from sandglass_think import search_filter
-                filt = search_filter(query)
-                weights = filt.get("weights", {})
-                if weights:
-                    scored = [(sum(weights.get(w, 1.0) for w in _query_tokens(t) if w in weights), item)
-                              for _, _, t in results for item in [(_, _, t)]]
-                    results = [item for _, item in sorted(scored, key=lambda x: x[0], reverse=True)]
-            except: pass
-
-            return results[:limit]
-        except Exception as e:
+            return fts5_search(query, limit)
+        except Exception:
             return []
 
 
 # ═══════════════════ MmapFallback ═══════════════════
 class MmapFallback:
-    """mmap兜底——全量扫描最后手段。独立可测。"""
+    """mmap全量扫描兜底——最后一层保障。"""
     def __init__(self, sandfile=None):
         self.sandfile = sandfile or _SANDGLASS
 
-    def search(self, query: str, limit: int = 200, month: str = "") -> list:
+    def search(self, query: str, limit: int = 10) -> list:
         results = []
         try:
-            stage_filter = False
-            scan_months = [month] if month else []
-            if not month:
-                try:
-                    from sandglass_think import _current_stage
-                    scan_months = [_current_stage()]
-                except: pass
+            scan_months = []
+            try:
+                from sandglass_think import _current_stage
+                scan_months = [_current_stage()]
+            except: pass
 
             with open(self.sandfile, "rb") as f:
                 with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
@@ -121,8 +63,6 @@ class MmapFallback:
                             if len(parts) < 3: continue
                             ts, sender, text = parts
 
-                            # V2.4.0: 明文存储，无需解密
-                            # 阶段过滤
                             if scan_months and not any(ts.startswith(m) for m in scan_months):
                                 continue
 
@@ -131,36 +71,68 @@ class MmapFallback:
                                 if len(results) >= limit: break
                         except: pass
 
-            # 再走 FTS5 精排
             if results:
                 from sandglass_sqlite import search_in, sync_incremental
-                line_nums = list(range(1, len(results)+1))
+                lns = [r[0] for r in results[:500]]
                 sync_incremental()
-                ranked = search_in(line_nums[:500], query)
+                ranked = search_in(lns, query)
                 if ranked:
-                    return [(r[0], r[1], r[2]) for r in ranked[:10]]
+                    return [(r[0], r[1], r[2]) for r in ranked[:limit]]
 
-            return results[:10]
-        except Exception as e:
+            return results[:limit]
+        except Exception:
             return []
 
 
 # ═══════════════════ SearchRouter ═══════════════════
 class SearchRouter:
-    """搜索路由器——三层依次降级，每层独立可测。"""
-    def __init__(self, shadow=None, idxfts=None, mmap=None):
+    """搜索路由器——两层并行 + 兜底。
+    影子沙(信任分) + FTS5(BM25) 并行 → 混合排序 → mmap兜底。"""
+
+    def __init__(self, shadow=None, fts5=None, mmap=None):
         self.shadow = shadow or ShadowSearch()
-        self.idxfts = idxfts or IdxFtsSearch()
+        self.fts5 = fts5 or Fts5Search()
         self.mmapfallback = mmap or MmapFallback()
 
     def search(self, query: str, limit: int = 10) -> list:
-        # Layer 1: 影子沙 (<1ms)
-        r = self.shadow.search(query, limit)
-        if r: return r
+        # Layer 1: 影子沙 + FTS5 并行
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+            fut_shadow = ex.submit(self.shadow.search, query, limit)
+            fut_fts5 = ex.submit(self.fts5.search, query, limit)
 
-        # Layer 2: 投石问路→FTS5
-        r = self.idxfts.search(query, limit)
-        if r: return r
+        shadow_hits = fut_shadow.result() or []
+        fts5_hits = fut_fts5.result() or []
 
-        # Layer 3: mmap兜底
+        # 混合排序：去重 + 影子沙在前(FIFO) + FTS5在后
+        seen = set()
+        results = []
+
+        # 影子沙结果（按信任分排序，已在 shadow_search 内排好）
+        if shadow_hits:
+            with open(_SANDGLASS, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            for score, ln in shadow_hits[:limit]:
+                if ln not in seen and 0 < ln <= len(lines):
+                    seen.add(ln)
+                    ts, sender, text = _parse_line(lines[ln - 1])
+                    if ts and text:
+                        results.append((ln, ts, text))
+
+        # FTS5结果（已按 BM25 rank 排序）
+        for rowid, ts, text in fts5_hits[:limit * 2]:
+            if rowid not in seen and len(results) < limit:
+                seen.add(rowid)
+                results.append((rowid, ts, text))
+
+        if results:
+            # 标记影子沙检索计数
+            if shadow_hits:
+                try:
+                    from shadow_sand import shadow_retrieval_bump
+                    shadow_retrieval_bump([ln for _, ln in shadow_hits[:limit]])
+                except: pass
+            return results[:limit]
+
+        # Layer 2: mmap 兜底
         return self.mmapfallback.search(query, limit)

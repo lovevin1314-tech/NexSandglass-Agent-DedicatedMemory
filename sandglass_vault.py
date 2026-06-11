@@ -197,10 +197,10 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
     """搜索沙漏。返回 [(行号, 时间, 明文), ...]。
     委托给 SearchRouter 三层架构——影子沙→投石问路→mmap。"""
     try:
-        from search_router import SearchRouter, ShadowSearch, IdxFtsSearch, MmapFallback
+        from search_router import SearchRouter, ShadowSearch, Fts5Search, MmapFallback
         router = SearchRouter(
             ShadowSearch(_SANDGLASS),
-            IdxFtsSearch(_SANDGLASS, _IDX),
+            Fts5Search(),
             MmapFallback(_SANDGLASS)
         )
         return router.search(query, limit)
