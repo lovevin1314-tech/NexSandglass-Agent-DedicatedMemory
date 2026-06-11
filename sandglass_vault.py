@@ -13,8 +13,10 @@ import os
 import re
 from datetime import datetime
 
-_SANDGLASS = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.txt")
-_IDX = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.idx")
+_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+
+_SANDGLASS = os.path.join(_NB, "sandglass.txt")
+_IDX = os.path.join(_NB, "sandglass.idx")
 
 logger = logging.getLogger(__name__)
 

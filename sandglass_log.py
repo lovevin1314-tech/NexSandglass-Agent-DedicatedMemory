@@ -43,7 +43,9 @@ def _estimate_info_value(text: str) -> float:
         score = 0.0
     return min(score, 1.0)
 
-_SANDGLASS = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.txt")
+_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+
+_SANDGLASS = os.path.join(_NB, "sandglass.txt")
 
 # Windows DPAPI
 try:

@@ -13,7 +13,9 @@ from datetime import datetime
 
 from sandglass_vault import _tokenize
 
-_VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")
+_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+
+_VAULT = _NB
 _PERSONA_DIR = os.path.join(_VAULT, "persona")
 _PERSONA = os.path.join(_PERSONA_DIR, "persona.md")
 _PERSONA_TIMELINE = os.path.join(_PERSONA_DIR, "persona-timeline.jsonl")
@@ -103,7 +105,7 @@ _FULL_SANITY = {
     "L3_test": ["test_smoke.py"],
 }
 
-_HEALTH_REPORT = os.path.join(os.path.expanduser("~"), ".neurobase", "health_report.json")
+_HEALTH_REPORT = os.path.join(_NB, "health_report.json")
 
 def full_sanity() -> dict:
     """
@@ -910,7 +912,7 @@ def stage_brief() -> str:
 
     # 高权重标签
     try:
-        wf = os.path.join(os.path.expanduser("~"), ".neurobase", "search_weights.txt")
+        wf = os.path.join(_NB, "search_weights.txt")
         if os.path.exists(wf):
             with open(wf, "r", encoding="utf-8") as f:
                 top = [line.strip() for line in f.readlines()[:5] if line.strip()]
@@ -921,7 +923,7 @@ def stage_brief() -> str:
 
     # 最近 3 条决策
     try:
-        dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+        dp_path = os.path.join(_NB, "decision_particles.txt")
         if os.path.exists(dp_path):
             with open(dp_path, "r", encoding="utf-8") as f:
                 recent = f.readlines()[-3:]
@@ -956,7 +958,7 @@ def stage_brief() -> str:
 
     # 自动蒸馏——每50条新沙子触发一次
     try:
-        last_distill = os.path.join(os.path.expanduser("~"), ".neurobase", ".last_distill")
+        last_distill = os.path.join(_NB, ".last_distill")
         since = total
         if os.path.exists(last_distill):
             with open(last_distill) as f:
@@ -1099,7 +1101,7 @@ def session_context(n: int = 5) -> str:
 # 3D 在线 = LLM 吃进所有 2D 影子 → 合成立体像（大标签，永久保存）
 # 每个阶段可以有多个注解——阶段切了、偏移变了、沙子够了、情绪波动了 → 重新生成
 
-_3D_ANNOTATIONS = os.path.join(os.path.expanduser("~"), ".neurobase", "3d_annotations.jsonl")
+_3D_ANNOTATIONS = os.path.join(_NB, "3d_annotations.jsonl")
 
 # ── 3D 解锁门槛：本地优先，2000 条沙子 + LLM → 才启用立体合成 ──
 _THREE_D_UNLOCK = 2000
@@ -1255,14 +1257,14 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
 
         # 3. 织布机矛盾
         weave_text = ""
-        weave_path = os.path.join(os.path.expanduser("~"), ".neurobase", "weave_alerts.txt")
+        weave_path = os.path.join(_NB, "weave_alerts.txt")
         if os.path.exists(weave_path):
             with open(weave_path, "r", encoding="utf-8") as f:
                 weave_text = f.read()[-500:]
 
         # 4. 搜索权重
         weight_text = ""
-        wf = os.path.join(os.path.expanduser("~"), ".neurobase", "search_weights.txt")
+        wf = os.path.join(_NB, "search_weights.txt")
         if os.path.exists(wf):
             with open(wf, "r", encoding="utf-8") as f:
                 weight_text = f.read()[:500]

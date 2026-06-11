@@ -446,3 +446,10 @@ class NexSandglassProvider(MemoryProvider):
         except Exception:
             pass
         return None
+
+
+# ── 插件自动发现入口 ──
+def register(ctx) -> None:
+    """Hermes 插件加载入口——接收 config 上下文并注册 Provider。"""
+    provider = NexSandglassProvider()
+    ctx.register_memory_provider(provider)

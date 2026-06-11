@@ -8,7 +8,9 @@ NexSandglass — 影子沙 (Shadow Sand)
 import sqlite3, os, re, threading, time
 from collections import defaultdict
 
-_SHADOW_DB = os.path.join(os.path.expanduser("~"), ".neurobase", "shadow_sand.db")
+_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+
+_SHADOW_DB = os.path.join(_NB, "shadow_sand.db")
 
 def set_shadow_path(path: str):
     """重定向影子沙路径——基准测试用。"""
