@@ -31,10 +31,10 @@ def _tokenize_simhash(text: str) -> list:
 
 
 def simhash(text: str, bits: int = _SIMHASH_BITS) -> int:
-    """文本→SimHash指纹。零依赖。"""
+    """文本→SimHash指纹。零依赖。空文本返回-1。"""
     tokens = _tokenize_simhash(text)
     if not tokens:
-        return 0
+        return -1  # 空文本标记，避免碰撞为0
     v = [0] * bits
     for token in tokens:
         h = int(hashlib.md5(token.encode()).hexdigest(), 16)
@@ -63,9 +63,13 @@ def simhash_search(query: str, candidates: list, limit: int = 20, threshold: int
     if not candidates:
         return []
     q_fp = simhash(query)
+    if q_fp == -1:  # 空文本查询，无法语义搜索
+        return []
     scored = []
     for ln, ts, text in candidates:
-        d_fp = simhash(text[:300])
+        d_fp = simhash(text[:500])
+        if d_fp == -1:
+            continue
         dist = _hamming(q_fp, d_fp)
         if dist <= threshold:
             scored.append((dist, ln, ts, text))

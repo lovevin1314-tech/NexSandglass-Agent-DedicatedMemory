@@ -511,7 +511,7 @@ def search_semantic(query: str, limit: int = 10) -> list:
     try:
         from l3_search_core import simhash_search
         from sandglass_vault import recent
-        wide = [(ln, ts, text) for ln, ts, text in recent(200)]
+        wide = [(ln, ts, text) for ln, ts, text in recent(500)]
         if wide:
             semantic = simhash_search(query, wide, limit=limit * 2)
             if semantic:
