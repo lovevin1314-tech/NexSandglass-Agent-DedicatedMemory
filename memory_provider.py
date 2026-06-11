@@ -270,14 +270,25 @@ class NexSandglassProvider(MemoryProvider):
 最多5条，每条不超过30字。设定后我会永远遵守。"""
             return "NexSandglass记忆系统已就绪。"
 
-    def prefetch(self, query: str) -> Optional[List[Dict[str, Any]]]:
-        """每轮对话前预搜索。"""
+    def prefetch(self, query: str) -> str:
+        """每轮对话前注入当前阶段+偏移趋势（方案C：智能上下文感知）。"""
         try:
-            from sandglass_vault import search
-            results = search(query, limit=5)
-            return [{"line": ln, "ts": ts, "text": txt[:300]} for ln, ts, txt in results]
+            from sandglass_think import comprehensive_offset, _current_stage
+            from sandglass_vault import count
+            stage = _current_stage()
+            off = comprehensive_offset()
+            total = count()
+            return (
+                f"## NexSandglass 记忆\n"
+                f"当前阶段: {stage} | 沙子: {total}条 | "
+                f"偏移: {off.get('direction','?')} {off.get('offset',0):+d}%\n"
+            )
         except Exception:
-            return None
+            return ""
+
+    def queue_prefetch(self, query: str) -> None:
+        """后台预热——搜索足够快，不需要预热。保持接口兼容。"""
+        pass
 
     def sync_turn(self, user_msg: str, assistant_msg: str) -> None:
         """每轮对话后落沙。"""

@@ -14,10 +14,34 @@ import hashlib
 import logging
 import os
 import platform
+import re
 import time as _time
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# ── AI无意义回复过滤器（V2.1）──
+_AI_TRIVIAL = re.compile(
+    r'^(好的|明白了|没问题|请稍等|我来看看|是的|对的|'
+    r'你说得对|当然可以|不用担心|不客气|谢谢|可以|'
+    r'好|嗯|OK|ok|嗯嗯|好的呢|没问题呢|知道了|收到)'
+)
+
+
+def _estimate_info_value(text: str) -> float:
+    """评估消息信息量。0.0=无价值，1.0=高价值。"""
+    score = 0.3
+    if len(text) > 50:                score += 0.2
+    if re.search(r'\d+', text):       score += 0.2
+    if re.search(r'[。：；]', text):  score += 0.1
+    if any(kw in text for kw in [
+        '建议', '需要', '注意', '因为', '方案',
+        '步骤', '第一种', '第二种', '推荐',
+        '区别', '对比', '优点是', '缺点是',
+    ]):                                 score += 0.2
+    if _AI_TRIVIAL.match(text.strip()):
+        score = 0.0
+    return min(score, 1.0)
 
 _SANDGLASS = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.txt")
 
@@ -43,8 +67,12 @@ def _encrypt(plaintext: str) -> str:
 
 def log_message(text: str, sender: str = "agent") -> bool:
     """写入一条消息到沙漏。任何 Agent 调用此函数落沙。
-    返回 True 表示写入成功。"""
+    返回 True 表示写入成功。V2.1: AI低价值回复自动过滤。"""
     try:
+        # AI低价值回复过滤（V2.1）
+        if sender == "agent" and _estimate_info_value(text) < 0.3:
+            return False
+
         # 净化器插件（可选）
         sanitizer = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plugins", "sanitize.py")
         if os.path.exists(sanitizer):
