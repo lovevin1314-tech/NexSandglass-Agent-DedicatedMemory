@@ -1,6 +1,7 @@
 """NexSandglass L3 — persona_l3"""
-import os, re, json, hashlib, logging, math, statistics, shutil
+import os, re, json, hashlib, logging, shutil
 from datetime import datetime, timezone
+from pathlib import Path
 from sandglass_vault import _tokenize, recent as sv_recent, search as sv_search, count as sv_count
 
 _VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")

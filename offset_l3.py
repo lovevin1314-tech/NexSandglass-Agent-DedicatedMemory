@@ -23,9 +23,9 @@ _LLM_MODEL = "deepseek-v4-flash" if os.environ.get("DEEPSEEK_API_KEY") else "dee
 # Lazy imports — avoid circular dependency
 _fail_open = None; _llm = None; _extract_md_section = None
 _current_stage = None; stage_list = None; scene_current = None; _log_scene_timeline = None; scene_guess = None
-_WAVE_THRESHOLDS = None
+_WAVE_THRESHOLDS = None; _weave_guard = None; weave_contradiction = None
 def _lazy_import():
-    global _fail_open, _llm, _extract_md_section, _current_stage, stage_list, scene_current, _log_scene_timeline, scene_guess, _WAVE_THRESHOLDS
+    global _fail_open, _llm, _extract_md_section, _current_stage, stage_list, scene_current, _log_scene_timeline, scene_guess, _WAVE_THRESHOLDS, _weave_guard, weave_contradiction
     if _fail_open is None:
         from sandglass_think import _fail_open as _fo, _llm as _l, _extract_md_section as _em
         _fail_open = _fo; _llm = _l; _extract_md_section = _em
@@ -37,6 +37,9 @@ def _lazy_import():
     if _WAVE_THRESHOLDS is None:
         from persona_l3 import _WAVE_THRESHOLDS as _wt
         _WAVE_THRESHOLDS = _wt
+    if _weave_guard is None:
+        from weave_l3 import weave_contradiction as _wc
+        _weave_guard = False; weave_contradiction = _wc
 
 
 
@@ -218,11 +221,14 @@ def comprehensive_offset(scene: str = "") -> dict:
     }
     if scene:
         result["scene"] = scene
-    # 偏移超过阈值 → 自动织造
-    if abs(avg) >= 30:
+    # 偏移超过阈值 → 自动织造（带递归守卫）
+    if abs(avg) >= 30 and not _weave_guard:
         try:
+            _weave_guard = True
             weave_contradiction()
         except: pass
+        finally:
+            _weave_guard = False
     return result
 
 

@@ -187,7 +187,7 @@ def entropy_ghost(question: str) -> dict:
         graph = weave_graph(question[:20])
         if graph.get("chains"):
             result["causal_chain"] = [
-                f"{n['depth']}跳: {n['label']}" for n in graph["chains"][:5]
+                f"{n['depth']}跳: {n['keyword']}" for n in graph["chains"][:5]
             ]
     except Exception as e:
         logger.warning(f"entropy_ghost: 因果图追溯失败: {e}")
