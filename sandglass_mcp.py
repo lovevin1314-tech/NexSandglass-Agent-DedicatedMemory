@@ -32,21 +32,21 @@ def _handle_tool(name, args, request_id):
             from sandglass_vault import search
             r = search(args.get("query", ""), limit=args.get("limit", 10))
             return _rpc_response(request_id, [
-                {"line": ln, "ts": ts, "text": txt[:200]} for ln, ts, txt in r
+                {"line": ln, "ts": ts, "text": txt[:200]} for ln, ts, txt, *_ in r
             ])
 
         elif name == "sandglass_semantic":
             from sandglass_think import search_semantic
             r = search_semantic(args.get("query", ""), limit=args.get("limit", 5))
             return _rpc_response(request_id, [
-                {"line": ln, "ts": ts, "text": txt[:200]} for ln, ts, txt in r
+                {"line": ln, "ts": ts, "text": txt[:200]} for ln, ts, txt, *_ in r
             ])
 
         elif name == "sandglass_recent":
             from sandglass_vault import recent
             r = recent(args.get("limit", 10))
             return _rpc_response(request_id, [
-                {"line": ln, "ts": ts, "text": txt[:200]} for ln, ts, txt in r
+                {"line": ln, "ts": ts, "text": txt[:200]} for ln, ts, txt, *_ in r
             ])
 
         elif name == "sandglass_offset":

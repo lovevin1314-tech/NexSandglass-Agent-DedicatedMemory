@@ -8,7 +8,7 @@ NexSandglass — 影子沙 (Shadow Sand)
 import sqlite3, os, re, threading, time
 from collections import defaultdict
 
-_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+from sandglass_paths import _NB
 
 _SHADOW_DB = os.path.join(_NB, "shadow_sand.db")
 
@@ -151,16 +151,17 @@ def shadow_boost(candidate_lines: set, limit: int = 10) -> list:
 
 # ═══════════════════ 写入（落沙后同步） ═══════════════════
 
-def shadow_index(text: str, category: str = "general", tags: str = "") -> None:
+def shadow_index(text: str, category: str = "general", tags: str = "", line_num: int = 0) -> None:
     try:
         from sandglass_think import scene_mode
         if scene_mode() == 'exam': category = 'exam_' + category
     except: pass
-    """落沙后同步——自增ID，不读沙漏文件。"""
+    """落沙后同步——调用方传入实际行号，避免COUNT(*)偏移。"""
     db = _get_conn()
     with _lock:
-        # 自增ID = 当前信任表行数（=沙漏行数）
-        line_num = db.execute("SELECT COUNT(*) FROM trust").fetchone()[0] + 1
+        # 行号由调用方传入（sandglass_log 写入后传实际行号）
+        if line_num <= 0:
+            line_num = db.execute("SELECT COUNT(*) FROM trust").fetchone()[0] + 1
         
         # 提取实体
         for m in _ENTITY_RE.finditer(text):
