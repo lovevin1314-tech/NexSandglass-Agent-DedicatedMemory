@@ -119,6 +119,8 @@ def main():
                     {"name": "sandglass_dream", "description": "幽灵决策——'如果选另一个选项会怎样'"},
                     {"name": "sandglass_chart", "description": "情绪熵 ASCII 可视化图表"},
                     {"name": "sandglass_migrate", "description": "一键导出全部记忆数据为 tar.gz"},
+                    {"name": "sandglass_soul_export", "description": "导出灵魂差分(偏移率+决策+回音折)"},
+                    {"name": "sandglass_soul_merge", "description": "合并外部灵魂差分"},
                 ]
                 print(_rpc_response(tid, {"tools": tools}), flush=True)
 
