@@ -111,7 +111,9 @@ class MmapFallback:
 
             with open(self.sandfile, "rb") as f:
                 with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                    ln = 0
                     for line in iter(mm.readline, b""):
+                        ln += 1
                         try:
                             decoded = line.decode("utf-8", errors="ignore").strip()
                             if " | " not in decoded: continue
@@ -128,7 +130,7 @@ class MmapFallback:
                                 continue
 
                             if query.lower() in text.lower():
-                                results.append((0, ts, text[:300]))
+                                results.append((ln, ts, text[:300]))
                                 if len(results) >= limit: break
                         except: pass
 

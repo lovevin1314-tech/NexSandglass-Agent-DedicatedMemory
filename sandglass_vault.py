@@ -13,7 +13,7 @@ import os
 import re
 from datetime import datetime
 
-_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+from sandglass_paths import _NB
 
 _SANDGLASS = os.path.join(_NB, "sandglass.txt")
 _IDX = os.path.join(_NB, "sandglass.idx")
@@ -461,10 +461,10 @@ def recent(n: int = 10) -> list:
         if n <= 0 or not os.path.exists(_SANDGLASS):
             return []
         from collections import deque
-        # 只保留最后 N 行，不加载全文件
         with open(_SANDGLASS, "r", encoding="utf-8") as f:
-            last_lines = deque(f, n)
-        total = sum(1 for _ in open(_SANDGLASS, "r", encoding="utf-8"))
+            all_lines = f.readlines()
+        total = len(all_lines)
+        last_lines = deque(all_lines, n)
         results = []
         for i, line in enumerate(last_lines):
             ts, sender, text = _parse_line(line)
