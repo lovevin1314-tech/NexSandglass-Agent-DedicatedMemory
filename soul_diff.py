@@ -9,8 +9,10 @@ NexSandglass — 灵魂差分 (Soul Diff)
   python soul_diff.py export  → 导出到 ~/.neurobase/soul_diff.json
   python soul_diff.py merge <file>  → 从文件合并
 """
-import sys, os, json, shutil
+import sys, os, json, shutil, logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sandglass_paths import _NB
@@ -68,17 +70,14 @@ def export_soul(output: str = "") -> str:
         json.dump(soul, f, ensure_ascii=False, indent=2)
 
     size = os.path.getsize(path)
-    print(f"灵魂导出: {path} ({size}B)")
-    print(f"  偏移率: {soul['drift']}")
-    print(f"  决策链: {len(soul['decisions'])}条")
-    print(f"  回音折: {len(soul['echo_wind'])}条")
+    logger.info(f"灵魂导出: {path} ({size}B) | 偏移:{soul['drift']} | 决策:{len(soul['decisions'])}条 | 回音:{len(soul['echo_wind'])}条")
     return path
 
 
 def merge_soul(filepath: str) -> bool:
     """合并灵魂差分到当前系统——追加写入，不覆盖。"""
     if not os.path.exists(filepath):
-        print(f"文件不存在: {filepath}")
+        logger.warning(f"合并失败: 文件不存在 {filepath}")
         return False
 
     with open(filepath, "r", encoding="utf-8") as f:
@@ -107,7 +106,7 @@ def merge_soul(filepath: str) -> bool:
         except Exception:
             pass
 
-    print(f"灵魂合并完成: +{len(soul.get('decisions',[]))}决策 +{len(soul.get('echo_wind',[]))}回音")
+    logger.info(f"灵魂合并完成: +{len(soul.get('decisions',[]))}决策 +{len(soul.get('echo_wind',[]))}回音")
     return True
 
 
