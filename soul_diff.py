@@ -22,7 +22,7 @@ def export_soul(output: str = "") -> str:
     """导出灵魂差分——偏移率+决策链+回音折残留。"""
     path = output or SOUL_DIFF
     soul = {
-        "version": "1.7.9",
+        "version": "2.1.18",
         "exported_at": datetime.now().isoformat(),
         "drift": {},
         "decisions": [],

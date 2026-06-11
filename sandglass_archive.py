@@ -85,6 +85,9 @@ def cold_migration(dry_run: bool = False) -> dict:
                 break
             except FileExistsError:
                 _time.sleep(0.01)
+        else:
+            # 锁超时——落沙正在写入，跳过本次迁移，下次再试
+            return {"moved": 0, "dropped": 0, "kept": kept}
 
         try:
             # 重写热沙

@@ -3,7 +3,6 @@ import os, re, json, logging
 from datetime import datetime, timezone
 from sandglass_vault import _tokenize
 from sandglass_paths import _NB
-from sandglass_paths import _NB
 
 _VAULT = _NB
 _PERSONA_DIR = os.path.join(_VAULT, "persona")

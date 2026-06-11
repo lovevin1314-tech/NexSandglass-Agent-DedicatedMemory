@@ -32,6 +32,7 @@ FILES=(
     discipline.py offset_signals.py
     decision_particles.py emotion_vocab.py
     shadow_sand.py search_router.py l0_buffer.py
+    soul_diff.py
 )
 for f in "${FILES[@]}"; do
     [ -f "$SCRIPT_DIR/$f" ] && cp "$SCRIPT_DIR/$f" "$HOME/.neurobase/scripts/$f"

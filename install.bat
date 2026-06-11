@@ -22,6 +22,7 @@ for %%f in (
     discipline.py offset_signals.py
     decision_particles.py emotion_vocab.py
     shadow_sand.py search_router.py l0_buffer.py
+    soul_diff.py
 ) do (
     if exist "%%~dp0%%f" copy /Y "%%~dp0%%f" "%USERPROFILE%\.neurobase\scripts\%%f" >nul
 )
