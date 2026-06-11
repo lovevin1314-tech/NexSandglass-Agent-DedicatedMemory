@@ -1,4 +1,4 @@
-# NexSandglass 沙漏记忆系统⏳ V2.3.0 — 正式版
+# NexSandglass 沙漏记忆系统⏳ V2.3.11 — 正式版
 
 > **是记住。是理解。是懂你。是想你。**
 
@@ -375,3 +375,15 @@ V2.1.14: system_prompt_block重构250→60行+路径彻底清零
 
 > 测试环境：931条沙子 · Windows 10 · i5-8265U · Python 3.11 · 零污染（L1写入使用临时沙漏副本）
 > 基准脚本：`benchmark.py` — `python benchmark.py`
+
+### V2.3.x 系列
+```
+V2.3.0: MCP服务器重写—11工具+标准协议
+V2.3.1-3: 双审P0/P1修复
+V2.3.4-5: MCP协议修复
+V2.3.6-7: persona去重+路径统一
+V2.3.8-9: install补全+版本统一
+V2.3.10: recent() seek流式O(N)
+V2.3.11: heartbeat轮转
+└── P0/P1/P2全修—MCP可用、代码干净、性能稳健
+```
