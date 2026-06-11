@@ -1,0 +1,437 @@
+"""
+NexSandglass MemoryProvider — MemoryProvider for Hermes
+========================================================
+让 Hermes 使用 NexSandglass 作为记忆后端，替代 Holographic。
+
+零API Key、零外部依赖——纯本地驱动。投石问路（倒排索引）优先、
+五维权重排序、偏移率感知、回音折情绪追踪、影子灵魂预测。
+"""
+from __future__ import annotations
+
+import json, logging, os, re, threading, time
+from typing import Any, Dict, List, Optional
+
+# 条件导入——兼容赫姆斯环境和独立运行时
+try:
+    from agent.memory_provider import MemoryProvider
+except ImportError:
+    class MemoryProvider:
+        name = "nexsandglass"
+        def is_available(self): return True
+        def initialize(self): pass
+        def shutdown(self): pass
+        def get_tool_schemas(self): return []
+        def handle_tool_call(self, name, args): return ""
+        def system_prompt_block(self): return ""
+        def prefetch(self, query): return None
+        def sync_turn(self, user_msg, assistant_msg): pass
+
+try:
+    from agent.memory_manager import sanitize_context
+except ImportError:
+    def sanitize_context(text): return text
+
+try:
+    from tools.registry import tool_error
+except ImportError:
+    def tool_error(msg): return json.dumps({"error": msg})
+
+logger = logging.getLogger(__name__)
+
+# ══════════════════════════════════════════════════════════
+# 工具方法——把 sandglass 函数暴露给 Hermes 模型调用
+# ══════════════════════════════════════════════════════════
+
+_TOOL_SCHEMAS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "sandglass_search",
+            "description": "搜索沙漏记忆——投石问路（倒排索引）优先，五维权重排序。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "搜索关键词"},
+                    "limit": {"type": "integer", "default": 10},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "sandglass_recent",
+            "description": "获取最近 N 条记忆。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "n": {"type": "integer", "default": 10},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "sandglass_offset",
+            "description": "计算当前偏移率——主人决策方向的趋势。返回偏移百分比和方向。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fact_store",
+            "description": "影子沙事实存储。action=add/search/probe/reason。存储结构化事实，信任评分排序。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["add", "search", "probe", "reason"]},
+                    "content": {"type": "string", "description": "事实内容"},
+                    "category": {"type": "string", "default": "general"},
+                    "query": {"type": "string"},
+                    "entity": {"type": "string"},
+                },
+                "required": ["action"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fact_feedback",
+            "description": "信任评分反馈。标记记忆是否有帮助。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "line_num": {"type": "integer"},
+                    "helpful": {"type": "boolean"},
+                },
+                "required": ["line_num", "helpful"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "sandglass_echo",
+            "description": "读取回音折——最近的情感风向。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+]
+
+
+class NexSandglassProvider(MemoryProvider):
+    """NexSandglass 记忆提供器——替代 Holographic，纯本地零依赖。"""
+
+    def __init__(self, config: dict = None):
+        self._config = config or {}
+        self._lock = threading.Lock()
+        self._initialized = False
+        self._turn_count = 0
+
+    # ═══════ MemoryProvider 核心接口 ═══════
+
+    @property
+    def name(self) -> str:
+        return "nexsandglass"
+
+    def is_available(self) -> bool:
+        """始终可用——零API Key，纯本地。"""
+        return True
+
+    def initialize(self) -> None:
+        """设置沙漏路径、重建投石问路索引。"""
+        with self._lock:
+            if self._initialized:
+                return
+            # 确保 sandglass 模块可导入
+            import sys
+            nb_scripts = os.path.expanduser("~/.neurobase/scripts")
+            if nb_scripts not in sys.path:
+                sys.path.insert(0, nb_scripts)
+
+            from sandglass_vault import rebuild_index
+            rebuild_index()
+            self._initialized = True
+            logger.info("NexSandglass MemoryProvider initialized")
+
+    def system_prompt_block(self) -> str:
+        """递给LLM的纸条——200字以内，只给最关键的认知。"""
+        try:
+            from sandglass_vault import count, search as vs
+            from sandglass_think import comprehensive_offset, _sentiment_wind, _emotional_entropy
+            total = count()
+            off = comprehensive_offset()
+            wind = _sentiment_wind()
+
+            # 影子沙——MBTI（会变，不属于画像）
+            mbti = ""
+            try:
+                from shadow_sand import shadow_mbti
+                mbti = shadow_mbti()
+            except: pass
+
+            # 纪律因子
+            rules_line = ""
+            try:
+                from sandglass_think import iron_rules
+                rules = iron_rules()
+                if rules:
+                    rules_line = f"纪律: {' | '.join(rules)}"
+            except: pass
+
+            # 偏移方向→自然语言
+            dir_map = {"frugal": "主人最近倾向省钱、免费方案", 
+                       "spend": "主人最近愿意为效率付费",
+                       "drift": "主人最近有些放弃倾向，需要鼓励"}
+            dir_text = dir_map.get(off.get('direction'), "主人状态平稳")
+
+            # 回音折→自然语言
+            wind_text = ""
+            if wind > 0.5: wind_text = "主人近期情绪积极，可能遇到好事"
+            elif wind > 0.2: wind_text = "主人近期心情不错"
+            elif wind < -0.5: wind_text = "主人近期有些烦躁或焦虑"
+            elif wind < -0.2: wind_text = "主人近期情绪偏低"
+            else: wind_text = "主人情绪平稳" 
+
+            # 纪律因子
+            rules_text = ""
+            try:
+                from sandglass_think import iron_rules
+                rules = iron_rules()
+                if rules:
+                    rules_text = " 纪律: " + "; ".join(rules)
+            except: pass
+
+            # 画像
+            persona_text = ""
+            try:
+                from sandglass_think import _local_persona_extract
+                pt = _local_persona_extract()
+                if pt and pt != "数据不足":
+                    persona_text = f" 画像: {pt[:100]}"
+            except: pass
+
+            # 四大支柱
+            off_map = {"frugal": "倾向省钱", "spend": "愿意投入", "drift": "有些放弃倾向"}
+            off_text = off_map.get(off.get('direction', ''), '平稳')
+            echo = "回音折" + (f"正面({wind:+.1f})" if wind > 0.2 else f"负面({wind:+.1f})" if wind < -0.2 else "平稳")
+
+            # 丰富上下文
+            persona_line = ""
+            try:
+                from sandglass_think import _local_persona_extract
+                pt = _local_persona_extract()
+                if pt and pt != "数据不足" and len(pt) > 10:
+                    persona_line = f" | {pt[:80].replace(chr(10),' ')}"
+            except: pass
+
+            ent = _emotional_entropy()
+            mood = "平稳" if ent < 0.5 else ("上次好像有点难过" if ent > 1.0 else "有些波动")
+            echo_d = "" if abs(wind) < 0.2 else ("可能还对相关事物感兴趣" if wind > 0 else "需要一些鼓励")
+            dirs = {"frugal": f"左偏{off.get('offset',0):+d}%，倾向省钱", "spend": f"右偏{off.get('offset',0):+d}%，愿意投入", "drift": f"右偏{off.get('offset',0):+d}%，有些放弃"}
+            off_d = dirs.get(off.get('direction',''), f"平稳({off.get('offset',0):+d}%)")
+
+            tasks = "暂无待办"
+            try:
+                from sandglass_think import task_pending
+                tp = task_pending()
+                if tp: tasks = f"共计{len(tp)}条待办"
+            except: pass
+
+            rules_lines = ""
+            try:
+                from sandglass_think import iron_rules
+                rules = iron_rules()
+                if rules:
+                    nums = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣"]
+                    rules_lines = "\n".join(f"{nums[i]} {r}" for i, r in enumerate(rules[:5]))
+            except: pass
+
+            note = f"""NexSandglass灵魂注入
+灵魂蒸馏：{mbti or 'MBTI未记录'}{persona_line}
+搜索滤镜：情绪熵-{mood} | 回音折-{echo_d or '平稳'}
+偏移率：{off_d}
+织布机：{tasks}，有点开心
+—纪律如下
+{rules_lines}"""
+            return note.strip()
+        except Exception:
+            # 全新安装——引导用户设定铁律
+            if total == 0:
+                return """NexSandglass记忆系统已就绪。这是你的第一次使用。
+你可以设定铁律（绝不违反的规则），格式如下：
+铁律: 第一条规则
+铁律: 第二条规则
+...
+最多5条，每条不超过30字。设定后我会永远遵守。"""
+            return "NexSandglass记忆系统已就绪。"
+
+    def prefetch(self, query: str) -> Optional[List[Dict[str, Any]]]:
+        """每轮对话前预搜索。"""
+        try:
+            from sandglass_vault import search
+            results = search(query, limit=5)
+            return [{"line": ln, "ts": ts, "text": txt[:300]} for ln, ts, txt in results]
+        except Exception:
+            return None
+
+    def sync_turn(self, user_msg: str, assistant_msg: str) -> None:
+        """每轮对话后落沙。"""
+        try:
+            from sandglass_log import log_message
+            if user_msg:
+                log_message(user_msg, "user")
+            if assistant_msg:
+                log_message(assistant_msg, "agent")
+            self._turn_count += 1
+        except Exception:
+            pass
+
+    def shutdown(self) -> None:
+        """清理。"""
+        logger.info("NexSandglass MemoryProvider shutdown")
+
+    # ═══════ fact_store / fact_feedback ═══════
+
+    def _handle_fact_store(self, args: dict) -> str:
+        try:
+            from sandglass_vault import search as vault_search
+            from shadow_sand import shadow_search as _ss, shadow_feedback
+            action = args.get("action", "search")
+
+            if action == "add":
+                from sandglass_log import log_message
+                content = args.get("content", "")
+                category = args.get("category", "general")
+                log_message(content, "fact_store")
+                return json.dumps({"status": "added", "content": content[:100]})
+
+            if action == "search":
+                query = args.get("query", "")
+                results = vault_search(query, limit=10)
+                shadow_hits = _ss(query, limit=10)
+                return json.dumps({
+                    "fts_results": [{"line": ln, "text": txt[:200]} for ln, _, txt in results],
+                    "shadow_boosted": [{"line": ln, "trust": score} for score, ln in shadow_hits],
+                }, ensure_ascii=False)
+
+            if action == "probe":
+                entity = args.get("entity", "")
+                results = _ss(entity, limit=20)
+                return json.dumps([{"line": ln, "trust": score} for score, ln in results], ensure_ascii=False)
+
+            if action == "reason":
+                entity = args.get("entity", "")
+                results = _ss(entity, limit=5)
+                if results:
+                    ln = results[0][1]
+                    from sandglass_vault import search as vs
+                    r = vs(str(ln), limit=1)
+                    if r:
+                        return json.dumps({"line": ln, "text": r[0][2][:300]}, ensure_ascii=False)
+                return json.dumps({"status": "no results"})
+
+            return tool_error(f"Unknown fact_store action: {action}")
+        except Exception as e:
+            return tool_error(f"fact_store error: {e}")
+
+    def _handle_fact_feedback(self, args: dict) -> str:
+        try:
+            from shadow_sand import shadow_feedback
+            result = shadow_feedback(args["line_num"], args.get("helpful", True))
+            return json.dumps(result, ensure_ascii=False)
+        except Exception as e:
+            return tool_error(f"fact_feedback error: {e}")
+
+    def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
+        """会话结束——蒸馏 + 偏移检查。"""
+        try:
+            # 落最后一轮对话
+            for msg in messages[-5:]:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if content:
+                    from sandglass_log import log_message
+                    log_message(str(content)[:500], role)
+
+            # 触发偏移检查 + 织造
+            from sandglass_think import comprehensive_offset
+            off = comprehensive_offset()
+            if abs(off.get("offset", 0)) >= 30:
+                logger.info(f"会话结束偏移: {off['offset']:+d}% ({off['direction']})")
+
+        except Exception:
+            pass
+
+    # ═══════ 工具暴露 ═══════
+
+    def get_tool_schemas(self) -> List[Dict[str, Any]]:
+        return _TOOL_SCHEMAS
+
+    def handle_tool_call(self, name: str, args: Dict[str, Any]) -> str:
+        try:
+            if name == "sandglass_search":
+                from sandglass_vault import search
+                results = search(args.get("query", ""), limit=args.get("limit", 10))
+                return json.dumps(
+                    [{"line": ln, "ts": ts, "text": txt[:200]} for ln, ts, txt in results],
+                    ensure_ascii=False,
+                )
+
+            if name == "sandglass_recent":
+                from sandglass_vault import recent
+                results = recent(args.get("n", 10))
+                return json.dumps(
+                    [{"line": ln, "ts": ts, "text": txt[:200]} for ln, ts, txt in results],
+                    ensure_ascii=False,
+                )
+
+            if name == "sandglass_offset":
+                from sandglass_think import comprehensive_offset
+                off = comprehensive_offset()
+                return json.dumps(off, ensure_ascii=False)
+
+            if name == "sandglass_echo":
+                from sandglass_think import _sentiment_wind
+                wind = _sentiment_wind()
+                return json.dumps({"wind": wind, "direction": "正面" if wind > 0 else ("负面" if wind < 0 else "中性")}, ensure_ascii=False)
+
+            if name == "fact_store":
+                return self._handle_fact_store(args)
+
+            if name == "fact_feedback":
+                return self._handle_fact_feedback(args)
+
+            return tool_error(f"Unknown NexSandglass tool: {name}")
+
+        except Exception as e:
+            return tool_error(f"NexSandglass error: {e}")
+
+    # ═══════ 可选钩子 ═══════
+
+    def on_memory_write(self, action: str, target: str, content: str, metadata: dict = None) -> None:
+        """镜像内置记忆写入——同步落沙。"""
+        try:
+            from sandglass_log import log_message
+            text = f"[{action}] {target}: {content[:200]}"
+            log_message(text, "memory_write")
+        except Exception:
+            pass
+
+    def on_pre_compress(self, messages: List[Dict[str, Any]]) -> Optional[str]:
+        """上下文压缩前提取关键记忆。"""
+        try:
+            from sandglass_vault import search as vs
+            # 提取最后一轮对话的关键词搜索
+            if messages:
+                last = messages[-1].get("content", "")[:100]
+                if last:
+                    results = vs(last, limit=3)
+                    return "\n".join(txt[:200] for _, _, txt in results)
+        except Exception:
+            pass
+        return None
