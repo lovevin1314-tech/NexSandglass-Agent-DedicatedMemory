@@ -540,6 +540,18 @@ def search_semantic(query: str, limit: int = 10) -> list:
         results = [(ln, "", text, f"tfidf:{sim}") for ln, text, sim in tfidf]
         return sentiment_rerank(results[:limit], _sentiment_wind())
 
+    # 影子沙信任分加权兜底
+    from shadow_sand import shadow_boost
+    recent = vs(query, limit=20)
+    if recent:
+        line_nums = {ln for ln, _, _ in recent}
+        boosted = shadow_boost(line_nums, limit=limit)
+        if boosted:
+            line_map = {ln: (ts, txt) for ln, ts, txt in recent}
+            results = [(ln, line_map.get(ln, ("", ""))[0], line_map.get(ln, ("", ""))[1], f"trust:{score:.2f}") 
+                       for score, ln in boosted if ln in line_map]
+            return sentiment_rerank(results[:limit], _sentiment_wind())
+
     return []
 
 def _llm_expand(query: str) -> list:

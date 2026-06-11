@@ -244,13 +244,20 @@ def pulse(user_message: str = "") -> str:
                 signals.insert(0, "🌊 沙漏满500条——小波浪开始累积，影子轮廓成形")
 
             elif total == 1000:
-                # 阶段切换启用
+                # 阶段切换启用 + 冷迁移
                 try:
                     from sandglass_think import _maybe_switch_stage
                     _maybe_switch_stage("neutral")
                     signals.insert(0, "📜 沙漏满1000条——阶段切换系统启用")
                 except Exception as e:
-                    logger.warning(f"里程碑1000: stage_switch失败: {e}")
+                    logger.warning(f"里程碑1000: {e}")
+                try:
+                    from sandglass_archive import cold_migration
+                    r = cold_migration(dry_run=False)
+                    if r.get("moved", 0) > 0:
+                        signals.insert(0, f"🧊 冷迁移: {r['moved']}条→归档")
+                except Exception as e:
+                    logger.warning(f"冷迁移: {e}")
 
             elif total == 1500:
                 # 预3D

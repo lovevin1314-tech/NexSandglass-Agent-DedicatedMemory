@@ -81,6 +81,16 @@ def _handle_tool(name, args, request_id):
             path = memory_migrate(args.get("output", ""))
             return _rpc_response(request_id, {"exported": path})
 
+        elif name == "sandglass_soul_export":
+            from soul_diff import export_soul
+            path = export_soul(args.get("output", ""))
+            return _rpc_response(request_id, {"soul": path})
+
+        elif name == "sandglass_soul_merge":
+            from soul_diff import merge_soul
+            n = merge_soul(args.get("source", ""))
+            return _rpc_response(request_id, {"merged": n})
+
         else:
             return _rpc_error(request_id, -32601, f"Unknown tool: {name}")
 
