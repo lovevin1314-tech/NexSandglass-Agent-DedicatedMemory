@@ -20,16 +20,16 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# ── AI无意义回复过滤器（V2.1）──
+# ── AI无意义回复过滤器（V2.1.10修复：长度判断替代^锚定）──
 _AI_TRIVIAL = re.compile(
-    r'^(好的|明白了|没问题|请稍等|我来看看|是的|对的|'
+    r'(好的|明白了|没问题|请稍等|我来看看|是的|对的|'
     r'你说得对|当然可以|不用担心|不客气|谢谢|可以|'
     r'好|嗯|OK|ok|嗯嗯|好的呢|没问题呢|知道了|收到)'
 )
 
 
 def _estimate_info_value(text: str) -> float:
-    """评估消息信息量。0.0=无价值，1.0=高价值。"""
+    """评估消息信息量。0.0=纯确认词，1.0=高价值。"""
     score = 0.3
     if len(text) > 50:                score += 0.2
     if re.search(r'\d+', text):       score += 0.2
@@ -39,11 +39,13 @@ def _estimate_info_value(text: str) -> float:
         '步骤', '第一种', '第二种', '推荐',
         '区别', '对比', '优点是', '缺点是',
     ]):                                 score += 0.2
-    if _AI_TRIVIAL.match(text.strip()):
-        score = 0.0
+    # 短文本+纯确认词 → 零价值；长文本开头是确认词 → 仍可加分
+    stripped = text.strip()
+    if _AI_TRIVIAL.match(stripped) and len(stripped) <= 10:
+        score = 0.0  # 只有真的是纯粹的"好的""明白了"才丢弃
     return min(score, 1.0)
 
-_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+from sandglass_paths import _NB
 
 _SANDGLASS = os.path.join(_NB, "sandglass.txt")
 

@@ -138,6 +138,7 @@ def offset_check(decision_text: str, user_persisted: bool = False) -> dict:
 def comprehensive_offset(scene: str = "") -> dict:
     """综合偏移率——滚动窗口加权平均。可选按场景过滤。
     scene 参数匹配场景标签列表中的任意一项。"""
+    global _weave_guard  # V2.1.10: 修复UnboundLocalError
     entries = _read_decision_log(50)
     if not entries:
         return {"offset": 0, "direction": "neutral", "sample": 0, "trend": "stable"}
@@ -152,7 +153,23 @@ def comprehensive_offset(scene: str = "") -> dict:
     weight_sum = 0
     directions = {"frugal": 0, "spend": 0, "drift": 0, "neutral": 0}
     chain_stats = {"total_decisions": 0, "hesitations": 0, "avg_chain_len": 0}
-    # 🆕 读取决策粒子链条
+
+    # EMA波浪自吸收——独立于dp_path，对所有entries生效
+    merged = []
+    for e in entries:
+        if merged and e["direction"] == merged[-1]["direction"] and e["direction"] != "neutral":
+            merged[-1]["offset"] = int(merged[-1]["offset"] * EMA_ALPHA + e["offset"] * (1 - EMA_ALPHA))
+            merged[-1]["count"] = merged[-1].get("count", 1) + 1
+        else:
+            merged.append(dict(e, count=1))
+
+    for i, e in enumerate(merged):
+        weight = e.get("count", 1)
+        total += e["offset"] * weight
+        weight_sum += weight
+        directions[e["direction"]] += weight
+
+    # 🆕 读取决策粒子链条（仅统计，不影响偏移率计算）
     dp_path = os.path.join(_NB, "decision_particles.txt")
     if os.path.exists(dp_path):
         import re as _re
@@ -172,31 +189,6 @@ def comprehensive_offset(scene: str = "") -> dict:
                             chain_stats["hesitations"] += 1
                     elif arrows:
                         chain_stats["total_decisions"] += 1
-        
-        # ═══════════════════════════════════════════════
-        # 波浪自吸收：小波浪累积够了 → 自动汇聚成大波浪
-        # 策略：固定 EMA 权重（不随时间衰减）+ 连续同向合并
-        # ═══════════════════════════════════════════════
-
-        EMA_ALPHA = 0.7
-        merged = []
-        for e in entries:
-            if merged and e["direction"] == merged[-1]["direction"] and e["direction"] != "neutral":
-                # 同向 → 合并进大波浪
-                merged[-1]["offset"] = int(merged[-1]["offset"] * EMA_ALPHA + e["offset"] * (1 - EMA_ALPHA))
-                merged[-1]["count"] = merged[-1].get("count", 1) + 1
-            else:
-                merged.append(dict(e, count=1))
-
-        total = 0
-        weight_sum = 0
-        directions = {"frugal": 0, "spend": 0, "drift": 0, "neutral": 0}
-
-        for i, e in enumerate(merged):
-            weight = e.get("count", 1)
-            total += e["offset"] * weight
-            weight_sum += weight
-            directions[e["direction"]] += weight
 
     avg = round(total / max(weight_sum, 1))
 
