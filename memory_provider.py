@@ -149,7 +149,7 @@ class NexSandglassProvider(MemoryProvider):
                 return
             # 确保 sandglass 模块可导入
             import sys
-            nb = os.environ.get("NEXSANDBASE_HOME") or kwargs.get("hermes_home") or os.path.expanduser("~/.neurobase")
+            nb = os.environ.get("NEXSANDBASE_HOME") or os.path.expanduser("~/.neurobase")
             nb_scripts = os.path.join(nb, "scripts")
             if nb_scripts not in sys.path:
                 sys.path.insert(0, nb_scripts)
