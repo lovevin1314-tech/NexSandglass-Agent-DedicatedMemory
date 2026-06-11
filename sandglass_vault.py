@@ -111,7 +111,7 @@ def rebuild_index() -> int:
 
 def _sync_index() -> dict:
     """增量更新索引并返回内存 dict。利用缓存避免重复读盘。"""
-    global _idx_cache
+    global _idx_cache, _idx_mtime
 
     try:
         if not os.path.exists(_SANDGLASS):
@@ -215,7 +215,7 @@ def _legacy_search(query, limit, month):
 
         # ── 影子沙优先（脱口而出层） ──
         try:
-            from shadow_sand import shadow_search as _shadow_search, shadow_retrieval_bump, shadow_boost, shadow_boost
+            from shadow_sand import shadow_search as _shadow_search, shadow_retrieval_bump, shadow_boost
             shadow_hits = _shadow_search(query, limit)
             if shadow_hits:
                 results = []

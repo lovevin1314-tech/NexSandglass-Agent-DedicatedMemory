@@ -10,7 +10,7 @@ _PERSONA_TIMELINE = os.path.join(_PERSONA_DIR, "persona-timeline.jsonl")
 _DECISION_LOG = os.path.join(_PERSONA_DIR, "decision-log.jsonl")
 logger = logging.getLogger(__name__)
 
-try: from sandglass_think import _read_decision_log
+try: from offset_l3 import _read_decision_log
 except: _read_decision_log = lambda n: []
 
 try: from sandglass_think import _fail_open, _llm, _emotional_entropy, comprehensive_offset
