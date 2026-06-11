@@ -8,7 +8,7 @@ NexSandglass 路径配置 — 单一真相来源 V2.2
 import os
 
 _NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
-__version__ = "2.5.0"
+__version__ = "2.5.1"
 _SCRIPTS = os.path.join(_NB, "scripts")
 _PERSONA = os.path.join(_NB, "persona")
 _ARCHIVE = os.path.join(_NB, "archive")

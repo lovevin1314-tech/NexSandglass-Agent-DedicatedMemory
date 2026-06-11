@@ -95,44 +95,46 @@ class SearchRouter:
         self.mmapfallback = mmap or MmapFallback()
 
     def search(self, query: str, limit: int = 10) -> list:
-        # Layer 1: 影子沙 + FTS5 并行
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
-            fut_shadow = ex.submit(self.shadow.search, query, limit)
-            fut_fts5 = ex.submit(self.fts5.search, query, limit)
+        # FTS5 全文搜索（主力，BM25精排）
+        fts5_hits = self.fts5.search(query, max(limit * 3, 30))
+        if not fts5_hits:
+            # FTS5没结果 → mmap兜底
+            return self.mmapfallback.search(query, limit)
 
-        shadow_hits = fut_shadow.result() or []
-        fts5_hits = fut_fts5.result() or []
+        # 影子沙 → 获取信任分（附加到 FTS5 结果上）
+        shadow_scores = {}
+        try:
+            from shadow_sand import shadow_search, shadow_retrieval_bump
+            sh = shadow_search(query, limit * 2)
+            if sh:
+                shadow_scores = {ln: score for score, ln in sh}
+                shadow_retrieval_bump([ln for _, ln in sh[:limit]])
+        except: pass
 
-        # 混合排序：去重 + 影子沙在前(FIFO) + FTS5在后
-        seen = set()
-        results = []
+        # 合并：FTS5结果 × 影子沙信任分
+        candidates = {}
+        for rowid, ts, text in fts5_hits:
+            trust = shadow_scores.get(rowid, 0.5)
+            candidates[rowid] = (ts, text, trust)
 
-        # 影子沙结果（按信任分排序，已在 shadow_search 内排好）
-        if shadow_hits:
-            with open(_SANDGLASS, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-            for score, ln in shadow_hits[:limit]:
-                if ln not in seen and 0 < ln <= len(lines):
-                    seen.add(ln)
-                    ts, sender, text = _parse_line(lines[ln - 1])
-                    if ts and text:
-                        results.append((ln, ts, text))
+        # L3 搜索滤镜 — 五维权重统一排序
+        try:
+            from sandglass_think import search_filter
+            filt = search_filter(query)
+            weights = filt.get("weights", {})
+            keywords = filt.get("keywords", [])
+            if weights:
+                # 五维权重排序：场景×1.5 + 画像×1.3 + 阶段×0.7 + 粒子×1.2 + 偏移×1.3
+                def _score(item):
+                    ln, (ts, text, trust) = item
+                    w = sum(weights.get(kw, 1.0) for kw in keywords if kw.lower() in text.lower())
+                    return trust * 0.3 + w * 0.7  # 信任分30% + 搜索滤镜70%
+                ranked = sorted(candidates.items(), key=_score, reverse=True)
+                results = [(ln, ts, text) for ln, (ts, text, _) in ranked[:limit]]
+                return results
+        except Exception:
+            pass
 
-        # FTS5结果（已按 BM25 rank 排序）
-        for rowid, ts, text in fts5_hits[:limit * 2]:
-            if rowid not in seen and len(results) < limit:
-                seen.add(rowid)
-                results.append((rowid, ts, text))
-
-        if results:
-            # 标记影子沙检索计数
-            if shadow_hits:
-                try:
-                    from shadow_sand import shadow_retrieval_bump
-                    shadow_retrieval_bump([ln for _, ln in shadow_hits[:limit]])
-                except: pass
-            return results[:limit]
-
-        # Layer 2: mmap 兜底
-        return self.mmapfallback.search(query, limit)
+        # 无搜索滤镜时：信任分排序
+        ranked = sorted(candidates.items(), key=lambda x: x[1][2], reverse=True)
+        return [(ln, ts, text) for ln, (ts, text, _) in ranked[:limit]]
