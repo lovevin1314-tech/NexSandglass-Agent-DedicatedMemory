@@ -27,11 +27,6 @@ except ImportError:
         def sync_turn(self, user_msg, assistant_msg): pass
 
 try:
-    from agent.memory_manager import sanitize_context
-except ImportError:
-    def sanitize_context(text): return text
-
-try:
     from tools.registry import tool_error
 except ImportError:
     def tool_error(msg): return json.dumps({"error": msg})
