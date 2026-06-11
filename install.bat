@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ╔══════════════════════════════════╗
-echo ║  NexSandglass V2.1.14 安装程序    ║
+echo ║  NexSandglass V2.3.8 安装程序    ║
 echo ╚══════════════════════════════════╝
 echo.
 echo 正在部署沙漏记忆系统...
@@ -44,7 +44,7 @@ echo # 如需多profile隔离，取消下行注释并设自定义路径 >> "%USE
 echo # set NEXSANDBASE_HOME=%%USERPROFILE%%\.neurobase-your-profile >> "%USERPROFILE%\.neurobase\README.txt"
 
 echo.
-echo ✅ NexSandglass V2.1.14 安装完成！
+echo ✅ NexSandglass V2.3.8 安装完成！
 echo.
 echo 📂 核心: 19模块 + MemoryProvider插件
 echo 🔐 加密: Windows DPAPI / Mac Linux base64

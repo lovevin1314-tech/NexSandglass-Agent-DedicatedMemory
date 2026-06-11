@@ -1,5 +1,5 @@
 """
-NexSandglass MCP Server V2.2.0
+NexSandglass MCP Server V2.3.8
 ===============================
 标准 MCP 协议——任何 MCP 兼容 Agent 可直接调用。
 启动: python sandglass_mcp.py
