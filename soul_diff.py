@@ -13,6 +13,7 @@ import sys, os, json, shutil
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sandglass_paths import _NB
 
 SOUL_DIFF = os.path.join(_NB, "soul_diff.json")
 

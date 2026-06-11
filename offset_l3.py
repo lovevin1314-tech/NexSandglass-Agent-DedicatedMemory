@@ -139,6 +139,7 @@ def comprehensive_offset(scene: str = "") -> dict:
     """综合偏移率——滚动窗口加权平均。可选按场景过滤。
     scene 参数匹配场景标签列表中的任意一项。"""
     global _weave_guard  # V2.1.10: 修复UnboundLocalError
+    _lazy_import()        # V2.1.18: 确保weave_contradiction已加载
     entries = _read_decision_log(50)
     if not entries:
         return {"offset": 0, "direction": "neutral", "sample": 0, "trend": "stable"}
@@ -155,6 +156,7 @@ def comprehensive_offset(scene: str = "") -> dict:
     chain_stats = {"total_decisions": 0, "hesitations": 0, "avg_chain_len": 0}
 
     # EMA波浪自吸收——独立于dp_path，对所有entries生效
+    EMA_ALPHA = 0.7
     merged = []
     for e in entries:
         if merged and e["direction"] == merged[-1]["direction"] and e["direction"] != "neutral":
