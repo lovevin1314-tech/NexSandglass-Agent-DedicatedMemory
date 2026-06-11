@@ -7,7 +7,8 @@ V1.4.4：sandglass.txt不动，SQLite分词FTS5平行加速。
 
 import os, re, sqlite3, threading
 
-_DB = os.path.join(os.path.expanduser("~"), ".neurobase", "sandglass.db")
+_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+_DB = os.path.join(_NB, "sandglass.db")
 _lock = threading.Lock()
 _last_sync_mtime = 0  # 记录上次同步时的 sandglass.txt 修改时间
 
