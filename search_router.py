@@ -45,12 +45,6 @@ class MmapFallback:
     def search(self, query: str, limit: int = 10) -> list:
         results = []
         try:
-            scan_months = []
-            try:
-                from sandglass_think import _current_stage
-                scan_months = [_current_stage()]
-            except: pass
-
             with open(self.sandfile, "rb") as f:
                 with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                     ln = 0
@@ -62,9 +56,6 @@ class MmapFallback:
                             parts = decoded.split(" | ", 2)
                             if len(parts) < 3: continue
                             ts, sender, text = parts
-
-                            if scan_months and not any(ts.startswith(m) for m in scan_months):
-                                continue
 
                             if query.lower() in text.lower():
                                 results.append((ln, ts, text[:300]))
