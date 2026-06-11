@@ -55,6 +55,7 @@ from offset_l3 import (
     _maybe_switch_stage, offset_check, offset_guide,
     cross_stage_offset, offset_chart, shadow_chart,
     stage_mark, stage_marks,
+    _STAGE_THRESHOLD,
 )
 
 # ── LLM 配置（单一来源：offset_signals）──
