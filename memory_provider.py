@@ -160,92 +160,44 @@ class NexSandglassProvider(MemoryProvider):
             logger.info("NexSandglass MemoryProvider initialized")
 
     def system_prompt_block(self) -> str:
-        """递给LLM的纸条——200字以内，只给最关键的认知。"""
+        """递给LLM的纸条——灵魂注入：阶段+偏移+纪律。V2.1.14精简。"""
         try:
-            from sandglass_vault import count, search as vs
-            from sandglass_think import comprehensive_offset, _sentiment_wind, _emotional_entropy
+            from sandglass_vault import count
+            from sandglass_think import comprehensive_offset, _current_stage, task_pending
+            from sandglass_think import iron_rules, _emotional_entropy, _sentiment_wind
+
             total = count()
             off = comprehensive_offset()
+            stage = _current_stage()
+            ent = _emotional_entropy()
             wind = _sentiment_wind()
 
-            # 影子沙——MBTI（会变，不属于画像）
+            # MBTI（影子沙，会变）
             mbti = ""
             try:
                 from shadow_sand import shadow_mbti
                 mbti = shadow_mbti()
             except: pass
 
-            # 纪律因子
-            rules_line = ""
+            # 偏移方向
+            dirs = {"frugal": f"省钱({off.get('offset',0):+d}%)",
+                    "spend": f"愿投({off.get('offset',0):+d}%)",
+                    "drift": f"放弃({off.get('offset',0):+d}%)"}
+            off_d = dirs.get(off.get('direction', ''), '平稳')
+
+            # 情绪
+            mood = "平稳" if ent < 0.5 else ("波动" if ent < 1.0 else "高熵")
+
+            # 待办
+            tasks = ""
             try:
-                from sandglass_think import iron_rules
-                rules = iron_rules()
-                if rules:
-                    rules_line = f"纪律: {' | '.join(rules)}"
-            except: pass
-
-            # 偏移方向→自然语言
-            dir_map = {"frugal": "主人最近倾向省钱、免费方案", 
-                       "spend": "主人最近愿意为效率付费",
-                       "drift": "主人最近有些放弃倾向，需要鼓励"}
-            dir_text = dir_map.get(off.get('direction'), "主人状态平稳")
-
-            # 回音折→自然语言
-            wind_text = ""
-            if wind > 0.5: wind_text = "主人近期情绪积极，可能遇到好事"
-            elif wind > 0.2: wind_text = "主人近期心情不错"
-            elif wind < -0.5: wind_text = "主人近期有些烦躁或焦虑"
-            elif wind < -0.2: wind_text = "主人近期情绪偏低"
-            else: wind_text = "主人情绪平稳" 
-
-            # 纪律因子
-            rules_text = ""
-            try:
-                from sandglass_think import iron_rules
-                rules = iron_rules()
-                if rules:
-                    rules_text = " 纪律: " + "; ".join(rules)
-            except: pass
-
-            # 画像
-            persona_text = ""
-            try:
-                from sandglass_think import _local_persona_extract
-                pt = _local_persona_extract()
-                if pt and pt != "数据不足":
-                    persona_text = f" 画像: {pt[:100]}"
-            except: pass
-
-            # 四大支柱
-            off_map = {"frugal": "倾向省钱", "spend": "愿意投入", "drift": "有些放弃倾向"}
-            off_text = off_map.get(off.get('direction', ''), '平稳')
-            echo = "回音折" + (f"正面({wind:+.1f})" if wind > 0.2 else f"负面({wind:+.1f})" if wind < -0.2 else "平稳")
-
-            # 丰富上下文
-            persona_line = ""
-            try:
-                from sandglass_think import _local_persona_extract
-                pt = _local_persona_extract()
-                if pt and pt != "数据不足" and len(pt) > 10:
-                    persona_line = f" | {pt[:80].replace(chr(10),' ')}"
-            except: pass
-
-            ent = _emotional_entropy()
-            mood = "平稳" if ent < 0.5 else ("上次好像有点难过" if ent > 1.0 else "有些波动")
-            echo_d = "" if abs(wind) < 0.2 else ("可能还对相关事物感兴趣" if wind > 0 else "需要一些鼓励")
-            dirs = {"frugal": f"左偏{off.get('offset',0):+d}%，倾向省钱", "spend": f"右偏{off.get('offset',0):+d}%，愿意投入", "drift": f"右偏{off.get('offset',0):+d}%，有些放弃"}
-            off_d = dirs.get(off.get('direction',''), f"平稳({off.get('offset',0):+d}%)")
-
-            tasks = "暂无待办"
-            try:
-                from sandglass_think import task_pending
                 tp = task_pending()
-                if tp: tasks = f"共计{len(tp)}条待办"
+                if tp: tasks = f"{len(tp)}项待办"
             except: pass
 
+            # 纪律
             rules_lines = ""
             try:
-                from sandglass_think import iron_rules
                 rules = iron_rules()
                 if rules:
                     nums = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣"]
@@ -253,22 +205,14 @@ class NexSandglassProvider(MemoryProvider):
             except: pass
 
             note = f"""NexSandglass灵魂注入
-灵魂蒸馏：{mbti or 'MBTI未记录'}{persona_line}
-搜索滤镜：情绪熵-{mood} | 回音折-{echo_d or '平稳'}
-偏移率：{off_d}
-织布机：{tasks}
-—纪律如下
-{rules_lines}"""
+沙漏: {total}条 | 阶段: {stage}
+偏移: {off_d} | 情绪: {mood}
+{"待办: " + tasks if tasks else ""}
+{mbti and 'MBTI: ' + mbti + chr(10) or ''}—纪律
+{rules_lines or '未设定'}"""
             return note.strip()
         except Exception:
-            # 全新安装——引导用户设定铁律
-            return """NexSandglass记忆系统已就绪。这是你的第一次使用。
-你可以设定铁律（绝不违反的规则），格式如下：
-铁律: 第一条规则
-铁律: 第二条规则
-...
-最多5条，每条不超过30字。设定后我会永远遵守。"""
-            return "NexSandglass记忆系统已就绪。"
+            return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
 
     def prefetch(self, query: str) -> str:
         """每轮对话前注入当前阶段+偏移趋势（方案C：智能上下文感知）。"""
