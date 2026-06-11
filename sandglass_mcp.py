@@ -1,5 +1,5 @@
 """
-NexSandglass MCP Server V2.1.20
+NexSandglass MCP Server V2.2.0
 ===============================
 标准 MCP 协议——任何 MCP 兼容 Agent 可直接调用。
 启动: python sandglass_mcp.py
@@ -109,7 +109,7 @@ def main():
             elif method == "initialize":
                 print(_rpc_response(tid, {
                     "protocolVersion": "2024-11-05",
-                    "serverInfo": {"name": "NexSandglass", "version": "2.1.20"}
+                    "serverInfo": {"name": "NexSandglass", "version": "2.2.0"}
                 }), flush=True)
 
             else:

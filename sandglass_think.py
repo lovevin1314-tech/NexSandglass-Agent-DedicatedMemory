@@ -13,7 +13,7 @@ from datetime import datetime
 
 from sandglass_vault import _tokenize
 
-_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
+from sandglass_paths import _NB
 
 _VAULT = _NB
 _PERSONA_DIR = os.path.join(_VAULT, "persona")
@@ -100,7 +100,7 @@ _FULL_SANITY = {
     "L3_emotion": ["emotion_vocab.py"],
     "L3_particles": ["decision_particles.py"],
     "L3_log": ["sandglass_log.py"],
-    "L3_mcp": ["mcp_server.py"],
+    "L3_mcp": ["sandglass_mcp.py"],
     "L3_nex": ["nexsandglass.py"],
     "L3_test": ["test_smoke.py"],
 }
@@ -476,14 +476,6 @@ def search_with_stage_label(query: str, limit: int = 5) -> list:
             "evolution": cross["evolution"],
         })
     return labeled
-
-    def norm(v, lo, hi):
-        return (v - lo) / (hi - lo) if hi > lo else 0.5
-
-    composites = [(norm(t, t_min, t_max) * text_w + norm(w, w_min, w_max) * ext_w, item)
-                  for t, w, item in scores]
-    composites.sort(key=lambda x: x[0], reverse=True)
-    return [item for _, item in composites]
 
 def search_semantic(query: str, limit: int = 10) -> list:
     from sandglass_vault import search as vs
