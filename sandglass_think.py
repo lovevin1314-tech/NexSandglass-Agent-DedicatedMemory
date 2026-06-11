@@ -637,6 +637,24 @@ def search_filter(query: str) -> dict:
     except Exception:
         pass
 
+    # ── 影子沙注入（脱口而出层的实体标签 → 搜索权重）──
+    try:
+        from shadow_sand import shadow_search
+        sh = shadow_search(query, 5)
+        if sh:
+            db = __import__('shadow_sand')._get_conn()
+            for score, ln in sh[:3]:
+                row = db.execute("SELECT tags FROM trust WHERE line_num = ?", (ln,)).fetchone()
+                if row and row[0]:
+                    for tag in row[0].split(","):
+                        tag = tag.strip()
+                        if tag and tag not in result["keywords"]:
+                            result["keywords"].append(tag)
+                            result["weights"][tag] = 1.5  # 影子沙标签加权
+            result["shadow_context"] = f"影子沙命中{len(sh)}条"
+    except Exception:
+        pass
+
     # ── 决策粒子全量喂入 LLM 扩展（让 LLM 吃决策历史推断搜索意图）──
     dp_path = os.path.join(_VAULT, "decision_particles.txt")
     dp_context = ""
