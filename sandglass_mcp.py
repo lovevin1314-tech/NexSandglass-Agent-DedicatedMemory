@@ -8,6 +8,7 @@ NexSandglass MCP Server V2.3.8
 import sys, os, json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sandglass_paths import __version__
 
 
 def _rpc_response(id, result):
