@@ -1,9 +1,11 @@
 """NexSandglass L3 — offset_l3"""
 import os, re, json, hashlib, logging, math, statistics, shutil
 from datetime import datetime, timezone
-from sandglass_vault import _tokenize, recent as sv_recent, search as sv_search, count as sv_count
+from sandglass_vault import _tokenize
+from sandglass_vault import recent as sv_recent, search as sv_search, count as sv_count
+from sandglass_paths import _NB
 
-_VAULT = os.path.join(os.path.expanduser("~"), ".neurobase")
+_VAULT = _NB
 _PERSONA_DIR = os.path.join(_VAULT, "persona")
 _PERSONA = os.path.join(_PERSONA_DIR, "persona.md")
 _PERSONA_TIMELINE = os.path.join(_PERSONA_DIR, "persona-timeline.jsonl")
@@ -151,7 +153,7 @@ def comprehensive_offset(scene: str = "") -> dict:
     directions = {"frugal": 0, "spend": 0, "drift": 0, "neutral": 0}
     chain_stats = {"total_decisions": 0, "hesitations": 0, "avg_chain_len": 0}
     # 🆕 读取决策粒子链条
-    dp_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_particles.txt")
+    dp_path = os.path.join(_NB, "decision_particles.txt")
     if os.path.exists(dp_path):
         import re as _re
         with open(dp_path, "r", encoding="utf-8") as f:
@@ -393,7 +395,7 @@ def _log_decision(decision_text: str, offset_result: dict) -> None:
     # 决策全维度快照（点线面）—— 传offset_result断递归
     try:
         snapshot = decision_snapshot(decision_text, offset_result)
-        snap_path = os.path.join(os.path.expanduser("~"), ".neurobase", "decision_snapshots.txt")
+        snap_path = os.path.join(_NB, "decision_snapshots.txt")
         with open(snap_path, "a", encoding="utf-8") as f:
             f.write(json.dumps({"ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                                 "decision": decision_text[:200],
