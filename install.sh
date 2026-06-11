@@ -39,7 +39,7 @@ FILES=(
 for f in "${FILES[@]}"; do
     [ -f "$SCRIPT_DIR/$f" ] && cp "$SCRIPT_DIR/$f" "$HOME/.neurobase/scripts/$f"
 done
-echo "✅ 21个核心模块已部署"
+echo "✅ 30个核心模块已部署"
 
 # MemoryProvider 插件
 [ -f "$SCRIPT_DIR/memory_provider.py" ] && cp "$SCRIPT_DIR/memory_provider.py" "$HOME/.hermes/plugins/memory/nexsandglass/__init__.py"
@@ -56,7 +56,7 @@ fi
 echo ""
 echo "✅ NexSandglass V2.3.18 安装完成！"
 echo ""
-echo "📂 核心: 21模块 + MemoryProvider插件"
+echo "📂 核心: 30模块 + MemoryProvider插件"
 echo "🔐 加密: macOS/Linux base64 (Windows DPAPI)"
 echo "🌡️ 多profile: export NEXSANDBASE_HOME=~/.neurobase-custom"
 echo "🚀 重启 Hermes Gateway 即可自动落沙"
