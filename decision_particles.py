@@ -10,8 +10,8 @@ NexSandglass 决策粒子 — 第三层通用燃料 V2
 
 import os, json
 from datetime import datetime
+from sandglass_paths import _NB
 
-_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
 _PARTICLES = os.path.join(_NB, "decision_particles.txt")
 _VOCAB = os.path.join(_NB, "decision_vocab.txt")
 
