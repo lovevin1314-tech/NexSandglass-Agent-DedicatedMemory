@@ -305,18 +305,55 @@ V1.7.8: 一拆六架构——sandglass_think(3628行)拆为6模块
 ### V1.7.9 → V2.0.0
 ```
 V2.0.0: 正式版——God Module彻底拆分+信号全通+审计清零
-├── 拆出4个新模块：l3_tasks / l3_persona_verify / l3_search_core / l3_persona
 ├── sandglass_think: 2,709→1,389行(-49%)
-├── 修复11个丢失函数：_save_scenes/_load_scenes/_PERSONA_SYSTEM/_LLM_KEY等
-├── 信号链路全通：偏移→场景/织布/玻璃/波浪/情绪 5条跨模块信号
-├── 静默异常：18→1裸pass(只剩可选插件)
-├── _fail_open统一到offset_signals(单一来源)
-├── 里程碑演化系统：沙量触发画像/偏移/阶段/3D
-├── 阶段系统：0→4阶段(年月+沙量双层)
-├── 场景检测恢复：_emotional_entropy/comprehensive_offset补导入
-├── 代码审查：P0/P1/P2全部修复，双审查零问题
-├── 脱敏加固：.gitignore防真实数据上传，install.bat一键部署24模块
-└── 意义：从架构到信号到数据，全系统可独立安装运行
+├── 修复V1.7.8遗留: 11个丢失函数补回
+├── 信号链路全通: 偏移→场景/织布/玻璃/波浪/情绪 5条
+├── 静默异常: 18→1裸pass
+├── _fail_open统一到offset_signals
+├── 里程碑演化系统: 沙量触发画像/偏移/阶段/3D
+├── 阶段系统: 0→4阶段(年月+沙量双层)
+├── 脱敏加固: .gitignore防真实数据上传
+└── 意义: 从架构到信号到数据，全系统可独立安装运行
+```
+
+### V2.0.0 → V2.0.5
+```
+优化系列:
+├── V2.0.1: SimHash语义搜索(零依赖)+同义词库20→32词
+├── V2.0.2: SimHash空文本防护+候选池200→500
+├── V2.0.3: 画像双语+代码之神审计P0
+├── V2.0.4: composite_rerank均匀值+关注过匹配去除
+├── V2.0.5: SimHash缓存+L0蒸馏截断300字
+└── 意义: 搜索链从"关键词匹配"进化为"语义搜索+情感重排"
+```
+
+### V2.0.5 → V2.1
+```
+V2.1: 首次主动系统
+├── prefetch智能上下文注入(阶段+偏移趋势)
+├── AI低价值回复过滤(0.3阈值)
+├── MemoryProvider initialize签名修复
+├── register()插件自动发现入口
+└── 意义: V2.0全被动→V2.1首次主动开口
+```
+
+### V2.1 → V2.1.14
+```
+V2.1.1: 冷热分层存储(30天阈值，按月归档)
+V2.1.2: 回音折死代码修复—移到return前
+V2.1.3: ④频率巩固+⑦度量反馈接入full_sanity(织布机9路全通)
+V2.1.4: initialize签名修复
+V2.1.5: register入口+NEXSANDBASE_HOME路径可配置
+V2.1.6: 路径统一补sandglass_sqlite+memory_provider
+V2.1.7: decision_particles路径统一
+V2.1.8: discipline+emotion_vocab全覆盖
+V2.1.9: sandglass_paths单一来源—10模块统一
+V2.1.10: 硬编码路径清零—16模块全覆盖
+V2.1.11: P0修复—EMA独立dp_path+_weave_guard+AI过滤长度判断
+V2.1.12: total未定义+SimHash LRU上限10000
+V2.1.13: 落沙锁加固—O_CREAT|O_EXCL同款锁
+V2.1.14: system_prompt_block重构250→60行+路径彻底清零
+└── 意义: 从"能跑"到"稳定"到"精致"—路径/信号/锁/代码质量全面收尾
 
 ---
 
