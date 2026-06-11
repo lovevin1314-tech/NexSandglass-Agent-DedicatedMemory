@@ -24,15 +24,32 @@ _CANVAS = os.path.join(_VAULT, "profile", "canvas.md")
 _PATTERNS = os.path.join(_VAULT, "profile", "thinking-patterns.md")
 _INSIGHTS = os.path.join(_VAULT, "memory", "insights.md")
 
-from scene_l3 import *
-from weave_l3 import *
-from emotion_l3 import *
+from scene_l3 import (
+    scene_mode, scene_add, scene_current, scene_sync,
+    scene_history, scene_dominance, stage_switch_prediction,
+    scene_stage_matrix, novel_scene_detect,
+    _log_scene_timeline, _load_scenes, _save_scenes,
+    scene_remove, scene_guess,
+)
+from weave_l3 import (
+    weave_insight, weave_contradiction, weave_chain, weave_graph,
+)
+from emotion_l3 import (
+    entropy_mirror, entropy_ghost, glass_reminder,
+    entropy_reminder, memo_mode,
+)
 from discipline import iron_rules, iron_rules_set
 from l3_tasks import task_defer, task_pending, task_done, task_check_trigger
 from l3_persona_verify import persona_trace, persona_verify, persona_diff
 from l3_search_core import _synonym_expand, _tfidf_search, composite_rerank, _search_with_fallback, _sentiment_wind, sentiment_rerank, simhash_search
 from l3_persona import persona_project
-from persona_l3 import *
+from persona_l3 import (
+    persona_build, persona_update, persona_canvas,
+    persona_freshness, stage_list, stage_canvas,
+    _current_stage, _load_persona, _local_persona_extract,
+    persona_trace, persona_verify, persona_diff,
+    persona_project, sand_since_update, stage_similarity,
+)
 from persona_l3 import _WAVE_THRESHOLDS, _SEARCH_WEIGHTS
 from offset_l3 import (
     _log_decision, _read_decision_log, comprehensive_offset,
