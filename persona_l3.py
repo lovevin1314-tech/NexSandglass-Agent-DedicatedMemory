@@ -381,7 +381,6 @@ _PERSONA_SYSTEM = """# 🧬 人格架构师 — 渐进演化协议
 """
 
 
-_PERSONA_DIR = os.path.join(_VAULT, "persona")
 
 _CANVAS_SYSTEM = """# 画布生成器
 
