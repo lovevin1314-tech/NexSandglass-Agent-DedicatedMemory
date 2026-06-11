@@ -60,8 +60,13 @@ def tick() -> dict:
     except Exception:
         status["env"] = "未知"
 
-    # 4. 写心跳日志
+    # 4. 写心跳日志（超过1MB自动轮转保留最后1000行）
     os.makedirs(os.path.dirname(_HEARTBEAT_LOG), exist_ok=True)
+    if os.path.exists(_HEARTBEAT_LOG) and os.path.getsize(_HEARTBEAT_LOG) > 1_000_000:
+        with open(_HEARTBEAT_LOG, "r", encoding="utf-8") as f:
+            lines = f.readlines()[-1000:]
+        with open(_HEARTBEAT_LOG, "w", encoding="utf-8") as f:
+            f.writelines(lines)
     with open(_HEARTBEAT_LOG, "a", encoding="utf-8") as f:
         f.write(json.dumps(status, ensure_ascii=False) + "\n")
 
