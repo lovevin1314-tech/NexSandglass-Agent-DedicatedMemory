@@ -29,7 +29,7 @@ from emotion_l3 import *
 from discipline import iron_rules, iron_rules_set
 from l3_tasks import task_defer, task_pending, task_done, task_check_trigger
 from l3_persona_verify import persona_trace, persona_verify, persona_diff
-from l3_search_core import _synonym_expand, _tfidf_search, composite_rerank, _search_with_fallback, _sentiment_wind, sentiment_rerank
+from l3_search_core import _synonym_expand, _tfidf_search, composite_rerank, _search_with_fallback, _sentiment_wind, sentiment_rerank, simhash_search
 from l3_persona import persona_project
 from persona_l3 import *
 from persona_l3 import _WAVE_THRESHOLDS, _SEARCH_WEIGHTS
@@ -506,6 +506,18 @@ def search_semantic(query: str, limit: int = 10) -> list:
         results = _search_with_fallback(expanded, vs, limit * 2, weights)
         if results:
             return sentiment_rerank(results[:limit], _sentiment_wind())
+
+    # 2.5级：SimHash语义搜索（V2.0.1，零依赖纯本地）
+    try:
+        from l3_search_core import simhash_search
+        wide = vs(query, limit=200)
+        if wide:
+            semantic = simhash_search(query, wide, limit=limit * 2)
+            if semantic:
+                results = [(ln, ts, text, "simhash") for ln, ts, text in semantic]
+                return sentiment_rerank(results[:limit], _sentiment_wind())
+    except Exception:
+        pass
 
     # 3级：TF-IDF 余弦相似度
     tfidf = _tfidf_search(query, limit)

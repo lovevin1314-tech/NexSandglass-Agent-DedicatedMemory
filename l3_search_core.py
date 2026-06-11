@@ -2,20 +2,81 @@
 """
 NexSandglass L3 — 搜索核心模块
 _synonym_expand / _tfidf_search / composite_rerank / _search_with_fallback
-_sentiment_wind / sentiment_rerank + _SYNONYMS 词表
+_sentiment_wind / sentiment_rerank / simhash / simhash_search + _SYNONYMS 词表
 
-从 sandglass_think.py 提取 (2026-06-11)
-原位置: L1441-1616
+V2.0.1: +SimHash语义搜索(零依赖纯Python)
 """
 
 import re
 import math
 import os
+import hashlib
+
+# ═══════════════════════════════════════════════════════
+# SimHash 语义哈希（Google 2007，纯stdlib，零依赖）
+# 文本→128bit指纹，汉明距离越小=语义越近
+# ═══════════════════════════════════════════════════════
+
+_SIMHASH_BITS = 128
+
+
+def _tokenize_simhash(text: str) -> list:
+    """中文2-gram + 英文分词"""
+    tokens = []
+    chars = re.findall(r'[\u4e00-\u9fff]', text)
+    for i in range(len(chars) - 1):
+        tokens.append(''.join(chars[i:i+2]))
+    tokens.extend(re.findall(r'[a-zA-Z]{2,}', text.lower()))
+    return tokens
+
+
+def simhash(text: str, bits: int = _SIMHASH_BITS) -> int:
+    """文本→SimHash指纹。零依赖。"""
+    tokens = _tokenize_simhash(text)
+    if not tokens:
+        return 0
+    v = [0] * bits
+    for token in tokens:
+        h = int(hashlib.md5(token.encode()).hexdigest(), 16)
+        for i in range(bits):
+            if (h >> (i % 128)) & 1:
+                v[i] += 1
+            else:
+                v[i] -= 1
+    fp = 0
+    for i in range(bits):
+        if v[i] > 0:
+            fp |= (1 << i)
+    return fp
+
+
+def _hamming(a: int, b: int) -> int:
+    """汉明距离"""
+    return (a ^ b).bit_count()
+
+
+def simhash_search(query: str, candidates: list, limit: int = 20, threshold: int = 60) -> list:
+    """SimHash语义搜索——从候选文档中返回最相似的limit条。
+    candidates: [(line_no, timestamp, text), ...]
+    threshold: 汉明距离上限（越小越严格），默认60(128bit下≈53%相似度)
+    """
+    if not candidates:
+        return []
+    q_fp = simhash(query)
+    scored = []
+    for ln, ts, text in candidates:
+        d_fp = simhash(text[:300])
+        dist = _hamming(q_fp, d_fp)
+        if dist <= threshold:
+            scored.append((dist, ln, ts, text))
+    scored.sort(key=lambda x: x[0])
+    return [(ln, ts, text) for _, ln, ts, text in scored[:limit]]
 
 # ═══════════════════════════════════════════════════════
 # 通用技术同义词（模块级常量）
 # ═══════════════════════════════════════════════════════
 _SYNONYMS = {
+    # 技术
     "加密": ["DPAPI", "保护", "安全", "隐私", "密钥", "密文"],
     "安全": ["保护", "加密", "隐私", "防护", "DPAPI"],
     "搜索": ["检索", "查询", "查找", "定位", "seek", "find"],
@@ -36,6 +97,20 @@ _SYNONYMS = {
     "数据": ["信息", "data", "内容", "记录", "文件"],
     "本地": ["local", "离线", "本地化", "客户端", "本机"],
     "云端": ["cloud", "远程", "在线", "服务器", "SaaS"],
+    # 成本/价值（V2.0.1扩）
+    "免费": ["不花钱", "开源", "无需付费", "白嫖", "free"],
+    "付费": ["花钱", "购买", "订阅", "买", "收费", "pay"],
+    "便宜": ["低价", "实惠", "划算", "廉价", "低成本"],
+    "省钱": ["节约", "性价比", "经济", "节省", "省"],
+    "效率": ["快速", "省事", "高效", "方便", "自动化"],
+    "质量": ["好用", "稳定", "可靠", "精准", "准确"],
+    # 行为/偏好（V2.0.1扩）
+    "喜欢": ["偏好", "倾向", "习惯", "爱", "常用"],
+    "讨厌": ["反感", "不喜欢", "烦", "受不了", "拒绝"],
+    "自己": ["DIY", "手工", "亲自", "独立", "自主"],
+    "外包": ["委托", "找人", "代劳", "付费做", "服务"],
+    "简单": ["容易", "轻松", "不复杂", "直接", "快"],
+    "复杂": ["麻烦", "困难", "繁琐", "难搞", "折腾"],
 }
 
 
