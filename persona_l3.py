@@ -167,8 +167,8 @@ def persona_canvas(persona_path: str = "", stage: str = "") -> str:
     m = re.search(r"```(?:markdown)?\s*\n(.*?)```", result, re.DOTALL)
     content = m.group(1).strip() if m else result.strip()
 
-    os.makedirs(_CANVAS_DIR, exist_ok=True)
-    canvas_path = os.path.join(_CANVAS_DIR, f"canvas.{stage}.md")
+    os.makedirs(_PERSONA_DIR, exist_ok=True)
+    canvas_path = os.path.join(_PERSONA_DIR, f"canvas.{stage}.md")
     with open(canvas_path, "w", encoding="utf-8") as f:
         f.write(content)
 
@@ -206,8 +206,8 @@ def stage_list() -> list:
                         seen.add(key)
                         stages.append({
                             "stage": key,
-                            "canvas": os.path.join(_CANVAS_DIR, f"canvas.{key}.md"),
-                            "persona": os.path.join(_CANVAS_DIR, f"persona.{key}.md"),
+                            "canvas": os.path.join(_PERSONA_DIR, f"canvas.{key}.md"),
+                            "persona": os.path.join(_PERSONA_DIR, f"persona.{key}.md"),
                             "when": entry["ts"][:10],
                             "from": entry["from_stage"],
                         })
@@ -230,7 +230,7 @@ def stage_list() -> list:
 
 def stage_canvas(stage: str) -> str | None:
     """读某个阶段的画布内容。快照索引，不是全量画像。"""
-    canvas_path = os.path.join(_CANVAS_DIR, f"canvas.{stage}.md")
+    canvas_path = os.path.join(_PERSONA_DIR, f"canvas.{stage}.md")
     if os.path.exists(canvas_path):
         with open(canvas_path, "r", encoding="utf-8") as f:
             return f.read().strip()
@@ -240,7 +240,7 @@ def stage_canvas(stage: str) -> str | None:
             return f.read().strip()
     return None
 
-_SCENE_FILE = os.path.join(_VAULT, "persona", "scenes.json")
+_SCENE_FILE = os.path.join(_PERSONA_DIR, "scenes.json")
 
 # 场景关键词（可扩展）
 
@@ -381,7 +381,7 @@ _PERSONA_SYSTEM = """# 🧬 人格架构师 — 渐进演化协议
 """
 
 
-_CANVAS_DIR = os.path.join(_VAULT, "persona")
+_PERSONA_DIR = os.path.join(_VAULT, "persona")
 
 _CANVAS_SYSTEM = """# 画布生成器
 
