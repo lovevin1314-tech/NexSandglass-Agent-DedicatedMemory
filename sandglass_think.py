@@ -206,6 +206,10 @@ def full_sanity() -> dict:
             eg = entropy_ghost("如果选另一个选项呢")
             checks["幽灵决策"] = "✅" if isinstance(eg, dict) else "⚠️"
         except: checks["幽灵决策"] = "❌"
+        try:
+            fb = _metrics_feedback()
+            checks["度量反馈"] = "✅" if isinstance(fb, dict) else "⚠️"
+        except: checks["度量反馈"] = "❌"
 
         l3_ok = all("✅" in v for v in checks.values())
         report["layers"]["L3"] = "✅ 全接口通过" if l3_ok else "⚠️ 部分接口异常"
@@ -939,9 +943,12 @@ def stage_brief() -> str:
     except Exception:
         pass
 
-    # 新场景发现
+    # 新场景发现 → 频率巩固触发器
     try:
         novel = novel_scene_detect()
+        if novel.get("drift_trigger"):
+            off = comprehensive_offset()
+            lines.append(f"\n⚡ 频率突变触发偏移率检查: {off['direction']} {off['offset']:+d}%")
         if novel.get("novel"):
             lines.append(f"\n🆕 新场景: {novel['insight']}")
     except Exception:
