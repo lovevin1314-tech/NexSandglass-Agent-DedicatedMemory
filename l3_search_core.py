@@ -512,23 +512,3 @@ def _detect_lang(query: str) -> str:
     if has_cjk and has_alpha: return 'mixed'
     elif has_cjk: return 'zh'
     else: return 'en'
-
-def _tokenize_for_grain(text: str) -> set:
-    lang = _detect_lang(text)
-    tokens = set()
-    if lang in ('zh', 'mixed'):
-        prev = None
-        for c in text:
-            if chr(0x4e00) <= c <= chr(0x9fff):
-                if prev: tokens.add(prev + c)
-                prev = c
-            else: prev = None
-    if lang in ('en', 'mixed'):
-        import re
-        for w in re.findall(r'[a-zA-Z]+', text.lower()):
-            if len(w) >= 2:
-                tokens.add(w)
-                for n in (2, 3):
-                    for i in range(len(w) - n + 1):
-                        tokens.add(w[i:i+n])
-    return tokens
