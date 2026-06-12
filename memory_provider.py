@@ -248,11 +248,15 @@ class NexSandglassProvider(MemoryProvider):
 
             # 阶段 + 场景语义
             stage_scenes = ""
+            doing_lines = ""
             try:
                 from scene_l3 import scene_current
                 scenes = scene_current()
                 if scenes:
                     stage_scenes = " → " + "、".join(scenes[:3])
+                    doing_lines = "最近在做\n" + "\n".join(
+                        f"{i+1}. {s}" for i, s in enumerate(scenes[:3])
+                    )
             except: pass
 
             note = f"""NexSandglass灵魂注入
@@ -262,6 +266,7 @@ class NexSandglassProvider(MemoryProvider):
 纪律
 {rules_lines or '未设定'}
 {tasks_block}
+{doing_lines}
 {ctx[:500] if ctx else ""}"""
             return note.strip()
         except Exception:
