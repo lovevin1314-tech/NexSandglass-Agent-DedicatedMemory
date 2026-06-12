@@ -169,7 +169,15 @@ class NexSandglassProvider(MemoryProvider):
             stage = _current_stage()
             ent = _emotional_entropy()
             wind = _sentiment_wind()
-            ctx = session_context(3)
+            # 最近对话原文（替代认知地图——LLM可调工具查地图）
+            ctx = ""
+            try:
+                from sandglass_paths import _SANDGLASS
+                with open(_SANDGLASS, "r", encoding="utf-8") as f:
+                    all_lines = f.readlines()
+                recent = [l.strip() for l in all_lines[-30:] if " | " in l]
+                ctx = "\n".join(recent[-15:])  # 最近15条对话
+            except: pass
 
             # 偏移方向
             dirs = {"frugal": f"省钱({off.get('offset',0):+d}%)",
