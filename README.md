@@ -1,18 +1,16 @@
-# NexSandglass 沙漏记忆系统⏳ V2.3.11 — 正式版
+# NexSandglass 沙漏记忆系统⏳ V2.8.0 — 四路并发搜索
 
 > **是记住。是理解。是懂你。是想你。**
 
-> 每句话加密落沙，一粒不丢。从沙子里捞画像——你变了，它比你先发现。
+> 明文落沙，一粒不丢。四路并发搜索——FTS5·IDX·TF-IDF·影子沙。
 > 不光知道你是谁，还知道你是怎么变成今天这样的。三天前说过的事，它还记着。
->
-> 真正意义上的"越用越懂你"。
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Lines](https://img.shields.io/badge/Lines-4230-lightgrey)]()
-[![Size](https://img.shields.io/badge/Size-57KB-brightgreen)]()
+[![Lines](https://img.shields.io/badge/Lines-8160-lightgrey)]()
+[![Size](https://img.shields.io/badge/Size-263KB-brightgreen)]()
 
-> **Soul Distillation (灵魂蒸馏):** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity (偏移率)**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories——we forge a unique, evolving soul that resonates with the user.
+> **V2.8 四路并发搜索:** FTS5(BM25) + IDX(米粒密度) + TF-IDF + 影子沙 并行搜索，SimHash语义重排，中英文混合查询。搜索链从单路30ms → 四路并行3ms。
 
 ---
 
