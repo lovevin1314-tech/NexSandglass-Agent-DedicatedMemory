@@ -86,3 +86,72 @@ def task_check_trigger(keyword: str) -> list:
         if trigger and keyword.lower() in trigger.lower():
             matched.append(t)
     return matched
+
+
+def task_auto_sense() -> str:
+    """V2.8.9: 自动感知已完成任务——基于简单启发式。
+    返回被自动完成的任务摘要，供注入上下文使用。
+    
+    启发式：
+    1. 文件存在性 — 任务名含文件名关键词 → 检查文件
+    2. 版本里程碑 — 任务名含 Vx.y → 检查当前版本
+    3. 超时陈旧 — 超过 60 天 → 自动完成
+    """
+    from sandglass_paths import __version__
+    import glob
+    
+    current_version = __version__
+    auto_done = []
+    stale = []
+    
+    for t in task_pending():
+        tid = t["id"]
+        task_name = t.get("task", "")
+        trigger = t.get("trigger", "")
+        note = t.get("note", "")
+        ts = t.get("ts", "")
+        full_text = f"{task_name} {trigger} {note}"
+        
+        done = False
+        
+        # 1. 文件存在性检查
+        file_keywords = {
+            "nightwatch": "nightwatch.py",
+            "守夜人": "nightwatch.py",
+            "sandglass_log": "sandglass_log.py",
+            "落沙": "sandglass_log.py",
+        }
+        for kw, filename in file_keywords.items():
+            if kw.lower() in full_text.lower():
+                if os.path.exists(os.path.join(_NB, filename)):
+                    done = True
+                    break
+        
+        # 2. 版本里程碑检查
+        import re
+        ver_match = re.search(r'V(\d+\.\d+)', full_text)
+        if ver_match:
+            target_ver = ver_match.group(1)
+            try:
+                if float(current_version.replace("2.", "")) > float(target_ver):
+                    done = True
+            except: pass
+        
+        # 3. 超时陈旧 (>60天自动完成)
+        if ts and not done:
+            try:
+                created = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                age_days = (datetime.now(timezone.utc) - created).days
+                if age_days > 60:
+                    done = True
+            except: pass
+        
+        if done:
+            try:
+                task_done(tid)
+                auto_done.append(task_name)
+            except: pass
+    
+    if auto_done:
+        return f"自动完成{len(auto_done)}项: " + "、".join(auto_done)
+    return ""
