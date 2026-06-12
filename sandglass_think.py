@@ -576,18 +576,20 @@ def search_semantic(query: str, limit: int = 10) -> list:
         except: return []
     
     def _tfidf_search():
-        try: return [(ln, "", text) for ln, text, _ in _tfidf_search_inner(query, limit * 3)]
+        try:
+            from l3_search_core import _tfidf_search
+            return [(ln, "", text) for ln, text, _ in _tfidf_search(query, limit * 3)]
         except: return []
     
     def _shadow_search():
         try:
             from shadow_sand import shadow_search as sh_search
             from sandglass_vault import _parse_line
+            from sandglass_paths import _SANDGLASS
             hits = sh_search(query, limit * 3)
             if not hits: return []
             results = []
-            sg = __import__('sandglass_vault')._SANDGLASS
-            with open(sg, "r", encoding="utf-8") as f:
+            with open(_SANDGLASS, "r", encoding="utf-8") as f:
                 lines = f.readlines()
             for score, ln in hits:
                 if 0 < ln <= len(lines):
@@ -621,8 +623,9 @@ def search_semantic(query: str, limit: int = 10) -> list:
     if not candidates:
         # mmap兜底
         try:
-            from sandglass_vault import _legacy_search
-            return _legacy_search(query, limit, "")
+            from search_router import MmapFallback
+            mmap = MmapFallback()
+            return mmap.search(query, limit)
         except: return []
 
     # Step 4: SimHash语义重排
