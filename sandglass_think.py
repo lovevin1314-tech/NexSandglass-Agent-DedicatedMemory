@@ -494,7 +494,7 @@ def _detect_lang(query: str) -> str:
     elif has_cjk: return "zh"
     else: return "en"
 
-def _tokenize_for_grain(query: str) -> set:
+def _tokenize_for_density(query: str) -> set:
     """查询分词（语言感知）：中文2字滑窗+英文2-3gram"""
     lang = _detect_lang(query)
     tokens = set()
@@ -517,7 +517,7 @@ def _tokenize_for_grain(query: str) -> set:
 def sand_density(text: str, query_tokens: set) -> float:
     """沙子密度 = 文本token ∩ query token / query token"""
     if not query_tokens: return 0.0
-    text_tokens = _tokenize_for_grain(text)
+    text_tokens = _tokenize_for_density(text)
     return len(query_tokens & text_tokens) / len(query_tokens)
 
 def simhash_rerank(query: str, candidates: list) -> dict:
@@ -632,7 +632,7 @@ def search_semantic(query: str, limit: int = 10) -> list:
     simhash_scores = simhash_rerank(query, candidates)
 
     # Step 5: 沙子密度 × 信任分 + SimHash加分
-    query_tokens = _tokenize_for_grain(query)
+    query_tokens = _tokenize_for_density(query)
     from shadow_sand import shadow_boost
     line_nums = {ln for ln, _, _ in candidates}
     trust_scores = {}

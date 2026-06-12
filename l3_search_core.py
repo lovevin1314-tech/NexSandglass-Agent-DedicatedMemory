@@ -27,7 +27,7 @@ def _detect_lang(text: str) -> str:
     elif has_cjk: return "zh"
     else: return "en"
 
-def _tokenize_for_grain(text: str) -> set:
+def _tokenize_for_density(text: str) -> set:
     """查询分词（语言感知）——维粒密度计算基础"""
     lang = _detect_lang(text)
     tokens = set()
@@ -54,7 +54,7 @@ def _tokenize_for_grain(text: str) -> set:
 def sand_density(text: str, query_tokens: set) -> float:
     """沙子密度 = token重叠数 / query token总数"""
     if not query_tokens: return 0.0
-    hit_tokens = _tokenize_for_grain(text)
+    hit_tokens = _tokenize_for_density(text)
     return len(query_tokens & hit_tokens) / len(query_tokens)
 
 # ═══════════════════════════════════════════════════════
