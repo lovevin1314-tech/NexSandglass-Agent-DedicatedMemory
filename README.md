@@ -1,4 +1,4 @@
-# NexSandglass 沙漏记忆系统⏳ V2.8.6 — 四路并发搜索 · 统一入口 · 明文落沙
+# NexSandglass 沙漏记忆系统⏳ V2.8.7 — 统一入口 · 密度元数据 · 明文落沙
 
 > **是记住。是理解。是懂你。是想你。**
 
@@ -384,4 +384,17 @@ V2.3.8-9: install补全+版本统一
 V2.3.10: recent() seek流式O(N)
 V2.3.11: heartbeat轮转
 └── P0/P1/P2全修—MCP可用、代码干净、性能稳健
+```
+
+### V2.8.x 系列
+```
+V2.8.0: 四路并发搜索(IDX+FTS5+TF-IDF+影子沙) + SimHash语义重排 + 明文落沙
+V2.8.1: 四路跑通 + idx_search去重(保留语言感知版)
+V2.8.2: 米粒密度→沙子密度(聚沙) + 去重4→1
+V2.8.3: sand_density统一到l3_search_core单一来源
+V2.8.3: P0修复—IDX传参错位+影子沙短路+扩展词生效
+V2.8.4: 版本号对齐
+V2.8.5: README去DPAPI残留—对比表×性能基准全同步 + 性能实测2.1ms
+V2.8.6: 统一搜索入口—search_semantic委托SearchRouter + density×trust+simhash公式统一 + 128-bit SimHash统一 + 删死代码
+V2.8.7: 密度元数据回归—每条搜索结果附带sand:0.XX标签
 ```

@@ -545,9 +545,8 @@ def dynamic_expand(hit_line: int, query_tokens: set, all_lines: list, max_ctx: i
         else: break
     return all_lines[start:end+1]
 def search_semantic(query: str, limit: int = 10) -> list:
-    """V2.8.6: 薄封装 — search_filter 扩展关键词 → SearchRouter 统一搜索入口。
-    四路并发+沙子密度融合+SimHash语义重排 全部在 SearchRouter 内部完成。"""
-    # Step 1: 四维感知关键词扩展
+    """V2.8.7: SearchRouter 统一搜索入口 + 密度元数据输出。
+    search_filter 扩展关键词 → SearchRouter → 密度标注 → 情感重排。"""
     expanded_query = query
     try:
         filt = search_filter(query)
@@ -556,23 +555,30 @@ def search_semantic(query: str, limit: int = 10) -> list:
     except Exception:
         pass
 
-    # Step 2: 委托 SearchRouter（唯一搜索入口）
+    results = []
     try:
         from search_router import SearchRouter
         router = SearchRouter()
         results = router.search(expanded_query, limit)
-        if results:
-            # 附加情感重排
-            return sentiment_rerank(results, _sentiment_wind())
     except Exception:
         pass
 
-    # Fallback: 直接走 sandglass_vault
-    try:
-        from sandglass_vault import search as vs
-        return vs(query, limit)
-    except Exception:
-        return []
+    if not results:
+        try:
+            from sandglass_vault import search as vs
+            results = vs(query, limit)
+        except Exception:
+            return []
+
+    # V2.8.7: 标注密度元数据 — 每条结果附带 sand:0.XX 标签
+    query_tokens = _tokenize_for_density(query)
+    enriched = []
+    for item in results:
+        ln, ts, text = item[0], item[1], item[2]
+        density = sand_density(text, query_tokens)
+        enriched.append((ln, ts, text, f"sand:{density:.2f}"))
+
+    return sentiment_rerank(enriched, _sentiment_wind())
 
 def _llm_expand(query: str) -> list:
     """LLM 语义扩展----把用户查询扩展为多个相关关键词。
