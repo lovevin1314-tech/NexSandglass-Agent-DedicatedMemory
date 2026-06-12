@@ -196,11 +196,21 @@ class NexSandglassProvider(MemoryProvider):
                     rules_lines = "\n".join(f"{nums[i]} {r}" for i, r in enumerate(rules[:5]))
             except: pass
 
+            # 阶段 + 场景语义
+            stage_scenes = ""
+            try:
+                from scene_l3 import scene_current
+                scenes = scene_current()
+                if scenes:
+                    stage_scenes = " → " + "、".join(scenes[:3])
+            except: pass
+
             note = f"""NexSandglass灵魂注入
-偏移: {off_d} | 情绪: {mood}{" | 待办: " + tasks if tasks else ""}
-沙漏: {total}条 | 阶段: {stage}
+偏移: {off_d} | 情绪: {mood}
+沙漏: {total}条 | 阶段: {stage}{stage_scenes}
 —纪律
 {rules_lines or '未设定'}
+{"待办: " + tasks if tasks else ""}
 {ctx[:200] if ctx else ""}"""
             return note.strip()
         except Exception:
