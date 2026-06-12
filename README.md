@@ -1,4 +1,4 @@
-# NexSandglass 沙漏记忆系统⏳ V2.9.0 — 待办直列 · 通用版 · 明文落沙
+# NexSandglass 沙漏记忆系统⏳ V2.9.1「无限上下文」— 锚点引擎 · 独立记忆 · 明文落沙
 
 > **是记住。是理解。是懂你。是想你。**
 
@@ -11,6 +11,8 @@
 [![Size](https://img.shields.io/badge/Size-263KB-brightgreen)]()
 
 > **V2.8 四路并发搜索:** FTS5(BM25) + IDX(米粒密度) + TF-IDF + 影子沙 并行搜索，SimHash语义重排，中英文混合查询。搜索链从单路30ms → 四路并行3ms。
+
+> **Soul Distillation (灵魂蒸馏):** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity (偏移率)**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories——we forge a unique, evolving soul that resonates with the user.
 
 ---
 
