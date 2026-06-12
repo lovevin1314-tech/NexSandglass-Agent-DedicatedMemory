@@ -554,27 +554,28 @@ def search_semantic(query: str, limit: int = 10) -> list:
     except Exception: pass
     expanded = filt.get("keywords", [query])
 
-    # Step 2: 四路并发搜索
+    # Step 2: 四路并发搜索 — 使用扩展关键词
     import concurrent.futures
+    expanded_query = " ".join(expanded[:8])  # 最多8个扩展词
     results_all = {}
     
     def _fts5_search():
         try:
             from sandglass_sqlite import search as fts5, sync_incremental
             sync_incremental()
-            return [(r[0], r[1], r[2]) for r in fts5(query, limit * 3)]
+            return [(r[0], r[1], r[2]) for r in fts5(expanded_query, limit * 3)]
         except: return []
     
     def _idx_search():
         try:
             from sandglass_vault import idx_search
-            return idx_search(query, limit * 3)
+            return idx_search(expanded_query, limit * 3)
         except: return []
     
     def _tfidf_search():
         try:
             from l3_search_core import _tfidf_search
-            return [(ln, "", text) for ln, text, _ in _tfidf_search(query, limit * 3)]
+            return [(ln, "", text) for ln, text, _ in _tfidf_search(expanded_query, limit * 3)]
         except: return []
     
     def _shadow_search():
