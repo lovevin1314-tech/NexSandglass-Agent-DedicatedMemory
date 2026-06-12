@@ -233,7 +233,7 @@ class NexSandglassProvider(MemoryProvider):
 纪律
 {rules_lines or '未设定'}
 {tasks_block}
-{ctx[:200] if ctx else ""}"""
+{ctx[:500] if ctx else ""}"""
             return note.strip()
         except Exception:
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
