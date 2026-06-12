@@ -173,7 +173,8 @@ def _synonym_expand(query: str) -> list:
             if syn.lower() not in seen:
                 keywords.append(syn)
                 seen.add(syn.lower())
-    # 情绪词库互积累——查询词命中情绪词时，扩展同类词
+    # 情绪词库互积累——先注入情绪词到同义词表，再查情绪词库
+    _feed_emotion_to_synonyms()
     try:
         from emotion_vocab import load_vocab
         vocab = load_vocab()
@@ -328,3 +329,54 @@ def sentiment_rerank(results, wind: float):
         scored.append((boost, item))
     scored.sort(key=lambda x: x[0], reverse=True)
     return [item for _, item in scored]
+
+
+# ═══════════════════════════════════════════════════════
+# 情绪→同义词桥（方案B：单向注入，零新文件）
+# ═══════════════════════════════════════════════════════
+_EMOTION_SYN_FED = False  # 只注入一次
+
+def _feed_emotion_to_synonyms():
+    """情绪词库高频词 → 注入同义词表。只跑一次。"""
+    global _EMOTION_SYN_FED
+    if _EMOTION_SYN_FED:
+        return
+    _EMOTION_SYN_FED = True
+    try:
+        from sandglass_paths import _NB
+        import os, json
+        ev = os.path.join(_NB, "emotion_vocab.jsonl")
+        if not os.path.exists(ev):
+            return
+        # 读情绪词库，取频次最高的词
+        emotion_words = {}
+        with open(ev, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    e = json.loads(line)
+                    w = e.get("word", "")
+                    if w and len(w) >= 2:
+                        emotion_words[w] = emotion_words.get(w, 0) + 1
+                except: pass
+        # 频次≥2的情绪词注入同义词
+        top = [w for w, c in sorted(emotion_words.items(), key=lambda x: x[1], reverse=True)[:30] if c >= 2]
+        for w in top:
+            if w not in _SYNONYMS:
+                _SYNONYMS[w] = []
+            # 情绪词关联到相关语义
+            related = {
+                "太棒了": ["好", "不错", "满意"],
+                "终于": ["完成", "搞定", "成功"],
+                "烦死了": ["麻烦", "困难", "问题"],
+                "算了": ["放弃", "不管", "随它"],
+                "哇塞": ["惊喜", "意外", "厉害"],
+            }
+            if w in related:
+                for r in related[w]:
+                    if r not in _SYNONYMS[w]:
+                        _SYNONYMS[w].append(r)
+        if top:
+            import logging
+            logging.getLogger(__name__).info(f"情绪→同义词桥注入{len(top)}词")
+    except Exception:
+        pass
