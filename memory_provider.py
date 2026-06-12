@@ -267,7 +267,7 @@ class NexSandglassProvider(MemoryProvider):
 {tasks_block}
 {doing_lines}
 {ctx[:500] if ctx else ""}
-沙漏: {total}条 | 阶段: {stage}{stage_scenes}"""
+阶段: {stage}{stage_scenes} | 沙漏: {total}条"""
             return note.strip()
         except Exception:
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
