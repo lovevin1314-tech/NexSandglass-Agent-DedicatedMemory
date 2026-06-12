@@ -62,6 +62,27 @@ class MmapFallback:
                                 if len(results) >= limit: break
                         except: pass
 
+            # token级匹配：子串没命中时按token找
+            if not results:
+                from sandglass_vault import _query_tokens
+                tokens = _query_tokens(query)
+                if tokens:
+                    with open(self.sandfile, "rb") as f2:
+                        with mmap.mmap(f2.fileno(), 0, access=mmap.ACCESS_READ) as mm2:
+                            ln2 = 0
+                            for line2 in iter(mm2.readline, b""):
+                                ln2 += 1
+                                try:
+                                    d2 = line2.decode("utf-8", errors="ignore").strip()
+                                    if " | " not in d2: continue
+                                    p2 = d2.split(" | ", 2)
+                                    if len(p2) < 3: continue
+                                    ts2, s2, t2 = p2
+                                    if any(tk in t2.lower() for tk in tokens):
+                                        results.append((ln2, ts2, t2[:300]))
+                                        if len(results) >= limit: break
+                                except: pass
+
             if results:
                 from sandglass_sqlite import search_in, sync_incremental
                 lns = [r[0] for r in results[:500]]
