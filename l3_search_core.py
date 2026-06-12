@@ -161,17 +161,30 @@ _SYNONYMS = {
 
 def _synonym_expand(query: str) -> list:
     """本地同义词扩展——零 LLM 消耗，覆盖 80% 语义搜索场景。
+    同时查询同义词库+情绪词库，两库互积累。
     返回 [原词, 同义词1, 同义词2, ...]"""
     keywords = [query]
-    seen = {query}
+    seen = {query.lower()}
     # 2-gram 滑窗分词（和 _tokenize 一致）
     chars = "".join(re.findall(r"[\u4e00-\u9fff]", query))
     for i in range(len(chars) - 1):
         word = chars[i:i + 2]
         for syn in _SYNONYMS.get(word, []):
-            if syn not in seen:
+            if syn.lower() not in seen:
                 keywords.append(syn)
-                seen.add(syn)
+                seen.add(syn.lower())
+    # 情绪词库互积累——查询词命中情绪词时，扩展同类词
+    try:
+        from emotion_vocab import load_vocab
+        vocab = load_vocab()
+        for mood, words in vocab.items():
+            all_words = words.get("zh", []) + words.get("en", [])
+            if any(query.lower() in w.lower() or w.lower() in query.lower() for w in all_words):
+                for w in all_words:
+                    if w.lower() not in seen:
+                        keywords.append(w)
+                        seen.add(w.lower())
+    except: pass
     return keywords
 
 
