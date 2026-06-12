@@ -514,8 +514,8 @@ def _tokenize_for_grain(query: str) -> set:
                         tokens.add(w[i:i+n])
     return tokens
 
-def grain_density(text: str, query_tokens: set) -> float:
-    """米粒密度 = 文本token ∩ query token / query token"""
+def sand_density(text: str, query_tokens: set) -> float:
+    """沙子密度 = 文本token ∩ query token / query token"""
     if not query_tokens: return 0.0
     text_tokens = _tokenize_for_grain(text)
     return len(query_tokens & text_tokens) / len(query_tokens)
@@ -537,19 +537,19 @@ def simhash_rerank(query: str, candidates: list) -> dict:
     except: return {}
 
 def dynamic_expand(hit_line: int, query_tokens: set, all_lines: list, max_ctx: int = 15, threshold: float = 0.2):
-    """米粒密度衰减扩窗：遇到密度断崖就停"""
+    """沙子密度衰减扩窗：遇到密度断崖就停"""
     start, end = hit_line, hit_line
     for i in range(hit_line - 1, max(0, hit_line - max_ctx), -1):
         _, _, text = __import__('sandglass_vault')._parse_line(all_lines[i]) if callable(getattr(__import__('sandglass_vault'), '_parse_line', None)) else (None, None, all_lines[i])
-        if text and grain_density(text, query_tokens) >= threshold: start = i
+        if text and sand_density(text, query_tokens) >= threshold: start = i
         else: break
     for i in range(hit_line + 1, min(len(all_lines), hit_line + max_ctx)):
         _, _, text = __import__('sandglass_vault')._parse_line(all_lines[i]) if callable(getattr(__import__('sandglass_vault'), '_parse_line', None)) else (None, None, all_lines[i])
-        if text and grain_density(text, query_tokens) >= threshold: end = i
+        if text and sand_density(text, query_tokens) >= threshold: end = i
         else: break
     return all_lines[start:end+1]
 def search_semantic(query: str, limit: int = 10) -> list:
-    """V2.8: 四路并发搜索 + 米粒密度Rerank + SimHash语义重排"""
+    """V2.8: 四路并发搜索 + 沙子密度Rerank + SimHash语义重排"""
     from sandglass_vault import search as vs
 
     # Step 1: 四维感知关键词扩展 + 语言检测
@@ -631,7 +631,7 @@ def search_semantic(query: str, limit: int = 10) -> list:
     # Step 4: SimHash语义重排
     simhash_scores = simhash_rerank(query, candidates)
 
-    # Step 5: 米粒密度 × 信任分 + SimHash加分
+    # Step 5: 沙子密度 × 信任分 + SimHash加分
     query_tokens = _tokenize_for_grain(query)
     from shadow_sand import shadow_boost
     line_nums = {ln for ln, _, _ in candidates}
@@ -643,14 +643,14 @@ def search_semantic(query: str, limit: int = 10) -> list:
 
     scored = []
     for ln, ts, text in candidates:
-        density = grain_density(text, query_tokens)
+        density = sand_density(text, query_tokens)
         trust = trust_scores.get(ln, 0.5)
         sim_bonus = simhash_scores.get(ln, 0)
         final = density * trust + sim_bonus
         scored.append((final, ln, ts, text))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    results = [(ln, ts, text, f"grain:{grain_density(text,query_tokens):.2f}") for _, ln, ts, text in scored[:limit]]
+    results = [(ln, ts, text, f"sand:{sand_density(text,query_tokens):.2f}") for _, ln, ts, text in scored[:limit]]
     return sentiment_rerank(results, _sentiment_wind())
 
 def _llm_expand(query: str) -> list:

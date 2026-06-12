@@ -14,7 +14,7 @@ import hashlib
 
 
 # ═══════════════════════════════════════════════════════
-# 米粒密度引擎 (Grain Density Engine) — V2.8
+# 沙子密度引擎 (Sand Density Engine) — V2.8
 # token重叠率=候选行的token∩query的token / query的token
 # 零拍参数，越用越准
 # ═══════════════════════════════════════════════════════
@@ -51,8 +51,8 @@ def _tokenize_for_grain(text: str) -> set:
                         tokens.add(w[i:i+n])
     return tokens
 
-def grain_density(text: str, query_tokens: set) -> float:
-    """米粒密度 = token重叠数 / query token总数"""
+def sand_density(text: str, query_tokens: set) -> float:
+    """沙子密度 = token重叠数 / query token总数"""
     if not query_tokens: return 0.0
     hit_tokens = _tokenize_for_grain(text)
     return len(query_tokens & hit_tokens) / len(query_tokens)
@@ -504,7 +504,7 @@ def _feed_emotion_to_synonyms():
         pass
 
 
-# ======================== V2.8: grain density + dynamic expand + lang detect ========================
+# ======================== V2.8: sand density + dynamic expand + lang detect ========================
 
 def _detect_lang(query: str) -> str:
     has_cjk = any(chr(0x4e00) <= c <= chr(0x9fff) for c in query)
@@ -532,7 +532,3 @@ def _tokenize_for_grain(text: str) -> set:
                     for i in range(len(w) - n + 1):
                         tokens.add(w[i:i+n])
     return tokens
-
-def grain_density(text: str, query_tokens: set) -> float:
-    if not query_tokens: return 0.0
-    return len(query_tokens & _tokenize_for_grain(text)) / len(query_tokens)
