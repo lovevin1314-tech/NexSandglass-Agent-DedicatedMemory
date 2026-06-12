@@ -98,7 +98,7 @@ def log_message(text: str, sender: str = "agent") -> bool:
             from shadow_sand import shadow_index
             shadow_index(text, line_num=0)  # 0=让shadow_sand用trust表自增
         except Exception as e:
-            logger.error(f"影子沙索引同步失败: {e}")
+            logger.warning(f"影子沙索引同步跳过(锁冲突): {e}")
 
         return True
     except Exception as e:
