@@ -571,22 +571,8 @@ def search_semantic(query: str, limit: int = 10) -> list:
     
     def _idx_search():
         try:
-            from sandglass_vault import _sync_index, _query_tokens, _parse_line
-            idx = _sync_index()
-            if not idx: return []
-            tokens = _query_tokens(query)
-            line_nums = set()
-            for tok in tokens:
-                if tok in idx: line_nums.update(idx[tok])
-            if not line_nums: return []
-            results = []
-            with open(__import__('sandglass_vault')._SANDGLASS, "r", encoding="utf-8") as f:
-                for n, line in enumerate(f, 1):
-                    if n in line_nums:
-                        ts, _, text = _parse_line(line)
-                        if ts and text: results.append((n, ts, text))
-                        if len(results) >= 50: break
-            return results
+            from sandglass_vault import idx_search
+            return idx_search(query, limit * 3)
         except: return []
     
     def _tfidf_search():

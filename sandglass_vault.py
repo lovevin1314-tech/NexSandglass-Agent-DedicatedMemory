@@ -86,6 +86,37 @@ def _write_idx(idx):
     os.replace(tmp, _IDX)
 
 
+def idx_search(query: str, limit: int = 100) -> list:
+    """IDX搜索：语言感知分词→倒排→返回候选行号列表"""
+    try:
+        idx = _sync_index()
+        if not idx:
+            rebuild_index()
+            idx = _sync_index()
+        if not idx:
+            return []
+        from sandglass_think import _tokenize_for_grain
+        tokens = _tokenize_for_grain(query)
+        if not tokens:
+            return []
+        candidate_lines = set()
+        for token in tokens:
+            if token in idx:
+                candidate_lines.update(idx[token])
+        results = []
+        with open(_SANDGLASS, "r", encoding="utf-8") as f:
+            for n, line in enumerate(f, 1):
+                if n in candidate_lines:
+                    ts, sender, text = _parse_line(line)
+                    if ts and text:
+                        results.append((n, ts, text))
+                        if len(results) >= limit:
+                            break
+        return results
+    except Exception:
+        return []
+
+
 def rebuild_index() -> int:
     """全量重建投石问路（基于解密后文本）。原子写。返回词条数。"""
     global _idx_cache
