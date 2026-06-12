@@ -457,3 +457,37 @@ def _feed_emotion_to_synonyms():
             logging.getLogger(__name__).info(f"情绪→同义词桥注入{len(top)}词")
     except Exception:
         pass
+
+
+# ======================== V2.8: grain density + dynamic expand + lang detect ========================
+
+def _detect_lang(query: str) -> str:
+    has_cjk = any(chr(0x4e00) <= c <= chr(0x9fff) for c in query)
+    has_alpha = any(c.isascii() and c.isalpha() for c in query)
+    if has_cjk and has_alpha: return 'mixed'
+    elif has_cjk: return 'zh'
+    else: return 'en'
+
+def _tokenize_for_grain(text: str) -> set:
+    lang = _detect_lang(text)
+    tokens = set()
+    if lang in ('zh', 'mixed'):
+        prev = None
+        for c in text:
+            if chr(0x4e00) <= c <= chr(0x9fff):
+                if prev: tokens.add(prev + c)
+                prev = c
+            else: prev = None
+    if lang in ('en', 'mixed'):
+        import re
+        for w in re.findall(r'[a-zA-Z]+', text.lower()):
+            if len(w) >= 2:
+                tokens.add(w)
+                for n in (2, 3):
+                    for i in range(len(w) - n + 1):
+                        tokens.add(w[i:i+n])
+    return tokens
+
+def grain_density(text: str, query_tokens: set) -> float:
+    if not query_tokens: return 0.0
+    return len(query_tokens & _tokenize_for_grain(text)) / len(query_tokens)
