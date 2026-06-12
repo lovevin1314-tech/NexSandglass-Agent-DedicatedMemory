@@ -256,6 +256,39 @@ def _legacy_search(query, limit, month):
         return []
 
 
+
+def idx_search(query: str, limit: int = 30) -> list:
+    """IDX倒排搜索 — V2.8重新启用。
+    中文2字词匹配 + 英文n-gram模糊匹配。补足FTS5盲区。"""
+    results = []
+    try:
+        idx = _sync_index()
+        if not idx:
+            return []
+        from sandglass_vault import _query_tokens
+        tokens = _query_tokens(query)
+        if not tokens:
+            return []
+        # token→行号集合
+        candidate_lines = {}
+        for token in tokens:
+            for ln in idx.get(token, []):
+                candidate_lines[ln] = candidate_lines.get(ln, 0) + 1
+        if not candidate_lines:
+            return []
+        # 按匹配token数排序
+        ranked = sorted(candidate_lines.items(), key=lambda x: x[1], reverse=True)
+        with open(_SANDGLASS, "r", encoding="utf-8") as f:
+            all_lines = f.readlines()
+        for ln, matches in ranked[:limit]:
+            if 0 < ln <= len(all_lines):
+                ts, sender, text = _parse_line(all_lines[ln - 1])
+                if ts and text:
+                    results.append((ln, ts, text))
+    except Exception:
+        pass
+    return results
+
 def recent(n: int = 10) -> list:
     """最近 N 条。[(行号, 时间, 明文), ...]。V2.3.9: seek逆向流式，O(N)内存。"""
     try:
