@@ -221,7 +221,7 @@ _BIDIRECTIONAL_SYNS = _build_bidirectional_syns(_SYNONYMS)
 
 def _synonym_expand(query: str) -> list:
     """本地同义词扩展——零 LLM 消耗，覆盖 80% 语义搜索场景。
-    同时查询同义词库+情绪词库，两库互积累。
+    查询同义词库(单向) + 双向权重表 + 情绪词库，三库互积累。
     返回 [原词, 同义词1, 同义词2, ...]"""
     keywords = [query]
     seen = {query.lower()}
@@ -240,6 +240,16 @@ def _synonym_expand(query: str) -> list:
                 if syn.lower() not in seen:
                     keywords.append(syn)
                     seen.add(syn.lower())
+    # 双向同义词表——正链≥1.0(高质量)才扩展，避免弱反向词污染
+    try:
+        for word in list(seen):
+            if word in _BIDIRECTIONAL_SYNS:
+                for syn, weight in _BIDIRECTIONAL_SYNS[word].items():
+                    if weight >= 1.0 and syn.lower() not in seen:
+                        keywords.append(syn)
+                        seen.add(syn.lower())
+    except Exception:
+        pass
     # 情绪词库互积累——先注入情绪词到同义词表，再查情绪词库
     _feed_emotion_to_synonyms()
     try:
