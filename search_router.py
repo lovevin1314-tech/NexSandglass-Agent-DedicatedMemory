@@ -1,7 +1,7 @@
 """
 NexSandglass SearchRouter V2.8 — 四路并发搜索架构
 ===================================================
-影子沙 + FTS5 + IDX + TF-IDF 四路并发 → 米粒密度融合 → SimHash重排 → mmap兜底
+影子沙 + FTS5 + IDX + TF-IDF 四路并发 → 沙子密度融合 → SimHash重排 → mmap兜底
 """
 import os, mmap, re, threading, concurrent.futures, math
 from sandglass_vault import _SANDGLASS, _parse_line
@@ -44,9 +44,9 @@ def simhash_rerank(candidates, query) -> list:
     return sorted(candidates, key=hamming)
 
 
-# ═══════════════════ 米粒密度 ═══════════════════
-def grain_density(candidates, tokens, query) -> list:
-    """米粒密度排序 — token重叠率驱动。
+# ═══════════════════ 沙子密度 ═══════════════════
+def sand_density(candidates, tokens, query) -> list:
+    """沙子密度排序 — token重叠率驱动。
     density = matched_tokens / total_tokens × simhash_score
     """
     q_fp = _simhash(query)
@@ -249,7 +249,7 @@ class MmapFallback:
 
 # ═══════════════════ SearchRouter ═══════════════════
 class SearchRouter:
-    """搜索路由器——四路并发 + 米粒密度融合 + SimHash重排 + mmap兜底。"""
+    """搜索路由器——四路并发 + 沙子密度融合 + SimHash重排 + mmap兜底。"""
 
     def __init__(self, shadow=None, fts5=None, idx=None, tfidf=None, mmap=None):
         self.shadow = shadow or ShadowSearch()
@@ -310,10 +310,10 @@ class SearchRouter:
                         all_candidates.append((ln, ts, text))
 
         if all_candidates:
-            # 米粒密度排序
+            # 沙子密度排序
             from sandglass_vault import _query_tokens
             tokens = _query_tokens(query)
-            ranked = grain_density(all_candidates, tokens, query)
+            ranked = sand_density(all_candidates, tokens, query)
 
             # SimHash语义重排
             ranked = simhash_rerank(ranked, query)
