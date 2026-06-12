@@ -5,12 +5,15 @@ NexSandglass — 影子沙 (Shadow Sand)
 投石问路之前先查影子沙——脱口而出级速度。
 零依赖：sqlite3是Python stdlib。
 """
-import sqlite3, os, re, threading, time
+import sqlite3, os, re
 from collections import defaultdict
 
 from sandglass_paths import _NB
 
 _SHADOW_DB = os.path.join(_NB, "shadow_sand.db")
+
+import contextlib
+_null_lock = contextlib.nullcontext()
 
 def set_shadow_path(path: str):
     """重定向影子沙路径——基准测试用。"""
@@ -66,7 +69,6 @@ def shadow_mbti_set(mbti: str) -> None:
     db.execute("INSERT INTO mbti (mbti) VALUES (?)", (mbti.upper(),))
     db.commit()
 
-_lock = threading.Lock()
 
 
 _commit_pending = 0
@@ -94,7 +96,7 @@ def shadow_search(query: str, limit: int = 10) -> list:
     """影子沙优先搜索。返回 [(行号, 信任分), ...]"""
     db = _get_conn()
     words = [w for w in re.findall(r'\w+', query.lower()) if len(w) > 1]
-    with _lock:
+    with _null_lock:
         # 方法1: 实体名匹配（最快）
         results = []
         for w in words:
@@ -137,7 +139,7 @@ def shadow_boost(candidate_lines: set, limit: int = 10) -> list:
     if not candidate_lines:
         return []
     db = _get_conn()
-    with _lock:
+    with _null_lock:
         placeholders = ",".join("?" * len(candidate_lines))
         rows = db.execute(
             f"SELECT line_num, score FROM trust WHERE line_num IN ({placeholders})",
@@ -158,7 +160,7 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
     except: pass
     """落沙后同步——调用方传入实际行号，避免COUNT(*)偏移。"""
     db = _get_conn()
-    with _lock:
+    with _null_lock:
         # 行号由调用方传入（sandglass_log 写入后传实际行号）
         if line_num <= 0:
             line_num = db.execute("SELECT COUNT(*) FROM trust").fetchone()[0] + 1
@@ -204,7 +206,7 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
 def shadow_feedback(line_num: int, helpful: bool) -> dict:
     """信任评分反馈。"""
     db = _get_conn()
-    with _lock:
+    with _null_lock:
         row = db.execute(
             "SELECT score, helpful, unhelpful FROM trust WHERE line_num = ?",
             (line_num,)
@@ -232,7 +234,7 @@ def shadow_retrieval_bump(line_nums: list) -> None:
     if not line_nums:
         return
     db = _get_conn()
-    with _lock:
+    with _null_lock:
         placeholders = ",".join("?" * len(line_nums))
         db.execute(
             f"UPDATE trust SET retrievals = retrievals + 1 WHERE line_num IN ({placeholders})",
