@@ -14,9 +14,17 @@ _last_sync_mtime = 0  # 记录上次同步时的 sandglass.txt 修改时间
 
 
 def _tokenize(text: str) -> str:
-    """2-gram分词，空格分隔。统一使用 vault._tokenize 逻辑。"""
-    from sandglass_vault import _tokenize as _vt
-    return " ".join(sorted(_vt(text)))
+    """FTS5专用分词：英文全词 + 中文2-gram。不用滑动窗口（滑动窗口用于mmap OR匹配）。"""
+    import re as _re
+    tokens = set()
+    t = text.lower()
+    # 英文全词（2+字母的数字词）
+    tokens.update(_re.findall(r"[a-zA-Z0-9_]{2,}", t))
+    # 中文2字词
+    chars = "".join(_re.findall(r"[\u4e00-\u9fff]", text))
+    for i in range(len(chars) - 1):
+        tokens.add(chars[i : i + 2])
+    return " ".join(sorted(t for t in tokens if t))
 
 
 def _get_db():
