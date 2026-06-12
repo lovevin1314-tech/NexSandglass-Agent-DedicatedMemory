@@ -199,9 +199,9 @@ class NexSandglassProvider(MemoryProvider):
             note = f"""NexSandglass灵魂注入
 偏移: {off_d} | 情绪: {mood}{" | 待办: " + tasks if tasks else ""}
 沙漏: {total}条 | 阶段: {stage}
-{ctx[:200] if ctx else ""}
 —纪律
-{rules_lines or '未设定'}"""
+{rules_lines or '未设定'}
+{ctx[:200] if ctx else ""}"""
             return note.strip()
         except Exception:
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
