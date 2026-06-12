@@ -188,6 +188,7 @@ _SYNONYMS = {
     "user": ["person", "customer", "client", "human", "operator"],
     "data": ["information", "dataset", "record", "statistics", "metrics"],
     "open source": ["free", "public", "community", "OSS", "transparent"],
+    "free": ["open source", "no cost", "libre", "gratis", "freeware"],
     "version": ["release", "update", "patch", "iteration", "build"],
     "dependency": ["library", "package", "module", "requirement", "import"],
     "file": ["document", "artifact", "asset", "resource", "attachment"],
