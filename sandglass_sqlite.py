@@ -122,11 +122,15 @@ def search_year(query: str, year: str, limit: int = -1) -> list:
 
 
 def search(query: str, limit: int = 10) -> list:
-    """FTS5搜索。limit=-1 全量。返回[(行号,时间,明文),...]。"""
+    """FTS5搜索。limit=-1 全量。返回[(行号,时间,明文),...]。
+    中文用AND语义，英文自动切换OR避免n-gram碎片化。"""
     try:
         tokens = _tokenize(query)
         if not tokens.strip():
             return []
+        # 英文查询：OR语义（n-gram太多AND匹配不到）
+        if any(c.isascii() and c.isalpha() for c in query):
+            tokens = " OR ".join(tokens.split())
         with _lock:
             conn = _get_db()
             sql = "SELECT s.id, s.ts, s.text FROM sandglass_fts f JOIN sandglass s ON s.id = f.rowid WHERE sandglass_fts MATCH ? ORDER BY rank"
