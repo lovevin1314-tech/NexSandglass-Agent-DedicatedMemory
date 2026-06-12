@@ -193,7 +193,7 @@ class NexSandglassProvider(MemoryProvider):
                     if m not in seen and len(m) >= 2:
                         seen.add(m)
                         anchors.append(m)
-                    if len(anchors) >= 5:
+                    if len(anchors) >= 15:
                         break
                 anchors.reverse()
                 if anchors:
