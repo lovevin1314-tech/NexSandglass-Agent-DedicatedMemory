@@ -169,14 +169,35 @@ class NexSandglassProvider(MemoryProvider):
             stage = _current_stage()
             ent = _emotional_entropy()
             wind = _sentiment_wind()
-            # 最近对话原文（替代认知地图——LLM可调工具查地图）
+            # 最近对话锚点（关键词摘要——LLM可据此调sandglass_search查全文）
             ctx = ""
             try:
+                import re
                 from sandglass_paths import _SANDGLASS
                 with open(_SANDGLASS, "r", encoding="utf-8") as f:
                     all_lines = f.readlines()
-                recent = [l.strip() for l in all_lines[-30:] if " | " in l]
-                ctx = "\n".join(recent[-15:])  # 最近15条对话
+                # 提取最近用户消息作为话题锚点
+                user_msgs = []
+                for line in all_lines[-80:]:
+                    if " | user | " in line:
+                        parts = line.strip().split(" | ", 2)
+                        if len(parts) >= 3:
+                            msg = parts[2].strip()
+                            # 过滤纯测试数据
+                            if not re.match(r'^(perf_|_linealign|_signal_|V\d+|\d+$)', msg):
+                                user_msgs.append(msg[:40])  # 截断长消息
+                # 去重取最近5条
+                seen = set()
+                anchors = []
+                for m in reversed(user_msgs):
+                    if m not in seen and len(m) >= 2:
+                        seen.add(m)
+                        anchors.append(m)
+                    if len(anchors) >= 5:
+                        break
+                anchors.reverse()
+                if anchors:
+                    ctx = "最近: " + " · ".join(anchors)
             except: pass
 
             # 偏移方向
@@ -241,7 +262,7 @@ class NexSandglassProvider(MemoryProvider):
 纪律
 {rules_lines or '未设定'}
 {tasks_block}
-{ctx[:500] if ctx else ""}"""
+{ctx[:200] if ctx else ""}"""
             return note.strip()
         except Exception:
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
