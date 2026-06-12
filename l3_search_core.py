@@ -97,6 +97,24 @@ def simhash_search(query: str, candidates: list, limit: int = 20, threshold: int
     return [(ln, ts, text) for _, ln, ts, text in scored[:limit]]
 
 # ═══════════════════════════════════════════════════════
+
+
+# ═══════════════════════════════════════════════════════
+# 双向同义词——正链1.3x，反链0.8x（精准扩展）
+# ═══════════════════════════════════════════════════════
+def _build_bidirectional_syns(syns: dict) -> dict:
+    """把单向同义词扩展为双向权重表。正链权重1.3，反链0.8。"""
+    ws = {}
+    for k, vs in syns.items():
+        ws[k] = {v: 1.3 for v in vs}
+        for v in vs:
+            if v not in ws:
+                ws[v] = {}
+            ws[v][k] = ws[v].get(k, 0) or 0.8  # 反链不覆盖正链
+    return ws
+
+# _BIDIRECTIONAL_SYNS will be built at bottom after _SYNONYMS is defined
+
 # 通用技术同义词（模块级常量）
 # ═══════════════════════════════════════════════════════
 _SYNONYMS = {
@@ -157,6 +175,8 @@ _SYNONYMS = {
     "history": ["past", "record", "log", "timeline", "archive"],
     "compare": ["contrast", "diff", "versus", "match", "balance"],
 }
+_BIDIRECTIONAL_SYNS = _build_bidirectional_syns(_SYNONYMS)
+
 
 
 def _synonym_expand(query: str) -> list:
