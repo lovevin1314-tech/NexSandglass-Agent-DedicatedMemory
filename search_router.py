@@ -44,7 +44,13 @@ class MmapFallback:
 
     def search(self, query: str, limit: int = 10) -> list:
         results = []
+        results_token = []  # token级匹配备选
         try:
+            # 预取tokens（一次）
+            from sandglass_vault import _query_tokens
+            tokens = _query_tokens(query)
+            has_tokens = bool(tokens)
+            
             with open(self.sandfile, "rb") as f:
                 with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                     ln = 0
@@ -57,31 +63,19 @@ class MmapFallback:
                             if len(parts) < 3: continue
                             ts, sender, text = parts
 
+                            # 精确匹配优先
                             if query.lower() in text.lower():
                                 results.append((ln, ts, text[:300]))
                                 if len(results) >= limit: break
+                            # token级匹配备选（同一轮扫描）
+                            elif has_tokens and any(tk in text.lower() for tk in tokens):
+                                if len(results_token) < limit:
+                                    results_token.append((ln, ts, text[:300]))
                         except: pass
 
-            # token级匹配：子串没命中时按token找
-            if not results:
-                from sandglass_vault import _query_tokens
-                tokens = _query_tokens(query)
-                if tokens:
-                    with open(self.sandfile, "rb") as f2:
-                        with mmap.mmap(f2.fileno(), 0, access=mmap.ACCESS_READ) as mm2:
-                            ln2 = 0
-                            for line2 in iter(mm2.readline, b""):
-                                ln2 += 1
-                                try:
-                                    d2 = line2.decode("utf-8", errors="ignore").strip()
-                                    if " | " not in d2: continue
-                                    p2 = d2.split(" | ", 2)
-                                    if len(p2) < 3: continue
-                                    ts2, s2, t2 = p2
-                                    if any(tk in t2.lower() for tk in tokens):
-                                        results.append((ln2, ts2, t2[:300]))
-                                        if len(results) >= limit: break
-                                except: pass
+            # 精确匹配为空 → token级匹配兜底
+            if not results and results_token:
+                results = results_token[:limit]
 
             if results:
                 from sandglass_sqlite import search_in, sync_incremental
