@@ -379,3 +379,32 @@ def timeline(query: str) -> dict:
     except Exception:
         logger.warning("sandglass: timeline(%r) failed", query, exc_info=True)
         return {}
+
+def idx_search(query: str, limit: int = 30) -> list:
+    """IDX搜索 — 中文子串+英文模糊匹配，纯内存微秒级。
+    返回 [(line_num, ts, text), ...]"""
+    try:
+        idx = _sync_index()
+        if not idx:
+            return []
+        tokens = _query_tokens(query)
+        if not tokens:
+            return []
+        line_scores = {}
+        for token in tokens:
+            for ln in idx.get(token, []):
+                line_scores[ln] = line_scores.get(ln, 0) + 1
+        if not line_scores:
+            return []
+        results = []
+        top = sorted(line_scores, key=lambda x: line_scores[x], reverse=True)[:limit]
+        with open(_SANDGLASS, "r", encoding="utf-8") as f:
+            for n, line in enumerate(f, 1):
+                if n in top:
+                    ts, sender, text = _parse_line(line)
+                    if ts and text:
+                        results.append((n, ts, text))
+        results.sort(key=lambda x: line_scores.get(x[0], 0), reverse=True)
+        return results
+    except Exception:
+        return []
