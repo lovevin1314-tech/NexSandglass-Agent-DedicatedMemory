@@ -545,110 +545,34 @@ def dynamic_expand(hit_line: int, query_tokens: set, all_lines: list, max_ctx: i
         else: break
     return all_lines[start:end+1]
 def search_semantic(query: str, limit: int = 10) -> list:
-    """V2.8: 四路并发搜索 + 沙子密度Rerank + SimHash语义重排"""
-    from sandglass_vault import search as vs
-
-    # Step 1: 四维感知关键词扩展 + 语言检测
-    filt = {}
-    try: filt = search_filter(query)
-    except Exception: pass
-    expanded = filt.get("keywords", [query])
-
-    # Step 2: 四路并发搜索 — 使用扩展关键词
-    import concurrent.futures
-    expanded_query = " ".join(expanded[:8])  # 最多8个扩展词
-    results_all = {}
-    
-    def _fts5_search():
-        try:
-            from sandglass_sqlite import search as fts5, sync_incremental
-            sync_incremental()
-            return [(r[0], r[1], r[2]) for r in fts5(expanded_query, limit * 3)]
-        except: return []
-    
-    def _idx_search():
-        try:
-            from sandglass_vault import idx_search
-            return idx_search(expanded_query, limit * 3)
-        except: return []
-    
-    def _tfidf_search():
-        try:
-            from l3_search_core import _tfidf_search
-            return [(ln, "", text) for ln, text, _ in _tfidf_search(expanded_query, limit * 3)]
-        except: return []
-    
-    def _shadow_search():
-        try:
-            from shadow_sand import shadow_search as sh_search
-            from sandglass_vault import _parse_line
-            from sandglass_paths import _SANDGLASS
-            hits = sh_search(query, limit * 3)
-            if not hits: return []
-            results = []
-            with open(_SANDGLASS, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-            for score, ln in hits:
-                if 0 < ln <= len(lines):
-                    ts, _, text = _parse_line(lines[ln-1])
-                    if ts and text: results.append((ln, ts, text))
-            return results
-        except: return []
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
-        futures = {
-            ex.submit(_fts5_search): "fts5",
-            ex.submit(_idx_search): "idx",
-            ex.submit(_tfidf_search): "tfidf",
-            ex.submit(_shadow_search): "shadow",
-        }
-        for fut in concurrent.futures.as_completed(futures):
-            try: results_all[futures[fut]] = fut.result()
-            except: pass
-
-    # Step 3: 合并去重候选集
-    seen, candidates = set(), []
-    for src in ["shadow", "fts5", "idx", "tfidf"]:
-        for item in results_all.get(src, []):
-            ln = item[0]
-            if ln not in seen:
-                seen.add(ln)
-                candidates.append(item)
-                if len(candidates) >= limit * 5: break
-        if len(candidates) >= limit * 5: break
-
-    if not candidates:
-        # mmap兜底
-        try:
-            from search_router import MmapFallback
-            mmap = MmapFallback()
-            return mmap.search(query, limit)
-        except: return []
-
-    # Step 4: SimHash语义重排
-    simhash_scores = simhash_rerank(query, candidates)
-
-    # Step 5: 沙子密度 × 信任分 + SimHash加分
-    query_tokens = _tokenize_for_density(query)
-    from shadow_sand import shadow_boost
-    line_nums = {ln for ln, _, _ in candidates}
-    trust_scores = {}
+    """V2.8.6: 薄封装 — search_filter 扩展关键词 → SearchRouter 统一搜索入口。
+    四路并发+沙子密度融合+SimHash语义重排 全部在 SearchRouter 内部完成。"""
+    # Step 1: 四维感知关键词扩展
+    expanded_query = query
     try:
-        boosted = shadow_boost(line_nums, limit=len(candidates))
-        trust_scores = {ln: score for score, ln in boosted}
-    except: pass
+        filt = search_filter(query)
+        expanded = filt.get("keywords", [query])
+        expanded_query = " ".join(expanded[:8])
+    except Exception:
+        pass
 
-    scored = []
-    for ln, ts, text in candidates:
-        density = sand_density(text, query_tokens)
-        trust = trust_scores.get(ln, 0.5)
-        sim_bonus = simhash_scores.get(ln, 0)
-        final = density * trust + sim_bonus
-        scored.append((final, ln, ts, text))
+    # Step 2: 委托 SearchRouter（唯一搜索入口）
+    try:
+        from search_router import SearchRouter
+        router = SearchRouter()
+        results = router.search(expanded_query, limit)
+        if results:
+            # 附加情感重排
+            return sentiment_rerank(results, _sentiment_wind())
+    except Exception:
+        pass
 
-    scored.sort(key=lambda x: x[0], reverse=True)
-    results = [(ln, ts, text, f"sand:{sand_density(text,query_tokens):.2f}") for _, ln, ts, text in scored[:limit]]
-    return sentiment_rerank(results, _sentiment_wind())
+    # Fallback: 直接走 sandglass_vault
+    try:
+        from sandglass_vault import search as vs
+        return vs(query, limit)
+    except Exception:
+        return []
 
 def _llm_expand(query: str) -> list:
     """LLM 语义扩展----把用户查询扩展为多个相关关键词。
