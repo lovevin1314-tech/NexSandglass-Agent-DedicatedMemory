@@ -180,11 +180,18 @@ class NexSandglassProvider(MemoryProvider):
             # 情绪
             mood = "平稳" if ent < 0.5 else ("波动" if ent < 1.0 else "高熵")
 
-            # 待办
+            # 待办 + 自动感知
             tasks = ""
             try:
+                from l3_tasks import task_pending, task_auto_sense
+                auto_msg = task_auto_sense()
                 tp = task_pending()
-                if tp: tasks = f"{len(tp)}项待办"
+                parts = []
+                if auto_msg:
+                    parts.append(auto_msg)
+                if tp:
+                    parts.append(f"{len(tp)}项待办")
+                tasks = " | ".join(parts)
             except: pass
 
             # 纪律
