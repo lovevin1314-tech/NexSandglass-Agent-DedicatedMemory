@@ -48,7 +48,7 @@ echo "✅ MemoryProvider 插件已部署"
 # .env 模板
 if [ ! -f "$HOME/.hermes/.env" ]; then
     echo "# 可选：API Key（用于灵魂蒸馏和语义搜索）" > "$HOME/.hermes/.env"
-    echo "DEEPSEEK_API_KEY=***" >> "/c/home/NeuroBase/.hermes/.env"
+    echo "DEEPSEEK_API_KEY=***" >> "$HOME/.hermes/.env"
     chmod 600 "$HOME/.hermes/.env" 2>/dev/null || true
     echo "✅ .env 模板已创建"
 fi
