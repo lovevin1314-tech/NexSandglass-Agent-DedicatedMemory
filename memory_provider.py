@@ -157,7 +157,7 @@ class NexSandglassProvider(MemoryProvider):
             logger.info("NexSandglass MemoryProvider initialized")
 
     def system_prompt_block(self) -> str:
-        """V2.8.9: 灵魂注入——偏移→情绪→待办→上下文→纪律。删MBTI，按优先级重排。"""
+        """V2.9.0: 灵魂注入——沙漏→偏移+情绪→最近决策→纪律→待办→上下文。"""
         try:
             from sandglass_vault import count
             from sandglass_think import comprehensive_offset, _current_stage, task_pending
@@ -169,7 +169,7 @@ class NexSandglassProvider(MemoryProvider):
             stage = _current_stage()
             ent = _emotional_entropy()
             wind = _sentiment_wind()
-            ctx = session_context(5)  # V2.8.9: 关Hermes内存后扩到5轮
+            ctx = session_context(5)
 
             # 偏移方向
             dirs = {"frugal": f"省钱({off.get('offset',0):+d}%)",
@@ -179,6 +179,23 @@ class NexSandglassProvider(MemoryProvider):
 
             # 情绪
             mood = "平稳" if ent < 0.5 else ("波动" if ent < 1.0 else "高熵")
+
+            # 最近决策
+            decisions_lines = ""
+            try:
+                import json, os
+                from sandglass_paths import _NB
+                dlog = os.path.join(_NB, "persona", "decision-log.jsonl")
+                if os.path.exists(dlog):
+                    with open(dlog, "r", encoding="utf-8") as f:
+                        all_lines = f.readlines()
+                    recent = [json.loads(l) for l in all_lines[-10:]]
+                    recent = [d for d in recent if d.get("decision")]
+                    if recent:
+                        decisions_lines = "最近决策:\n" + "\n".join(
+                            f"  · {d['decision']}" for d in recent[-3:]
+                        )
+            except: pass
 
             # 待办
             tasks_block = ""
@@ -210,8 +227,9 @@ class NexSandglassProvider(MemoryProvider):
             except: pass
 
             note = f"""NexSandglass灵魂注入
-偏移: {off_d} | 情绪: {mood}
 沙漏: {total}条 | 阶段: {stage}{stage_scenes}
+偏移: {off_d} | 情绪: {mood}
+{decisions_lines}
 纪律
 {rules_lines or '未设定'}
 {tasks_block}
