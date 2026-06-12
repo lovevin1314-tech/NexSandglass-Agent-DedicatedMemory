@@ -56,15 +56,6 @@ def export_soul(output: str = "") -> str:
         with open(echo_path, "r", encoding="utf-8") as f:
             soul["echo_wind"] = f.readlines()[-20:]
 
-    # 影子沙 MBTI
-    try:
-        from shadow_sand import shadow_mbti
-        mbti = shadow_mbti()
-        if mbti:
-            soul["mbti"] = mbti
-    except Exception:
-        pass
-
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(soul, f, ensure_ascii=False, indent=2)
@@ -96,15 +87,6 @@ def merge_soul(filepath: str) -> bool:
         os.makedirs(os.path.dirname(echo_path), exist_ok=True)
         with open(echo_path, "a", encoding="utf-8") as f:
             f.writelines(soul["echo_wind"])
-
-    # 合并 MBTI（如果目标为空）
-    if soul.get("mbti"):
-        try:
-            from shadow_sand import shadow_mbti, shadow_mbti_set
-            if not shadow_mbti():
-                shadow_mbti_set(soul["mbti"])
-        except Exception:
-            pass
 
     logger.info(f"灵魂合并完成: +{len(soul.get('decisions',[]))}决策 +{len(soul.get('echo_wind',[]))}回音")
     return True
