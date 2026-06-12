@@ -180,18 +180,14 @@ class NexSandglassProvider(MemoryProvider):
             # 情绪
             mood = "平稳" if ent < 0.5 else ("波动" if ent < 1.0 else "高熵")
 
-            # 待办 + 自动感知
-            tasks = ""
+            # 待办
+            tasks_block = ""
             try:
-                from l3_tasks import task_pending, task_auto_sense
-                auto_msg = task_auto_sense()
+                from l3_tasks import task_pending
                 tp = task_pending()
-                parts = []
-                if auto_msg:
-                    parts.append(auto_msg)
                 if tp:
-                    parts.append(f"{len(tp)}项待办")
-                tasks = " | ".join(parts)
+                    tasks_lines = "\n".join(f"  {i+1}. {t['task']}" for i, t in enumerate(tp[:5]))
+                    tasks_block = "待办:\n" + tasks_lines
             except: pass
 
             # 纪律
@@ -217,7 +213,7 @@ class NexSandglassProvider(MemoryProvider):
 沙漏: {total}条 | 阶段: {stage}{stage_scenes}
 —纪律
 {rules_lines or '未设定'}
-{"待办: " + tasks if tasks else ""}
+{tasks_block}
 {ctx[:200] if ctx else ""}"""
             return note.strip()
         except Exception:
