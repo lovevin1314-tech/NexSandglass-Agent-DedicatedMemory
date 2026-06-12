@@ -135,6 +135,27 @@ _SYNONYMS = {
     "外包": ["委托", "找人", "代劳", "付费做", "服务"],
     "简单": ["容易", "轻松", "不复杂", "直接", "快"],
     "复杂": ["麻烦", "困难", "繁琐", "难搞", "折腾"],
+    # 英文通用词 (V2.6.12)
+    "encryption": ["security", "privacy", "protect", "crypto", "secure"],
+    "search": ["find", "query", "lookup", "retrieve", "locate", "seek"],
+    "memory": ["remember", "recall", "storage", "persist", "archive"],
+    "performance": ["speed", "fast", "quick", "efficient", "benchmark"],
+    "offline": ["local", "standalone", "disconnected", "no-internet"],
+    "privacy": ["private", "confidential", "secret", "encrypted", "personal"],
+    "fast": ["quick", "rapid", "speedy", "swift", "instant"],
+    "bug": ["error", "issue", "problem", "defect", "flaw", "crash"],
+    "fix": ["repair", "patch", "resolve", "correct", "solve"],
+    "design": ["architecture", "structure", "pattern", "blueprint"],
+    "agent": ["bot", "assistant", "AI", "copilot", "helper"],
+    "test": ["verify", "validate", "check", "confirm", "benchmark"],
+    "deploy": ["install", "setup", "configure", "launch", "ship"],
+    "error": ["mistake", "fault", "failure", "exception", "crash"],
+    "backup": ["copy", "snapshot", "save", "restore", "mirror"],
+    "index": ["catalog", "directory", "register", "inventory"],
+    "query": ["question", "ask", "request", "prompt", "input"],
+    "context": ["background", "environment", "setting", "scope"],
+    "history": ["past", "record", "log", "timeline", "archive"],
+    "compare": ["contrast", "diff", "versus", "match", "balance"],
 }
 
 
