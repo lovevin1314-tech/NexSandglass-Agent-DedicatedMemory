@@ -192,8 +192,8 @@ class NexSandglassProvider(MemoryProvider):
                     recent = [json.loads(l) for l in all_lines[-10:]]
                     recent = [d for d in recent if d.get("decision")]
                     if recent:
-                        decisions_lines = "最近决策:\n" + "\n".join(
-                            f"  · {d['decision']}" for d in recent[-3:]
+                        decisions_lines = "最近决策\n" + "\n".join(
+                            f"  {d['decision']}" for d in recent[-3:]
                         )
             except: pass
 
