@@ -197,7 +197,7 @@ class NexSandglassProvider(MemoryProvider):
                         break
                 anchors.reverse()
                 if anchors:
-                    ctx = "最近: " + " · ".join(anchors)
+                    ctx = "近期摘要: " + " · ".join(anchors)
             except: pass
 
             # 偏移方向
