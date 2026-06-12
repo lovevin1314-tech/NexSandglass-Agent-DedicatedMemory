@@ -98,8 +98,8 @@ class MmapFallback:
 
 # ═══════════════════ SearchRouter ═══════════════════
 class SearchRouter:
-    """搜索路由器——三级串联降级。
-    影子沙(脱口而出) → FTS5+搜索滤镜 → mmap兜底。"""
+    """搜索路由器——四级串联降级。
+    影子沙(脱口而出) → FTS5+搜索滤镜 → 语义搜索 → mmap兜底。"""
 
     def __init__(self, shadow=None, fts5=None, mmap=None):
         self.shadow = shadow or ShadowSearch()
@@ -132,7 +132,6 @@ class SearchRouter:
         # Layer 2: FTS5 + 搜索滤镜
         fts5_hits = self.fts5.search(query, max(limit * 3, 30))
         if fts5_hits:
-            # L3 搜索滤镜 — 五维权重统一排序
             try:
                 from sandglass_think import search_filter
                 filt = search_filter(query)
@@ -147,5 +146,13 @@ class SearchRouter:
             except: pass
             return [(r[0], r[1], r[2]) for r in fts5_hits[:limit]]
 
-        # Layer 3: mmap 兜底
+        # Layer 3: 语义搜索 — 同义词/SimHash/TF-IDF
+        try:
+            from sandglass_think import search_semantic
+            sem_hits = search_semantic(query, limit)
+            if sem_hits:
+                return [(r[0], r[1], r[2]) for r in sem_hits[:limit]]
+        except: pass
+
+        # Layer 4: mmap 兜底
         return self.mmapfallback.search(query, limit)
