@@ -188,7 +188,7 @@ class NexSandglassProvider(MemoryProvider):
                 if tp:
                     nums = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣"]
                     tasks_lines = "\n".join(f"{nums[i]} {t['task']}" for i, t in enumerate(tp[:5]))
-                    tasks_block = "待办:\n" + tasks_lines
+                    tasks_block = "待办\n" + tasks_lines
             except: pass
 
             # 纪律
@@ -212,7 +212,7 @@ class NexSandglassProvider(MemoryProvider):
             note = f"""NexSandglass灵魂注入
 偏移: {off_d} | 情绪: {mood}
 沙漏: {total}条 | 阶段: {stage}{stage_scenes}
-—纪律
+纪律
 {rules_lines or '未设定'}
 {tasks_block}
 {ctx[:200] if ctx else ""}"""
