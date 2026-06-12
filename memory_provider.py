@@ -193,7 +193,7 @@ class NexSandglassProvider(MemoryProvider):
                     recent = [d for d in recent if d.get("decision")]
                     if recent:
                         decisions_lines = "最近决策\n" + "\n".join(
-                            f"  {d['decision']}" for d in recent[-3:]
+                            f"  {i+1}. {d['decision']}" for i, d in enumerate(recent[-3:])
                         )
             except: pass
 
@@ -203,7 +203,7 @@ class NexSandglassProvider(MemoryProvider):
                 from l3_tasks import task_pending
                 tp = task_pending()
                 if tp:
-                    nums = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣"]
+                    nums = ["1.","2.","3.","4.","5."]
                     tasks_lines = "\n".join(f"{nums[i]} {t['task']}" for i, t in enumerate(tp[:5]))
                     tasks_block = "待办\n" + tasks_lines
             except: pass
@@ -213,7 +213,7 @@ class NexSandglassProvider(MemoryProvider):
             try:
                 rules = iron_rules()
                 if rules:
-                    nums = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣"]
+                    nums = ["1.","2.","3.","4.","5."]
                     rules_lines = "\n".join(f"{nums[i]} {r}" for i, r in enumerate(rules[:5]))
             except: pass
 
