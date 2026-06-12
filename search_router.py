@@ -271,24 +271,14 @@ class SearchRouter:
         idx_hits = fut_idx.result() or []
         tfidf_hits = fut_tfidf.result() or []
 
-        # 影子沙命中即返回（脱口而出）
+        # 影子沙结果合并进候选集（脱口而出权重高）
         if shadow_hits:
-            from shadow_sand import shadow_retrieval_bump
-            results = []
             try:
-                with open(_SANDGLASS, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
-                for score, ln in shadow_hits[:limit]:
-                    if 0 < ln <= len(lines):
-                        ts, sender, text = _parse_line(lines[ln - 1])
-                        if ts and text:
-                            results.append((ln, ts, text))
-                if results:
-                    shadow_retrieval_bump([ln for _, ln in shadow_hits[:limit]])
-                    return results
+                from shadow_sand import shadow_retrieval_bump
+                shadow_retrieval_bump([ln for _, ln in shadow_hits[:limit]])
             except: pass
 
-        # 多路融合：FTS5 + IDX + TF-IDF + 影子沙
+        # 合并去重四路候选集
         all_candidates = []
         seen = set()
         for hits in [fts5_hits, idx_hits, tfidf_hits]:
