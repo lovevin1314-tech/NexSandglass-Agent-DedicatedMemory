@@ -169,7 +169,7 @@ class NexSandglassProvider(MemoryProvider):
             stage = _current_stage()
             ent = _emotional_entropy()
             wind = _sentiment_wind()
-            ctx = session_context(3)
+            ctx = session_context(5)  # V2.8.9: 关Hermes内存后扩到5轮
 
             # 偏移方向
             dirs = {"frugal": f"省钱({off.get('offset',0):+d}%)",
