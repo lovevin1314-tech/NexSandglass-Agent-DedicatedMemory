@@ -12,6 +12,51 @@ import math
 import os
 import hashlib
 
+
+# ═══════════════════════════════════════════════════════
+# 米粒密度引擎 (Grain Density Engine) — V2.8
+# token重叠率=候选行的token∩query的token / query的token
+# 零拍参数，越用越准
+# ═══════════════════════════════════════════════════════
+
+def _detect_lang(text: str) -> str:
+    """纯文本语言检测: 'zh', 'en', 'mixed'"""
+    has_cjk = any('一' <= c <= '鿿' for c in text)
+    has_alpha = any(c.isascii() and c.isalpha() for c in text)
+    if has_cjk and has_alpha: return "mixed"
+    elif has_cjk: return "zh"
+    else: return "en"
+
+def _tokenize_for_grain(text: str) -> set:
+    """查询分词（语言感知）——维粒密度计算基础"""
+    lang = _detect_lang(text)
+    tokens = set()
+    if lang in ("zh", "mixed"):
+        # 中文2字滑窗
+        prev_cjk = None
+        for c in text:
+            if '一' <= c <= '鿿':
+                if prev_cjk:
+                    tokens.add(prev_cjk + c)
+                prev_cjk = c
+            else:
+                prev_cjk = None
+    if lang in ("en", "mixed"):
+        # 英文整词 + 2-3gram
+        for w in __import__('re').findall(r'[a-zA-Z]+', text.lower()):
+            if len(w) >= 2:
+                tokens.add(w)
+                for n in (2, 3):
+                    for i in range(len(w) - n + 1):
+                        tokens.add(w[i:i+n])
+    return tokens
+
+def grain_density(text: str, query_tokens: set) -> float:
+    """米粒密度 = token重叠数 / query token总数"""
+    if not query_tokens: return 0.0
+    hit_tokens = _tokenize_for_grain(text)
+    return len(query_tokens & hit_tokens) / len(query_tokens)
+
 # ═══════════════════════════════════════════════════════
 # SimHash 语义哈希（Google 2007，纯stdlib，零依赖）
 # 文本→128bit指纹，汉明距离越小=语义越近
