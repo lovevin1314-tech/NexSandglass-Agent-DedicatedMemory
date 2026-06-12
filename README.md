@@ -1,4 +1,4 @@
-# NexSandglass 沙漏记忆系统⏳ V2.8.7 — 统一入口 · 密度元数据 · 明文落沙
+# NexSandglass 沙漏记忆系统⏳ V2.8.8 — 统一入口 · 四路并发生效 · 明文落沙
 
 > **是记住。是理解。是懂你。是想你。**
 
@@ -397,4 +397,5 @@ V2.8.4: 版本号对齐
 V2.8.5: README去DPAPI残留—对比表×性能基准全同步 + 性能实测2.1ms
 V2.8.6: 统一搜索入口—search_semantic委托SearchRouter + density×trust+simhash公式统一 + 128-bit SimHash统一 + 删死代码
 V2.8.7: 密度元数据回归—每条搜索结果附带sand:0.XX标签
+V2.8.8: IdxSearch补__init__+sim_bonus除数64→128—四路并发在内部模块首次真正生效
 ```

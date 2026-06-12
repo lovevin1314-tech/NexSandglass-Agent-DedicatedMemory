@@ -59,7 +59,7 @@ def sand_density(candidates, query_tokens, query) -> list:
             sim_bonus = 0
         else:
             dist = bin(q_fp ^ fp).count('1')
-            sim_bonus = min(1.0 / (1 + dist / 64), 0.5)
+            sim_bonus = min(1.0 / (1 + dist / 128), 0.5)
         final = density * trust + sim_bonus
         scored.append((final, item))
     scored.sort(key=lambda x: x[0], reverse=True)
@@ -104,6 +104,11 @@ class Fts5Search:
 
 
 class IdxSearch:
+    """IDX倒排索引搜索—中文子串+英文模糊。独立可测。"""
+    def __init__(self, sandfile=None, idx_path=None):
+        self.sandfile = sandfile
+        self.idx_path = idx_path
+
     def search(self, query: str, limit: int = 30) -> list:
         try:
             from sandglass_vault import _sync_index, _query_tokens
