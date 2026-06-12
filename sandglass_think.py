@@ -514,11 +514,7 @@ def _tokenize_for_density(query: str) -> set:
                         tokens.add(w[i:i+n])
     return tokens
 
-def sand_density(text: str, query_tokens: set) -> float:
-    """沙子密度 = 文本token ∩ query token / query token"""
-    if not query_tokens: return 0.0
-    text_tokens = _tokenize_for_density(text)
-    return len(query_tokens & text_tokens) / len(query_tokens)
+from l3_search_core import sand_density
 
 def simhash_rerank(query: str, candidates: list) -> dict:
     """SimHash语义重排：对所有候选集计算汉明距离，返回{line_num: bonus}"""
