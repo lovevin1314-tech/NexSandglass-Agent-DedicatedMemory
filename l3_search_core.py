@@ -154,7 +154,8 @@ _SYNONYMS = {
     "简单": ["容易", "轻松", "不复杂", "直接", "快"],
     "复杂": ["麻烦", "困难", "繁琐", "难搞", "折腾"],
     # 英文通用词 (V2.6.12)
-    "encryption": ["security", "privacy", "protect", "crypto", "secure"],
+    "encryption": ["security", "privacy", "protect", "crypto"],
+    "security": ["encryption", "privacy", "protect", "safe"],
     "search": ["find", "query", "lookup", "retrieve", "locate", "seek"],
     "memory": ["remember", "recall", "storage", "persist", "archive"],
     "performance": ["speed", "fast", "quick", "efficient", "benchmark"],
@@ -231,6 +232,13 @@ def _synonym_expand(query: str) -> list:
             if syn.lower() not in seen:
                 keywords.append(syn)
                 seen.add(syn.lower())
+    # 英文单词匹配（2+字母）——激活英文同义词
+    for word in re.findall(r"[a-zA-Z]{2,}", query.lower()):
+        if word in _SYNONYMS:
+            for syn in _SYNONYMS[word]:
+                if syn.lower() not in seen:
+                    keywords.append(syn)
+                    seen.add(syn.lower())
     # 情绪词库互积累——先注入情绪词到同义词表，再查情绪词库
     _feed_emotion_to_synonyms()
     try:
@@ -403,7 +411,7 @@ def _feed_emotion_to_synonyms():
     try:
         from sandglass_paths import _NB
         import os, json
-        ev = os.path.join(_NB, "emotion_vocab.jsonl")
+        ev = os.path.join(_NB, "emotion_vocab.json")
         if not os.path.exists(ev):
             return
         # 读情绪词库，取频次最高的词
