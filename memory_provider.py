@@ -282,8 +282,8 @@ class NexSandglassProvider(MemoryProvider):
             total = count()
             return (
                 f"## NexSandglass 记忆\n"
-                f"当前阶段: {stage} | 沙子: {total}条 | "
-                f"偏移: {off.get('direction','?')} {off.get('offset',0):+d}%\n"
+                f"偏移: {off.get('direction','?')} {off.get('offset',0):+d}% | "
+                f"阶段: {stage} | 沙子: {total}条\n"
             )
         except Exception:
             return ""
