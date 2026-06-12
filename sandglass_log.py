@@ -96,7 +96,9 @@ def log_message(text: str, sender: str = "agent") -> bool:
         # 影子沙——落沙后同步索引（传实际行号）
         try:
             from shadow_sand import shadow_index
-            shadow_index(text, line_num=0)  # 0=让shadow_sand用trust表自增
+            # 统计实际行号 = 当前行数 + 1（刚写入的行）
+            line_num = sum(1 for _ in open(_SANDGLASS, "r", encoding="utf-8"))
+            shadow_index(text, line_num=line_num)
         except Exception as e:
             logger.error(f"影子沙索引同步失败: {e}")
 
