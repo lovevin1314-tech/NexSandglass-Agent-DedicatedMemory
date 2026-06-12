@@ -95,8 +95,8 @@ def idx_search(query: str, limit: int = 100) -> list:
             idx = _sync_index()
         if not idx:
             return []
-        from sandglass_think import _tokenize_for_grain
-        tokens = _tokenize_for_grain(query)
+        from sandglass_think import _tokenize_for_density
+        tokens = _tokenize_for_density(query)
         if not tokens:
             return []
         candidate_lines = set()
