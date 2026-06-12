@@ -193,7 +193,7 @@ class NexSandglassProvider(MemoryProvider):
                     recent = [d for d in recent if d.get("decision")]
                     if recent:
                         decisions_lines = "最近决策\n" + "\n".join(
-                            f"  {i+1}. {d['decision']}" for i, d in enumerate(recent[-3:])
+                            f"{i+1}. {d['decision']}" for i, d in enumerate(recent[-3:])
                         )
             except: pass
 
