@@ -6,12 +6,13 @@ NexSandglass SearchRouter V2.8.6 — 四路并发搜索架构（统一入口）
 V2.8.6: 统一搜索入口 — search_semantic 委托 SearchRouter
        density×trust+simhash_bonus 统一公式
        SimHash 统一为 l3_search_core 128-bit
-       分词统一为 l3_search_core._tokenize_for_density
+       密度计算与IDX/TF-IDF同源(_query_tokens)
        删除重复 _simhash / _simhash_density_decay
 """
 import os, mmap, re, concurrent.futures, math
 from sandglass_vault import _SANDGLASS, _parse_line
-from l3_search_core import simhash as _l3_simhash, _tokenize_for_density
+from l3_search_core import simhash as _l3_simhash
+from sandglass_vault import _query_tokens
 
 
 def _detect_lang(text: str) -> str:
@@ -49,7 +50,7 @@ def sand_density(candidates, query_tokens, query) -> list:
     for item in candidates:
         ln = item[0]
         text = item[2] if len(item) > 2 else ""
-        text_tokens = _tokenize_for_density(text)
+        text_tokens = _query_tokens(text)
         matched = len(query_tokens & text_tokens)
         density = matched / max(len(query_tokens), 1)
         trust = trust_scores.get(ln, 0.5)
@@ -256,7 +257,7 @@ class SearchRouter:
                         seen.add(ln)
                         all_candidates.append((ln, ts, text))
         if all_candidates:
-            tokens = _tokenize_for_density(query)
+            tokens = _query_tokens(query)
             ranked = sand_density(all_candidates, tokens, query)
             ranked = simhash_rerank(ranked, query)
             ranked = dynamic_expand(ranked, tokens, limit)
