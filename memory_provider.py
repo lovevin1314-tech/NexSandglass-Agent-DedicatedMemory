@@ -186,7 +186,8 @@ class NexSandglassProvider(MemoryProvider):
                 from l3_tasks import task_pending
                 tp = task_pending()
                 if tp:
-                    tasks_lines = "\n".join(f"  {i+1}. {t['task']}" for i, t in enumerate(tp[:5]))
+                    nums = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣"]
+                    tasks_lines = "\n".join(f"{nums[i]} {t['task']}" for i, t in enumerate(tp[:5]))
                     tasks_block = "待办:\n" + tasks_lines
             except: pass
 
