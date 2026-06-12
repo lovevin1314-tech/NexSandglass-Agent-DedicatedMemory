@@ -178,7 +178,7 @@ class NexSandglassProvider(MemoryProvider):
                     all_lines = f.readlines()
                 # 提取最近用户消息作为话题锚点
                 user_msgs = []
-                for line in all_lines[-80:]:
+                for line in all_lines[-150:]:
                     if " | user | " in line:
                         parts = line.strip().split(" | ", 2)
                         if len(parts) >= 3:
@@ -193,7 +193,7 @@ class NexSandglassProvider(MemoryProvider):
                     if m not in seen and len(m) >= 2:
                         seen.add(m)
                         anchors.append(m)
-                    if len(anchors) >= 15:
+                    if len(anchors) >= 25:
                         break
                 anchors.reverse()
                 if anchors:
@@ -262,7 +262,7 @@ class NexSandglassProvider(MemoryProvider):
 纪律
 {rules_lines or '未设定'}
 {tasks_block}
-{ctx[:200] if ctx else ""}"""
+{ctx[:500] if ctx else ""}"""
             return note.strip()
         except Exception:
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
