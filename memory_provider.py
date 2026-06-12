@@ -157,7 +157,7 @@ class NexSandglassProvider(MemoryProvider):
             logger.info("NexSandglass MemoryProvider initialized")
 
     def system_prompt_block(self) -> str:
-        """递给LLM的纸条——灵魂注入：阶段+偏移+纪律。V2.1.14精简。"""
+        """V2.8.9: 灵魂注入——偏移→情绪→待办→上下文→纪律。删MBTI，按优先级重排。"""
         try:
             from sandglass_vault import count
             from sandglass_think import comprehensive_offset, _current_stage, task_pending
@@ -169,14 +169,7 @@ class NexSandglassProvider(MemoryProvider):
             stage = _current_stage()
             ent = _emotional_entropy()
             wind = _sentiment_wind()
-            ctx = session_context(3)  # 最近3轮上下文
-
-            # MBTI（影子沙，会变）
-            mbti = ""
-            try:
-                from shadow_sand import shadow_mbti
-                mbti = shadow_mbti()
-            except: pass
+            ctx = session_context(3)
 
             # 偏移方向
             dirs = {"frugal": f"省钱({off.get('offset',0):+d}%)",
@@ -204,11 +197,10 @@ class NexSandglassProvider(MemoryProvider):
             except: pass
 
             note = f"""NexSandglass灵魂注入
+偏移: {off_d} | 情绪: {mood}{" | 待办: " + tasks if tasks else ""}
 沙漏: {total}条 | 阶段: {stage}
-偏移: {off_d} | 情绪: {mood}
-{"待办: " + tasks if tasks else ""}
 {ctx[:200] if ctx else ""}
-{mbti and 'MBTI: ' + mbti + chr(10) or ''}—纪律
+—纪律
 {rules_lines or '未设定'}"""
             return note.strip()
         except Exception:
