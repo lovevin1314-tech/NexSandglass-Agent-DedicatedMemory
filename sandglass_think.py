@@ -483,66 +483,186 @@ def search_with_stage_label(query: str, limit: int = 5) -> list:
         })
     return labeled
 
+
+# ═══════════════════ V2.8 四路并发搜索引擎 ═══════════════════
+
+def _detect_lang(query: str) -> str:
+    """纯文本语言检测：'zh', 'en', 'mixed'"""
+    has_cjk = any('一' <= c <= '鿿' for c in query)
+    has_alpha = any(c.isascii() and c.isalpha() for c in query)
+    if has_cjk and has_alpha: return "mixed"
+    elif has_cjk: return "zh"
+    else: return "en"
+
+def _tokenize_for_grain(query: str) -> set:
+    """查询分词（语言感知）：中文2字滑窗+英文2-3gram"""
+    lang = _detect_lang(query)
+    tokens = set()
+    if lang in ("zh", "mixed"):
+        prev_cjk = None
+        for c in query:
+            if '一' <= c <= '鿿':
+                if prev_cjk: tokens.add(prev_cjk + c)
+                prev_cjk = c
+            else: prev_cjk = None
+    if lang in ("en", "mixed"):
+        for w in __import__('re').findall(r'[a-zA-Z]+', query.lower()):
+            if len(w) >= 2:
+                tokens.add(w)
+                for n in (2, 3):
+                    for i in range(len(w) - n + 1):
+                        tokens.add(w[i:i+n])
+    return tokens
+
+def grain_density(text: str, query_tokens: set) -> float:
+    """米粒密度 = 文本token ∩ query token / query token"""
+    if not query_tokens: return 0.0
+    text_tokens = _tokenize_for_grain(text)
+    return len(query_tokens & text_tokens) / len(query_tokens)
+
+def simhash_rerank(query: str, candidates: list) -> dict:
+    """SimHash语义重排：对所有候选集计算汉明距离，返回{line_num: bonus}"""
+    try:
+        from l3_search_core import simhash, _hamming
+        q_fp = simhash(query)
+        if q_fp == -1: return {}
+        scores = {}
+        for ln, ts, text in candidates:
+            d_fp = simhash(text[:500])
+            if d_fp == -1: continue
+            dist = _hamming(q_fp, d_fp)
+            if dist <= 55:
+                scores[ln] = max(0, (55 - dist) / 55 * 0.5)
+        return scores
+    except: return {}
+
+def dynamic_expand(hit_line: int, query_tokens: set, all_lines: list, max_ctx: int = 15, threshold: float = 0.2):
+    """米粒密度衰减扩窗：遇到密度断崖就停"""
+    start, end = hit_line, hit_line
+    for i in range(hit_line - 1, max(0, hit_line - max_ctx), -1):
+        _, _, text = __import__('sandglass_vault')._parse_line(all_lines[i]) if callable(getattr(__import__('sandglass_vault'), '_parse_line', None)) else (None, None, all_lines[i])
+        if text and grain_density(text, query_tokens) >= threshold: start = i
+        else: break
+    for i in range(hit_line + 1, min(len(all_lines), hit_line + max_ctx)):
+        _, _, text = __import__('sandglass_vault')._parse_line(all_lines[i]) if callable(getattr(__import__('sandglass_vault'), '_parse_line', None)) else (None, None, all_lines[i])
+        if text and grain_density(text, query_tokens) >= threshold: end = i
+        else: break
+    return all_lines[start:end+1]
 def search_semantic(query: str, limit: int = 10) -> list:
+    """V2.8: 四路并发搜索 + 米粒密度Rerank + SimHash语义重排"""
     from sandglass_vault import search as vs
 
-    # 获取搜索滤镜（含5维权重+上下文扩展关键词）
-    weights = {}
-    expanded = []
-    try:
-        filt = search_filter(query)
-        weights = filt.get("weights", {})
-        # 用 search_filter 的关键词（同源，确保与 weights 键对齐）
-        if filt.get("source", "").startswith("LLM") and len(filt.get("keywords", [])) > 1:
-            expanded = filt["keywords"]
-    except Exception:
-        pass
+    # Step 1: 四维感知关键词扩展 + 语言检测
+    filt = {}
+    try: filt = search_filter(query)
+    except Exception: pass
+    expanded = filt.get("keywords", [query])
 
-    # 1级：search_filter 的 LLM 扩展（关键词与权重同源）
-    if expanded and len(expanded) > 1:
-        results = _search_with_fallback(expanded, vs, limit * 2, weights)
-        if results:
-            return sentiment_rerank(results[:limit], _sentiment_wind())
+    # Step 2: 四路并发搜索
+    import concurrent.futures
+    results_all = {}
+    
+    def _fts5_search():
+        try:
+            from sandglass_sqlite import search as fts5, sync_incremental
+            sync_incremental()
+            return [(r[0], r[1], r[2]) for r in fts5(query, limit * 3)]
+        except: return []
+    
+    def _idx_search():
+        try:
+            from sandglass_vault import _sync_index, _query_tokens, _parse_line
+            idx = _sync_index()
+            if not idx: return []
+            tokens = _query_tokens(query)
+            line_nums = set()
+            for tok in tokens:
+                if tok in idx: line_nums.update(idx[tok])
+            if not line_nums: return []
+            results = []
+            with open(__import__('sandglass_vault')._SANDGLASS, "r", encoding="utf-8") as f:
+                for n, line in enumerate(f, 1):
+                    if n in line_nums:
+                        ts, _, text = _parse_line(line)
+                        if ts and text: results.append((n, ts, text))
+                        if len(results) >= 50: break
+            return results
+        except: return []
+    
+    def _tfidf_search():
+        try: return [(ln, "", text) for ln, text, _ in _tfidf_search_inner(query, limit * 3)]
+        except: return []
+    
+    def _shadow_search():
+        try:
+            from shadow_sand import shadow_search as sh_search
+            from sandglass_vault import _parse_line
+            hits = sh_search(query, limit * 3)
+            if not hits: return []
+            results = []
+            sg = __import__('sandglass_vault')._SANDGLASS
+            with open(sg, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            for score, ln in hits:
+                if 0 < ln <= len(lines):
+                    ts, _, text = _parse_line(lines[ln-1])
+                    if ts and text: results.append((ln, ts, text))
+            return results
+        except: return []
 
-    # 2级：同义词扩展
-    expanded = _synonym_expand(query)
-    if len(expanded) > 1:
-        results = _search_with_fallback(expanded, vs, limit * 2, weights)
-        if results:
-            return sentiment_rerank(results[:limit], _sentiment_wind())
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        futures = {
+            ex.submit(_fts5_search): "fts5",
+            ex.submit(_idx_search): "idx",
+            ex.submit(_tfidf_search): "tfidf",
+            ex.submit(_shadow_search): "shadow",
+        }
+        for fut in concurrent.futures.as_completed(futures):
+            try: results_all[futures[fut]] = fut.result()
+            except: pass
 
-    # 2.5级：SimHash语义搜索（V2.0.1，零依赖纯本地）
-    try:
-        from l3_search_core import simhash_search
-        from sandglass_vault import recent
-        wide = [(ln, ts, text) for ln, ts, text in recent(500)]
-        if wide:
-            semantic = simhash_search(query, wide, limit=limit * 2)
-            if semantic:
-                results = [(ln, ts, text, "simhash") for ln, ts, text in semantic]
-                return sentiment_rerank(results[:limit], _sentiment_wind())
-    except Exception:
-        pass
+    # Step 3: 合并去重候选集
+    seen, candidates = set(), []
+    for src in ["shadow", "fts5", "idx", "tfidf"]:
+        for item in results_all.get(src, []):
+            ln = item[0]
+            if ln not in seen:
+                seen.add(ln)
+                candidates.append(item)
+                if len(candidates) >= limit * 5: break
+        if len(candidates) >= limit * 5: break
 
-    # 3级：TF-IDF 余弦相似度
-    tfidf = _tfidf_search(query, limit)
-    if tfidf:
-        results = [(ln, "", text, f"tfidf:{sim}") for ln, text, sim in tfidf]
-        return sentiment_rerank(results[:limit], _sentiment_wind())
+    if not candidates:
+        # mmap兜底
+        try:
+            from sandglass_vault import _legacy_search
+            return _legacy_search(query, limit, "")
+        except: return []
 
-    # 影子沙信任分加权兜底
+    # Step 4: SimHash语义重排
+    simhash_scores = simhash_rerank(query, candidates)
+
+    # Step 5: 米粒密度 × 信任分 + SimHash加分
+    query_tokens = _tokenize_for_grain(query)
     from shadow_sand import shadow_boost
-    recent = vs(query, limit=20)
-    if recent:
-        line_nums = {ln for ln, _, _ in recent}
-        boosted = shadow_boost(line_nums, limit=limit)
-        if boosted:
-            line_map = {ln: (ts, txt) for ln, ts, txt in recent}
-            results = [(ln, line_map.get(ln, ("", ""))[0], line_map.get(ln, ("", ""))[1], f"trust:{score:.2f}") 
-                       for score, ln in boosted if ln in line_map]
-            return sentiment_rerank(results[:limit], _sentiment_wind())
+    line_nums = {ln for ln, _, _ in candidates}
+    trust_scores = {}
+    try:
+        boosted = shadow_boost(line_nums, limit=len(candidates))
+        trust_scores = {ln: score for score, ln in boosted}
+    except: pass
 
-    return []
+    scored = []
+    for ln, ts, text in candidates:
+        density = grain_density(text, query_tokens)
+        trust = trust_scores.get(ln, 0.5)
+        sim_bonus = simhash_scores.get(ln, 0)
+        final = density * trust + sim_bonus
+        scored.append((final, ln, ts, text))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    results = [(ln, ts, text, f"grain:{grain_density(text,query_tokens):.2f}") for _, ln, ts, text in scored[:limit]]
+    return sentiment_rerank(results, _sentiment_wind())
 
 def _llm_expand(query: str) -> list:
     """LLM 语义扩展----把用户查询扩展为多个相关关键词。
