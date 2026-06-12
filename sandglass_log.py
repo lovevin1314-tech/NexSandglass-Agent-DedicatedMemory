@@ -93,12 +93,10 @@ def log_message(text: str, sender: str = "agent") -> bool:
                 except Exception as e:
                     logger.warning(f"锁文件二次删除也失败: {e}")
 
-        # 影子沙——落沙后同步索引（传实际行号）
+        # 影子沙——落沙后同步索引
         try:
             from shadow_sand import shadow_index
-            # 统计实际行号 = 当前行数 + 1（刚写入的行）
-            line_num = sum(1 for _ in open(_SANDGLASS, "r", encoding="utf-8"))
-            shadow_index(text, line_num=line_num)
+            shadow_index(text, line_num=0)  # 0=让shadow_sand用trust表自增
         except Exception as e:
             logger.error(f"影子沙索引同步失败: {e}")
 
