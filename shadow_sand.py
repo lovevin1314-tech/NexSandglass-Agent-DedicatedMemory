@@ -75,7 +75,6 @@ def _get_conn():
     global _conn
     if _conn is None:
         _conn = sqlite3.connect(_SHADOW_DB, check_same_thread=False)
-        _conn.execute("PRAGMA journal_mode=WAL")
         _conn.executescript(_SCHEMA)
         _conn.commit()
     return _conn
