@@ -260,14 +260,14 @@ class NexSandglassProvider(MemoryProvider):
             except: pass
 
             note = f"""NexSandglass灵魂注入
-沙漏: {total}条 | 阶段: {stage}{stage_scenes}
 偏移: {off_d} | 情绪: {mood}
 {decisions_lines}
 纪律
 {rules_lines or '未设定'}
 {tasks_block}
 {doing_lines}
-{ctx[:500] if ctx else ""}"""
+{ctx[:500] if ctx else ""}
+沙漏: {total}条 | 阶段: {stage}{stage_scenes}"""
             return note.strip()
         except Exception:
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
