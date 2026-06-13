@@ -329,19 +329,14 @@ def weave_output(query: str = "", limit: int = 5) -> dict:
             insight = weave_insight(query)
             if insight and insight.get("synthesis"):
                 result["insight"] = insight["synthesis"][:300]
-                if insight.get("keywords"):
-                    result["keywords"].extend(insight["keywords"][:5])
     except Exception:
         pass
     
     # 2. 矛盾检测
     try:
         contra = weave_contradiction()
-        if contra and contra.get("contradictions"):
-            result["contradictions"] = contra["contradictions"][:3]
-            for c in result["contradictions"]:
-                if isinstance(c, dict) and c.get("keywords"):
-                    result["keywords"].extend(c["keywords"][:3])
+        if contra and contra.get("conflicts"):
+            result["contradictions"] = contra["conflicts"][:3]
     except Exception:
         pass
     
