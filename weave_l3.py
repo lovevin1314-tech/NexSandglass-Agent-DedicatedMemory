@@ -383,7 +383,7 @@ def weave_search_filter(query: str = "") -> str:
     lines = []
     
     if w["insight"]:
-        lines.append(f"因果: {w['insight'][:120]}")
+        lines.append(f"状态: {w['insight'][:120]}")
     if w["contradictions"]:
         for c in w["contradictions"][:2]:
             if isinstance(c, dict) and c.get("text"):
@@ -394,8 +394,5 @@ def weave_search_filter(query: str = "") -> str:
         lines.append(w["emotion_note"])
     if w["scene_context"]:
         lines.append(f"场景: {w['scene_context']}")
-    if w["keywords"]:
-        lines.append("关键词: " + " · ".join(w["keywords"][:8]))
     
-    header = "织布机输出"
-    return header + "\n" + "\n".join(lines) if lines else ""
+    return "\n".join(lines) if lines else ""
