@@ -96,9 +96,17 @@ def log_message(text: str, sender: str = "agent") -> bool:
         # 影子沙——落沙后同步索引
         try:
             from shadow_sand import shadow_index
-            shadow_index(text, line_num=0)  # 0=让shadow_sand用trust表自增
+            shadow_index(text, line_num=0)
         except Exception as e:
             logger.warning(f"影子沙索引同步跳过(锁冲突): {e}")
+
+        # 知识图谱——落沙后提取三元组 (V2.9.3-dev)
+        if sender == "user":
+            try:
+                from weavethread import wthread_store
+                wthread_store(text, line_num=0)
+            except Exception:
+                pass
 
         return True
     except Exception as e:

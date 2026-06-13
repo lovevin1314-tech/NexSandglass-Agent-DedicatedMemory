@@ -382,3 +382,170 @@ def timeline(query: str) -> dict:
     except Exception:
         logger.warning("sandglass: timeline(%r) failed", query, exc_info=True)
         return {}
+
+# ═══════════════════════════════════════════════
+# 沙漏导入/合并 —— V2.9.3-dev
+# ═══════════════════════════════════════════════
+
+def sandglass_import(source_path: str, source_format: str = "sandglass") -> dict:
+    """导入外部对话记录到沙漏。支持格式:
+    - sandglass: 同格式沙漏导出 (时间戳 | 发送者 | 文本)
+    - chatgpt: ChatGPT JSON 导出
+    - claude: Claude 对话 JSON 导出
+    - plain: 纯文本，每行一条
+    
+    返回 {imported: N, skipped: N, total: N}
+    """
+    imported = 0
+    skipped = 0
+    
+    try:
+        if source_format == "sandglass":
+            imported, skipped = _import_sandglass(source_path)
+        elif source_format in ("chatgpt", "claude"):
+            imported, skipped = _import_json_convo(source_path, source_format)
+        elif source_format == "plain":
+            imported, skipped = _import_plain(source_path)
+        else:
+            return {"error": f"不支持格式: {source_format}"}
+        
+        # 导入后重建索引
+        try:
+            from sandglass_sqlite import sync_incremental
+            sync_incremental()
+        except: pass
+        
+        return {"imported": imported, "skipped": skipped, "total": imported + skipped}
+    except Exception as e:
+        logger.error(f"导入失败: {e}")
+        return {"error": str(e), "imported": imported, "skipped": skipped}
+
+
+
+
+def sandglass_export(output_path: str = None, limit: int = None, month: str = "") -> str:
+    """导出沙漏为可迁移文件。默认导出全部。
+    返回导出文件路径。
+    """
+    if output_path is None:
+        from sandglass_paths import _NB
+        output_path = os.path.join(_NB, "sandglass_export.txt")
+    
+    lines = []
+    if os.path.exists(_SANDGLASS):
+        with open(_SANDGLASS, "r", encoding="utf-8") as src:
+            for line in src:
+                if month and not line.startswith(month[:7]):
+                    continue
+                lines.append(line)
+                if limit and len(lines) >= limit:
+                    break
+        
+        # 取最后 limit 条（从全量读取后截断）
+        if limit and len(lines) > limit:
+            lines = lines[-limit:]
+    
+    with open(output_path, "w", encoding="utf-8") as dst:
+        dst.writelines(lines)
+    
+    return output_path
+
+def _import_sandglass(source_path: str) -> tuple:
+    """导入同格式沙漏——按行号去重"""
+    # 读已有沙漏的时间戳集合
+    existing_ts = set()
+    if os.path.exists(_SANDGLASS):
+        with open(_SANDGLASS, "r", encoding="utf-8") as f:
+            for line in f:
+                if " | " in line:
+                    ts = line.split(" | ")[0].strip()
+                    existing_ts.add(ts)
+    
+    imported = 0
+    skipped = 0
+    with open(source_path, "r", encoding="utf-8") as src:
+        for line in src:
+            line = line.strip()
+            if not line or not line.startswith("20"):  # 跳过非时间戳行
+                continue
+            if " | " not in line:
+                continue
+            ts = line.split(" | ")[0].strip()
+            if ts in existing_ts:
+                skipped += 1
+                continue
+            
+            # 追加到沙漏
+            try:
+                import sandglass_log
+                parts = line.split(" | ", 2)
+                if len(parts) >= 3:
+                    sender = parts[1].strip()
+                    text = parts[2].strip()
+                    sandglass_log.log_message(text, sender)
+                    existing_ts.add(ts)
+                    imported += 1
+            except Exception:
+                skipped += 1
+    
+    return imported, skipped
+
+
+def _import_json_convo(source_path: str, fmt: str) -> tuple:
+    """导入 ChatGPT/Claude JSON 导出"""
+    import json
+    with open(source_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    imported = 0
+    skipped = 0
+    
+    # ChatGPT 格式: [{"mapping": {...}}, ...]
+    # Claude 格式: [{"chat_messages": [...]}, ...]
+    messages = []
+    if fmt == "chatgpt":
+        for conv in (data if isinstance(data, list) else [data]):
+            mapping = conv.get("mapping", {})
+            for mid, node in sorted(mapping.items(), key=lambda x: x[1].get("create_time", 0) if x[1] else 0):
+                if node and node.get("message"):
+                    msg = node["message"]
+                    role = msg.get("author", {}).get("role", "user")
+                    content = "".join(p for p in (msg.get("content", {}).get("parts", []) if isinstance(msg.get("content"), dict) else []) if isinstance(p, str))
+                    if content:
+                        messages.append((role, content))
+    elif fmt == "claude":
+        for conv in (data if isinstance(data, list) else [data]):
+            for msg in conv.get("chat_messages", []):
+                role = msg.get("sender", "user")
+                content = msg.get("text", "")
+                if content:
+                    messages.append((role, content))
+    
+    for role, text in messages:
+        try:
+            import sandglass_log
+            sender = "user" if role in ("user", "human") else "agent"
+            sandglass_log.log_message(text, sender)
+            imported += 1
+        except Exception:
+            skipped += 1
+    
+    return imported, skipped
+
+
+def _import_plain(source_path: str) -> tuple:
+    """导入纯文本——每行一条用户消息"""
+    imported = 0
+    skipped = 0
+    with open(source_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                import sandglass_log
+                sandglass_log.log_message(line, "user")
+                imported += 1
+            except Exception:
+                skipped += 1
+    return imported, skipped
