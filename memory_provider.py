@@ -249,7 +249,7 @@ class NexSandglassProvider(MemoryProvider):
                 if tp:
                     nums = ["1.","2.","3.","4.","5."]
                     tasks_lines = "\n".join(f"{nums[i]} {t['task']}" for i, t in enumerate(tp[:5]))
-                    tasks_block = "待办\n" + tasks_lines
+                    tasks_block = "待办\n" + tasks_lines + "\n" + "\n"
             except: pass
 
             # 织布机搜索滤镜 — V2.9.5: 因果+矛盾+场景+偏移+情绪统一
@@ -268,9 +268,9 @@ class NexSandglassProvider(MemoryProvider):
                 if rules:
                     # 有计数的显示「×N」，全0的只显示规则文本
                     if any(c > 0 for _, c in rules):
-                        rules_lines = "\n".join(f"{r}  ×{c}" for r, c in rules)
+                        rules_lines = "\n".join(f"{i+1}. {r}  ×{c}" for i, (r, c) in enumerate(rules))
                     else:
-                        rules_lines = "\n".join(r for r, _ in rules)
+                        rules_lines = "\n".join(f"{i+1}. {r}" for i, (r, _) in enumerate(rules))
             except: pass
 
             # 阶段 + 场景语义
@@ -289,29 +289,27 @@ class NexSandglassProvider(MemoryProvider):
             note = f"""NexSandglass灵魂注入
 纪律
 {rules_lines or '尚无纪律——可询问主人是否要设定铁律(如"永远说实话""优先本地方案"等)'}
+{weave_block}
 偏移: {off_d} | 情绪: {mood}
 {decisions_lines}
-{ctx[:200] if ctx else ""}
-{tasks_block}
-{weave_block}
-{doing_lines}
+{tasks_block}{doing_lines}
 阶段: {stage}{stage_scenes} | 沙漏: {total}条"""
             return note.strip()
         except Exception:
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
 
     def prefetch(self, query: str) -> str:
-        """每轮对话前注入当前阶段+偏移趋势（方案C：智能上下文感知）。"""
+        """每轮对话前注入织布机摘要——偏移+情绪+场景。主注入已有全貌，这里只给最动态的信号。"""
         try:
-            from sandglass_think import comprehensive_offset, _current_stage
-            from sandglass_vault import count
-            stage = _current_stage()
+            from sandglass_think import comprehensive_offset, _current_stage, _emotional_entropy
             off = comprehensive_offset()
-            total = count()
+            ent = _emotional_entropy()
+            mood = "平稳" if ent < 0.5 else ("波动" if ent < 1.0 else "高熵")
+            dirs = {"frugal": "省钱", "spend": "愿投", "drift": "放弃"}
+            off_d = dirs.get(off.get('direction',''), '平稳')
             return (
-                f"## NexSandglass 记忆\n"
-                f"偏移: {off.get('direction','?')} {off.get('offset',0):+d}% | "
-                f"阶段: {stage} | 沙子: {total}条\n"
+                f"## 当前\n"
+                f"偏移: {off_d}({off.get('offset',0):+d}%) | 情绪: {mood}\n"
             )
         except Exception:
             return ""
