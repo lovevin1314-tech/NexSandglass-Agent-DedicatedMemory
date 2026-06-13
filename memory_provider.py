@@ -157,67 +157,67 @@ class NexSandglassProvider(MemoryProvider):
             logger.info("NexSandglass MemoryProvider initialized")
 
     def system_prompt_block(self) -> str:
-        """V2.9.0: 灵魂注入——沙漏→偏移+情绪→最近决策→纪律→待办→上下文。"""
+        """V2.9.8: 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完"""
         try:
             from sandglass_vault import count
-            from sandglass_think import comprehensive_offset, _current_stage, task_pending
-            from sandglass_think import _emotional_entropy, _sentiment_wind
-            from discipline import iron_rules_with_counts
-            from sandglass_think import session_context
+            from sandglass_think import comprehensive_offset, _current_stage
+            from sandglass_think import _emotional_entropy, search_filter
 
             total = count()
             off = comprehensive_offset()
             stage = _current_stage()
             ent = _emotional_entropy()
-            wind = _sentiment_wind()
-            # 最近对话锚点（关键词摘要——LLM可据此调sandglass_search查全文）
-            ctx = ""
-            try:
-                import re
-                from sandglass_paths import _SANDGLASS
-                with open(_SANDGLASS, "r", encoding="utf-8") as f:
-                    all_lines = f.readlines()
-                # 提取最近用户消息作为话题锚点
-                user_msgs = []
-                for line in all_lines[-150:]:
-                    if " | user | " in line:
-                        parts = line.strip().split(" | ", 2)
-                        if len(parts) >= 3:
-                            msg = parts[2].strip()
-                            # 过滤测试数据
-                            if re.match(r'^(perf_|_linealign|_signal_|V\d+|_speed_|_perf_|_audit_|_test_|_bench_|_fix_|_v\d|_diag|_cleanup|_p\d|bench_|bench-|\d+$|\[L0-auto\]|第\d+条|第\d+行|AR测试|CR测试)', msg):
-                                continue
-                            if '测试' in msg[:10] and len(msg) < 20:
-                                continue
-                            if len(msg) < 4:
-                                continue
-                            user_msgs.append(msg[:40])  # 截断长消息
-                # 去重取最近5条
-                seen = set()
-                anchors = []
-                for m in reversed(user_msgs):
-                    if m not in seen and len(m) >= 2:
-                        seen.add(m)
-                        anchors.append(m)
-                    if len(anchors) >= 20:
-                        break
-                anchors.reverse()
-                if anchors:
-                    ctx = ""
-            except Exception:
-                logger.debug("锚点提取失败", exc_info=True)
-
-            # 偏移方向
-            dirs = {"frugal": f"省钱({off.get('offset',0):+d}%)",
-                    "spend": f"愿投({off.get('offset',0):+d}%)",
-                    "drift": f"放弃({off.get('offset',0):+d}%)"}
-            off_d = dirs.get(off.get('direction', ''), '平稳')
-
-            # 情绪
             mood = "平稳" if ent < 0.5 else ("波动" if ent < 1.0 else "高熵")
 
+            # 偏移方向
+            dirs = {"frugal": "省钱", "spend": "愿投", "drift": "放弃"}
+            off_label = dirs.get(off.get('direction', ''), '平稳')
+            off_pct = off.get('offset', 0)
+
+            blocks = []
+
+            # ═══════ 第一层：你是谁 ═══════
+            persona_text = ""
+            scene_text = ""
+            try:
+                sf = search_filter("")
+                if sf.get("persona_context"):
+                    # 取前200字，截到完整句号
+                    raw = sf["persona_context"][:200]
+                    cut = raw.rfind("。")
+                    persona_text = raw[:cut+1] if cut > 50 else raw[:200]
+                if sf.get("scene_context"):
+                    scene_text = sf["scene_context"]
+            except Exception:
+                logger.debug("search_filter 失败", exc_info=True)
+
+            # fallback: scene_current
+            if not scene_text:
+                try:
+                    from scene_l3 import scene_current
+                    scenes = scene_current()
+                    if scenes:
+                        scene_text = f"当前场景：{'、'.join(scenes[:3])}"
+                except Exception:
+                    pass
+
+            if persona_text or scene_text:
+                layer1 = ["【你是谁】"]
+                if persona_text:
+                    layer1.append(persona_text)
+                if scene_text:
+                    layer1.append(f"📍 {scene_text}")
+                blocks.append("\n".join(layer1))
+
+            # ═══════ 第二层：你在往哪走 ═══════
+            layer2 = ["【你在往哪走】"]
+            if off_label != "平稳":
+                layer2.append(f"💰 {off_label}倾向({off_pct:+d}%)")
+            else:
+                layer2.append(f"💰 决策平稳")
+
             # 最近决策
-            decisions_lines = ""
+            decisions = []
             try:
                 import json, os
                 from sandglass_paths import _NB
@@ -227,89 +227,92 @@ class NexSandglassProvider(MemoryProvider):
                         all_lines = f.readlines()
                     recent = [json.loads(l) for l in all_lines[-10:]]
                     recent = [d for d in recent if d.get("decision")]
-                    # 去重 + 取最后3条
-                    seen, unique = set(), []
+                    seen_d, unique_d = set(), []
                     for d in reversed(recent):
-                        if d["decision"] not in seen:
-                            seen.add(d["decision"])
-                            unique.append(d)
-                        if len(unique) >= 3:
+                        if d["decision"] not in seen_d:
+                            seen_d.add(d["decision"])
+                            unique_d.append(d)
+                        if len(unique_d) >= 2:
                             break
-                    unique.reverse()
-                    if unique:
-                        decisions_lines = "最近决策\n" + "\n".join(
-                            f"{i+1}. {d['decision'][:60]}" for i, d in enumerate(unique[:2])
-                        )
-            except: pass
-
-            # 待办
-            tasks_block = ""
-            try:
-                from l3_tasks import task_pending
-                tp = task_pending()
-                if tp:
-                    nums = ["1.","2.","3.","4.","5."]
-                    tasks_lines = "\n".join(f"{nums[i]} {t['task']}" for i, t in enumerate(tp[:5]))
-                    tasks_block = "待办\n" + tasks_lines + "\n" + "\n"
+                    unique_d.reverse()
+                    decisions = [d['decision'][:60] for d in unique_d]
             except Exception:
-                logger.debug("待办提取失败", exc_info=True)
+                pass
+            if decisions:
+                layer2.append(f"📋 最近：{'；'.join(decisions)}")
 
-            # 织布机搜索滤镜 — V2.9.5: 因果+矛盾+场景+偏移+情绪统一
-            weave_block = ""
+            # 矛盾检测
             try:
-                from weave_l3 import weave_search_filter
-                weave_block = weave_search_filter(stage)
+                from weave_l3 import weave_contradiction
+                contra = weave_contradiction()
+                if contra.get("conflicts"):
+                    c0 = contra["conflicts"][0]
+                    if c0.get("conflict"):
+                        layer2.append(f"⚠️ {c0['conflict'][:100]}")
             except Exception:
-                logger.warning("织布机搜索滤镜失败", exc_info=True)
+                logger.debug("矛盾检测失败", exc_info=True)
 
-            # V2.9.7 织线摘要注入（数据门控：<20条三元组不注入）
-            thread_block = ""
+            if mood != "平稳":
+                layer2.append(f"🎭 情绪：{mood}")
+
+            blocks.append("\n".join(layer2))
+
+            # ═══════ 第三层：你怎么变成这样 ═══════
             try:
                 from weavethread import wthread_stats, wthread_weave
                 stats = wthread_stats()
                 if stats["total_triples"] >= 20:
-                    thread_block = wthread_weave(limit=3)
+                    thread = wthread_weave(limit=3)
+                    if thread and thread != "织线因果:":
+                        blocks.append(f"【你怎么变成这样】\n{thread[:200]}")
             except Exception:
-                logger.debug("织线摘要注入失败(可能三元组不足)", exc_info=True)
+                logger.debug("织线失败", exc_info=True)
 
+            # ═══════ 第四层：还没做完 ═══════
+            layer4 = []
 
-
-            # 纪律（按提醒次数排序，最多3条）
-            rules_lines = ""
+            # 待办
+            tasks = []
             try:
-                rules = iron_rules_with_counts(3)
-                if rules:
-                    # 有计数的显示「×N」，全0的只显示规则文本
-                    if any(c > 0 for _, c in rules):
-                        rules_lines = "\n".join(f"{i+1}. {r}  ×{c}" for i, (r, c) in enumerate(rules))
+                from l3_tasks import task_pending
+                tp = task_pending()
+                if tp:
+                    tasks = [t['task'][:80] for t in tp[:3]]
+            except Exception:
+                pass
+
+            # 纪律
+            rules = []
+            try:
+                from discipline import iron_rules_with_counts
+                raw_rules = iron_rules_with_counts(3)
+                if raw_rules:
+                    if any(c > 0 for _, c in raw_rules):
+                        rules = [f"{r} ×{c}" for r, c in raw_rules]
                     else:
-                        rules_lines = "\n".join(f"{i+1}. {r}" for i, (r, _) in enumerate(rules))
-            except: pass
+                        rules = [r for r, _ in raw_rules]
+            except Exception:
+                pass
 
-            # 阶段 + 场景语义
-            stage_scenes = ""
-            doing_lines = ""
-            try:
-                from scene_l3 import scene_current
-                scenes = scene_current()
-                if scenes:
-                    stage_scenes = " → " + "、".join(scenes[:3])
-                    doing_lines = "最近在做\n" + "\n".join(
-                        f"{i+1}. {s}" for i, s in enumerate(scenes[:3])
-                    )
-            except: pass
+            if tasks or rules:
+                header = "【还没做完】"
+                if tasks:
+                    layer4.append(header)
+                    layer4.append("待办：")
+                    layer4.extend(f"  {i+1}. {t}" for i, t in enumerate(tasks))
+                if rules:
+                    if not tasks:
+                        layer4.append(header)
+                    layer4.append("纪律：")
+                    layer4.extend(f"  {i+1}. {r}" for i, r in enumerate(rules))
+                blocks.append("\n".join(layer4))
 
-            note = f"""NexSandglass灵魂注入
-纪律
-{rules_lines or '尚无纪律——可询问主人是否要设定铁律(如"永远说实话""优先本地方案"等)'}
-{weave_block}
-{thread_block}
-偏移: {off_d} | 情绪: {mood}
-{decisions_lines}
-{tasks_block}{doing_lines}
-阶段: {stage}{stage_scenes} | 沙漏: {total}条"""
-            return note.strip()
+            # ═══════ 尾部 ═══════
+            blocks.append(f"沙漏: {total}条 | 阶段: {stage}")
+
+            return "\n\n".join(blocks).strip()
         except Exception:
+            logger.warning("system_prompt_block 整体失败", exc_info=True)
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
 
     def prefetch(self, query: str) -> str:
