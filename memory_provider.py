@@ -186,9 +186,9 @@ class NexSandglassProvider(MemoryProvider):
                             # 过滤测试数据
                             if re.match(r'^(perf_|_linealign|_signal_|V\d+|_speed_|_perf_|_audit_|_test_|_bench_|_fix_|_v\d|_diag|_cleanup|_p\d|bench_|bench-|\d+$|\[L0-auto\]|第\d+条|第\d+行|AR测试|CR测试)', msg):
                                 continue
-                            if '测试' in msg[:10]:  # 开头含测试的无意义
+                            if '测试' in msg[:10] and len(msg) < 20:
                                 continue
-                            if len(msg) < 4:  # 太短的无意义
+                            if len(msg) < 4:
                                 continue
                             user_msgs.append(msg[:40])  # 截断长消息
                 # 去重取最近5条
@@ -242,33 +242,7 @@ class NexSandglassProvider(MemoryProvider):
                     tasks_block = "待办\n" + tasks_lines
             except: pass
 
-            # 影子沙：高信实体 + 事实标签
-            shadow_block = ""
-            try:
-                import sqlite3, os as _os
-                from sandglass_paths import _NB
-                sdb = _os.path.join(_NB, "shadow_sand.db")
-                parts = []
-                if _os.path.exists(sdb):
-                    sconn = sqlite3.connect(sdb)
-                    # 高信实体
-                    rows = sconn.execute(
-                        "SELECT name, LENGTH(line_nums)-LENGTH(REPLACE(line_nums,',',''))+1 AS cnt "
-                        "FROM entities ORDER BY cnt DESC LIMIT 8"
-                    ).fetchall()
-                    ents = [r[0].strip() for r in rows if r[0].strip() and len(r[0].strip()) >= 2 and len(r[0].strip()) <= 20 and not r[0].strip().isdigit()]
-                    if ents:
-                        parts.append("高信实体\n" + "\n".join(f"  {e}" for e in ents[:4]))
-                    # 事实标签
-                    tags = sconn.execute(
-                        "SELECT DISTINCT category, tags FROM fact_tags WHERE category!='general' AND category!='' ORDER BY rowid DESC LIMIT 5"
-                    ).fetchall()
-                    tlines = [f"  [{r[0]}]" + (f" ({r[1]})" if r[1] else "") for r in tags]
-                    if tlines:
-                        parts.append("事实标签\n" + "\n".join(tlines))
-                    sconn.close()
-                shadow_block = "\n".join(parts)
-            except: pass
+
 
             # 纪律
             rules_lines = ""
@@ -298,7 +272,6 @@ class NexSandglassProvider(MemoryProvider):
 纪律
 {rules_lines or '尚无纪律——可询问主人是否要设定铁律(如"永远说实话""优先本地方案"等)'}
 {tasks_block}
-{shadow_block}
 {doing_lines}
 {ctx[:500] if ctx else ""}
 阶段: {stage}{stage_scenes} | 沙漏: {total}条"""
