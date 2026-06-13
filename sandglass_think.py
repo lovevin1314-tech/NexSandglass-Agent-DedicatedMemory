@@ -636,8 +636,10 @@ def decision_snapshot(decision_text: str, offset_result: dict = None) -> dict:
     return {"point": point, "line": line, "surface": surface}
 
 def search_filter(query: str) -> dict:
-    """场景+阶段+决策粒子+偏移率 四维感知搜索滤镜。
-    返回 {keywords, weights, scene_context, stage_context, decision_bias}"""
+    """场景+画像+阶段+决策粒子+偏移率+影子沙 六维感知搜索滤镜。
+    返回 {keywords, weights, scene_context, persona_context, stage_context,
+           decision_bias, decision_weight_boost, shadow_context, time_range,
+           alt_keywords, hint, source}"""
     result = {"keywords": [query], "weights": {}, "scene_context": "", "stage_context": "", "decision_bias": ""}
 
     # ── 场景感知（当前语境）──
