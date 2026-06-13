@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import statistics
+import time
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -451,10 +452,17 @@ def scene_stage_cross_validate() -> dict:
     )}
 
 def persona_maintain() -> dict:
-    """人格自动维护。沙子够了+偏移稳定→自动触发更新。"""
+    """人格自动维护。沙子够了+偏移稳定→自动触发更新。V2.9.7: 阈值降至80条+24h最小间隔"""
     fresh = persona_freshness()
-    if not fresh["since_sands"] or fresh["since_sands"] < 200:
-        return {"triggered": False, "reason": "沙子不足（" + str(fresh.get("since_sands", 0)) + "条，需200+）"}
+    if not fresh["since_sands"] or fresh["since_sands"] < 80:
+        return {"triggered": False, "reason": "沙子不足（" + str(fresh.get("since_sands", 0)) + "条，需80+）"}
+
+    # 24h 最小间隔检查
+    _PERSONA_FILE = os.path.join(os.environ.get("NEXSANDBASE_HOME", os.path.expanduser("~/.neurobase")), "persona", "persona.md")
+    if os.path.exists(_PERSONA_FILE):
+        age_hours = (time.time() - os.path.getmtime(_PERSONA_FILE)) / 3600
+        if age_hours < 24:
+            return {"triggered": False, "reason": f"距上次更新仅{age_hours:.1f}h，需≥24h间隔"}
 
     stab = decision_stability()
     if stab["overall"]["volatility"] >= 50:

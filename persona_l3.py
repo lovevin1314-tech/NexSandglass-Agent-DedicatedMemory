@@ -1,5 +1,5 @@
 """NexSandglass L3 — persona_l3"""
-import os, re, json, hashlib, logging, shutil
+import os, re, json, hashlib, logging, shutil, time
 from datetime import datetime, timezone
 from pathlib import Path
 from sandglass_vault import _tokenize
@@ -106,7 +106,7 @@ def persona_build() -> str:
 def persona_update() -> str:
     """增量更新人格画像。只扫描上次更新后的新沙子。"""
     _lazy_import()
-    from sandglass_vault import recent
+    from sandglass_vault import recent, count
 
     if not os.path.exists(_PERSONA):
         return persona_build()
@@ -114,20 +114,30 @@ def persona_update() -> str:
     with open(_PERSONA, "r", encoding="utf-8") as f:
         existing = f.read()
 
-    # 找最近50条沙子
-    sands = recent(50)
+    # 精确增量扫描：获取上次更新后的新沙子
+    since = sand_since_update()
+    if since <= 0:
+        return _PERSONA
+    total_sands = count()
+    scan_count = min(since + 20, 500)
+    sands = recent(scan_count)
     if not sands:
         return _PERSONA
+
+    # 计算真实行号范围
+    first_line = sands[0][0] if sands else 0
+    last_line = sands[-1][0] if sands else 0
+    sand_count = len(sands)
 
     lines = []
     for ln, ts, text in sands:
         lines.append(f"[L{ln} | {ts}] {text[:200]}")
     sand_text = "\n".join(lines)
 
-    user_prompt = f"当前时间：{datetime.now():%Y-%m-%d %H:%M}\n\n### 现有画像\n{existing[:4000]}\n\n### 新对话沙子\n{sand_text[:15000]}\n\n请增量更新画像。只改有变化的部分，不变的部分原样保留。注意维护项链溯源。"
+    user_prompt = f"当前时间：{datetime.now():%Y-%m-%d %H:%M}\n\n### 现有画像\n{existing[:4000]}\n\n### 新对话沙子（总{total_sands}条，本条第{first_line}-{last_line}行）\n{sand_text[:15000]}\n\n请增量更新画像。只改有变化的部分，不变的部分原样保留。注意维护项链溯源。"
 
     result = _llm(_PERSONA_SYSTEM.format(time=datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                          first_line="?", last_line="?", total="?"),
+                                          first_line=first_line, last_line=last_line, total=sand_count),
                   user_prompt, max_tokens=4096)
 
     if result:
@@ -182,9 +192,9 @@ def persona_freshness() -> dict:
     sands = sand_since_update()
     if sands < 0:
         return {"stale": True, "since_sands": -1, "since_days": -1, "warning": "画像不存在"}
-    if sands < 50:
+    if sands < 30:
         return {"stale": False, "since_sands": sands, "since_days": 0, "warning": ""}
-    if sands < 200:
+    if sands < 80:
         return {"stale": "mild", "since_sands": sands, "since_days": 0,
                 "warning": f"画像已滞后 {sands} 条沙子，建议近期更新"}
     return {"stale": True, "since_sands": sands, "since_days": 0,
@@ -534,7 +544,7 @@ _SEARCH_WEIGHTS = {
 
 
 def sand_since_update() -> int:
-    """上次画像更新后新增了多少条沙子。返回 -1 表示画像不存在。"""
+    """上次画像更新后新增了多少条沙子。返回 -1 表示画像不存在，999 表示无法解析。"""
     from sandglass_vault import count
 
     if not os.path.exists(_PERSONA):
@@ -543,11 +553,23 @@ def sand_since_update() -> int:
     with open(_PERSONA, "r", encoding="utf-8") as f:
         head = f.read()[:500]
 
-    m = re.search(r"L(\d+)", head)
-    last_indexed = int(m.group(1)) if m else 0
+    # 解析 L 标记：<!-- L: first_line=X last_line=Y total=Z -->
+    m = re.search(r"last_line=(\d+)", head)
+    if m:
+        last_indexed = int(m.group(1))
+        total = count()
+        return max(0, total - last_indexed)
 
+    # fallback: L 标记解析失败，用文件修改时间估算
+    mtime = os.path.getmtime(_PERSONA)
+    age_days = (time.time() - mtime) / 86400
     total = count()
-    return max(0, total - last_indexed)
+    if age_days < 1:
+        return max(0, total // 4)  # 最近更新，新沙不多
+    elif age_days < 7:
+        return max(0, total // 2)
+    else:
+        return max(1, total)  # 太久没更新，强制触发
 
 
 def stage_similarity(stage_a: str, stage_b: str) -> dict:
