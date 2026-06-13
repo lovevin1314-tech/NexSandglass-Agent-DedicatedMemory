@@ -458,7 +458,7 @@ def persona_maintain() -> dict:
         return {"triggered": False, "reason": "沙子不足（" + str(fresh.get("since_sands", 0)) + "条，需80+）"}
 
     # 24h 最小间隔检查
-    _PERSONA_FILE = os.path.join(os.environ.get("NEXSANDBASE_HOME", os.path.expanduser("~/.neurobase")), "persona", "persona.md")
+    from persona_l3 import _PERSONA as _PERSONA_FILE
     if os.path.exists(_PERSONA_FILE):
         age_hours = (time.time() - os.path.getmtime(_PERSONA_FILE)) / 3600
         if age_hours < 24:
