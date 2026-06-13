@@ -256,7 +256,16 @@ class NexSandglassProvider(MemoryProvider):
             weave_block = ""
             try:
                 from weave_l3 import weave_search_filter
-                weave_block = weave_search_filter(stage)
+                weave_block = weave_search_filter(query)
+            except: pass
+
+            # V2.9.7 织线摘要注入（数据门控：<20条三元组不注入）
+            thread_block = ""
+            try:
+                from weavethread import wthread_stats, wthread_weave
+                stats = wthread_stats()
+                if stats["total_triples"] >= 20:
+                    thread_block = wthread_weave(limit=3)
             except: pass
 
 
@@ -290,6 +299,7 @@ class NexSandglassProvider(MemoryProvider):
 纪律
 {rules_lines or '尚无纪律——可询问主人是否要设定铁律(如"永远说实话""优先本地方案"等)'}
 {weave_block}
+{thread_block}
 偏移: {off_d} | 情绪: {mood}
 {decisions_lines}
 {tasks_block}{doing_lines}

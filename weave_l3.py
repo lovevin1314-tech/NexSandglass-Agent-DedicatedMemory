@@ -27,8 +27,8 @@ except:
 
 @_fail_open({})
 def weave_insight(topic: str) -> dict:
-    """织布：给定一个话题，从三个支柱分别取线，织成合成洞察。
-    返回 {persona_view, offset_view, search_view, synthesis}"""
+    """织布：给定一个话题，从四个支柱分别取线，织成合成洞察。
+    返回 {persona_view, offset_view, search_view, thread_view, synthesis}"""
     result = {}
 
     # 蒸馏的线：这个话题在画像里怎么说的
@@ -56,7 +56,19 @@ def weave_insight(topic: str) -> dict:
     search = search_with_stage_label(topic, limit=3)
     result["search_view"] = search
 
-    # 织：三条线合成
+    # V2.9.7 第四支柱：织线因果链（按话题查，有数据门控）
+    result["thread_view"] = ""
+    try:
+        from weavethread import wthread_stats, wthread_to_weave
+        stats = wthread_stats()
+        if stats["total_triples"] >= 20:
+            thread = wthread_to_weave(entity=topic if topic else "user")
+            if thread.get("summary"):
+                result["thread_view"] = thread["summary"]
+    except Exception:
+        pass
+
+    # 织：四条线合成
     synthesis = []
     if result["persona_view"] and result["persona_view"][0] != "画像中无相关内容":
         synthesis.append("画像说：" + result["persona_view"][0][:80])
@@ -64,6 +76,8 @@ def weave_insight(topic: str) -> dict:
         synthesis.append("偏移说：" + result["offset_view"]["evolution"])
     if sands:
         synthesis.append("沙子中有 " + str(len(sands)) + " 条相关记录")
+    if result["thread_view"]:
+        synthesis.append("织线：" + result["thread_view"][:100])
 
     result["synthesis"] = "；".join(synthesis) if synthesis else "数据不足，无法合成"
     return result
@@ -313,8 +327,8 @@ def weave_output(query: str = "", limit: int = 5) -> dict:
     try:
         if query:
             insight = weave_insight(query)
-            if insight and insight.get("insight"):
-                result["insight"] = insight["insight"][:300]
+            if insight and insight.get("synthesis"):
+                result["insight"] = insight["synthesis"][:300]
                 if insight.get("keywords"):
                     result["keywords"].extend(insight["keywords"][:5])
     except Exception:
@@ -361,7 +375,7 @@ def weave_output(query: str = "", limit: int = 5) -> dict:
         from sandglass_think import _emotional_entropy
         ent = _emotional_entropy()
         if ent < 0.5:
-            result["emotion_note"] = "平静期 — 理性主导"
+            result["emotion_note"] = "状态: 平稳 — 理性主导"
         elif ent < 1.0:
             result["emotion_note"] = "波动期 — 可能犹豫或感性"
         else:
@@ -386,8 +400,8 @@ def weave_search_filter(query: str = "") -> str:
         lines.append(f"状态: {w['insight'][:120]}")
     if w["contradictions"]:
         for c in w["contradictions"][:2]:
-            if isinstance(c, dict) and c.get("text"):
-                lines.append(f"矛盾: {c['text'][:100]}")
+            if isinstance(c, dict) and c.get("conflict"):
+                lines.append(f"矛盾: {c['conflict'][:100]}")
     if w["offset_guide"]:
         lines.append(w["offset_guide"])
     if w["emotion_note"]:
