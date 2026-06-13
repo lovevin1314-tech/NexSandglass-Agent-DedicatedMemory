@@ -256,7 +256,7 @@ class NexSandglassProvider(MemoryProvider):
             weave_block = ""
             try:
                 from weave_l3 import weave_search_filter
-                weave_block = weave_search_filter(query)
+                weave_block = weave_search_filter(stage)
             except: pass
 
             # V2.9.7 织线摘要注入（数据门控：<20条三元组不注入）
