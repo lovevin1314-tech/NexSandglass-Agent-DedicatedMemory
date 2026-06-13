@@ -182,18 +182,12 @@ class NexSandglassProvider(MemoryProvider):
             try:
                 sf = search_filter("")
                 if sf.get("persona_context"):
-                    raw = sf["persona_context"][:300]
-                    # 跳过元数据块（更新日期/沙子来源），从##标题开始取
-                    h2 = raw.find("\n## ") 
-                    if h2 > 0:
-                        raw = raw[h2:]
-                    # 取前120字，去尾部残缺行
-                    persona_text = raw[:120].strip()
-                    # 去掉末尾不完整的行和孤立的列表标记
-                    if "\n" in persona_text:
-                        last_line = persona_text.split("\n")[-1]
-                        if last_line.strip() in ("-", "*", ""):
-                            persona_text = persona_text[:persona_text.rfind("\n")].strip()
+                    raw = sf["persona_context"][:250]
+                    # 保留完整结构（含日期/沙子来源→精准定位），截到段落边界
+                    cut = raw.rfind("\n\n")
+                    if cut > 80:
+                        raw = raw[:cut]
+                    persona_text = raw.strip()
                 if sf.get("scene_context"):
                     raw_scene = sf["scene_context"]
                     if "：" in raw_scene:
