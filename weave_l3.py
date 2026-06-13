@@ -330,7 +330,7 @@ def weave_output(query: str = "", limit: int = 5) -> dict:
             if insight and insight.get("synthesis"):
                 result["insight"] = insight["synthesis"][:300]
     except Exception:
-        pass
+        logger.warning("织布机因果洞察失败", exc_info=True)
     
     # 2. 矛盾检测
     try:
@@ -338,7 +338,7 @@ def weave_output(query: str = "", limit: int = 5) -> dict:
         if contra and contra.get("conflicts"):
             result["contradictions"] = contra["conflicts"][:3]
     except Exception:
-        pass
+        logger.warning("织布机矛盾检测失败", exc_info=True)
     
     # 3. 场景感知
     try:
