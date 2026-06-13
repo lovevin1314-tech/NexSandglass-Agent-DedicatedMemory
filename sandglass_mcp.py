@@ -92,6 +92,36 @@ def _handle_tool(name, args, request_id):
             n = merge_soul(args.get("source", ""))
             return _rpc_response(request_id, {"merged": n})
 
+        elif name == "sandglass_import":
+            from sandglass_vault import sandglass_import
+            r = sandglass_import(args.get("source_path", ""), args.get("format", "sandglass"))
+            return _rpc_response(request_id, r)
+
+        elif name == "sandglass_export":
+            from sandglass_vault import sandglass_export
+            path = sandglass_export(args.get("output_path"), args.get("limit"), args.get("month", ""))
+            return _rpc_response(request_id, {"exported": path})
+
+        elif name == "sandglass_thread":
+            from weavethread import wthread_query
+            r = wthread_query(args.get("entity"), args.get("relation"), args.get("limit", 20))
+            return _rpc_response(request_id, r)
+
+        elif name == "sandglass_thread_graph":
+            from weavethread import wthread_graph
+            r = wthread_graph(args.get("entity", ""), args.get("depth", 1))
+            return _rpc_response(request_id, r)
+
+        elif name == "sandglass_thread_weave":
+            from weavethread import wthread_weave
+            r = wthread_weave(args.get("limit", 3))
+            return _rpc_response(request_id, {"causal_summary": r})
+
+        elif name == "sandglass_thread_add":
+            from weavethread import wthread_add
+            ok = wthread_add(args.get("subject", "user"), args.get("relation", ""), args.get("object", ""))
+            return _rpc_response(request_id, {"added": ok})
+
         else:
             return _rpc_error(request_id, -32601, f"Unknown tool: {name}")
 
@@ -122,6 +152,12 @@ def main():
                     {"name": "sandglass_migrate", "description": "一键导出全部记忆数据为 tar.gz"},
                     {"name": "sandglass_soul_export", "description": "导出灵魂差分(偏移率+决策+回音折)"},
                     {"name": "sandglass_soul_merge", "description": "合并外部灵魂差分"},
+                    {"name": "sandglass_import", "description": "导入外部沙漏或ChatGPT/Claude对话导出"},
+                    {"name": "sandglass_export", "description": "导出沙漏为可迁移文件"},
+                    {"name": "sandglass_thread", "description": "查询织线知识图谱——实体关系三元组"},
+                    {"name": "sandglass_thread_graph", "description": "织线实体子图——展开N跳关系"},
+                    {"name": "sandglass_thread_weave", "description": "织线→织布机桥接——因果链摘要"},
+                    {"name": "sandglass_thread_add", "description": "手动补入三元组——Agent发现漏抓时调用"},
                 ]
                 print(_rpc_response(tid, {"tools": tools}), flush=True)
 
