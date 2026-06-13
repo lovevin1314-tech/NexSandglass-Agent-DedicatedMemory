@@ -134,8 +134,16 @@ def main():
     for line in sys.stdin:
         try:
             req = json.loads(line.strip())
-            tid = req.get("id", 0)
             method = req.get("method", "")
+
+            # JSON-RPC 2.0 spec: messages without "id" are notifications.
+            # Servers MUST NOT reply to notifications. The MCP handshake sends
+            # `notifications/initialized` right after `initialize`; replying to
+            # it with a fake id=0 corrupts subsequent response correlation and
+            # breaks strict clients (opencode / Claude Desktop / Cursor).
+            if "id" not in req:
+                continue
+            tid = req["id"]
 
             if method == "tools/list":
                 tools = [
