@@ -225,9 +225,18 @@ class NexSandglassProvider(MemoryProvider):
                         all_lines = f.readlines()
                     recent = [json.loads(l) for l in all_lines[-10:]]
                     recent = [d for d in recent if d.get("decision")]
-                    if recent:
+                    # 去重 + 取最后3条
+                    seen, unique = set(), []
+                    for d in reversed(recent):
+                        if d["decision"] not in seen:
+                            seen.add(d["decision"])
+                            unique.append(d)
+                        if len(unique) >= 3:
+                            break
+                    unique.reverse()
+                    if unique:
                         decisions_lines = "最近决策\n" + "\n".join(
-                            f"{i+1}. {d['decision']}" for i, d in enumerate(recent[-3:])
+                            f"{i+1}. {d['decision']}" for i, d in enumerate(unique)
                         )
             except: pass
 
@@ -273,7 +282,7 @@ class NexSandglassProvider(MemoryProvider):
 {rules_lines or '尚无纪律——可询问主人是否要设定铁律(如"永远说实话""优先本地方案"等)'}
 {tasks_block}
 {doing_lines}
-{ctx[:500] if ctx else ""}
+{ctx[:200] if ctx else ""}
 阶段: {stage}{stage_scenes} | 沙漏: {total}条"""
             return note.strip()
         except Exception:
