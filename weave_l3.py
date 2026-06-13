@@ -290,3 +290,112 @@ def weave_graph(question: str, max_hops: int = 3) -> dict:
     except Exception:
         return {"question": question, "chains": [], "root_causes": [], "total_hops": 0,
                 "insight": "织布机因果图暂不可用（需要 sandglass_sqlite FTS5 索引）"}
+
+def weave_output(query: str = "", limit: int = 5) -> dict:
+    """V2.9.5: 织布机统一输出 → 搜索滤镜素材。
+    整合因果链 + 矛盾检测 + 场景感知 + 偏移率 + 情绪，
+    返回 {insight, contradictions, causal, scene_context, offset_guide, emotion_note}
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    result = {
+        "insight": "",
+        "contradictions": [],
+        "causal": [],
+        "scene_context": "",
+        "offset_guide": "",
+        "emotion_note": "",
+        "keywords": [],
+    }
+    
+    # 1. 因果洞察
+    try:
+        if query:
+            insight = weave_insight(query)
+            if insight and insight.get("insight"):
+                result["insight"] = insight["insight"][:300]
+                if insight.get("keywords"):
+                    result["keywords"].extend(insight["keywords"][:5])
+    except Exception:
+        pass
+    
+    # 2. 矛盾检测
+    try:
+        contra = weave_contradiction()
+        if contra and contra.get("contradictions"):
+            result["contradictions"] = contra["contradictions"][:3]
+            for c in result["contradictions"]:
+                if isinstance(c, dict) and c.get("keywords"):
+                    result["keywords"].extend(c["keywords"][:3])
+    except Exception:
+        pass
+    
+    # 3. 场景感知
+    try:
+        from scene_l3 import scene_current
+        scenes = scene_current()
+        if scenes:
+            result["scene_context"] = " · ".join(scenes[:3])
+            result["keywords"].extend(scenes[:3])
+    except Exception:
+        pass
+    
+    # 4. 偏移率方向
+    try:
+        from sandglass_think import comprehensive_offset
+        off = comprehensive_offset()
+        direction = off.get("direction", "")
+        offset_val = off.get("offset", 0)
+        if direction == "frugal":
+            result["offset_guide"] = f"省钱倾向({offset_val:+d}%) — 偏好免费/本地/开源方案"
+        elif direction == "spend":
+            result["offset_guide"] = f"愿投倾向({offset_val:+d}%) — 愿意为效率/质量付费"
+        elif direction == "drift":
+            result["offset_guide"] = f"放弃倾向({offset_val:+d}%) — 可能厌倦或想换方向"
+    except Exception:
+        pass
+    
+    # 5. 情绪温度
+    try:
+        from sandglass_think import _emotional_entropy
+        ent = _emotional_entropy()
+        if ent < 0.5:
+            result["emotion_note"] = "平静期 — 理性主导"
+        elif ent < 1.0:
+            result["emotion_note"] = "波动期 — 可能犹豫或感性"
+        else:
+            result["emotion_note"] = "高熵期 — 情绪波动大，谨慎建议"
+    except Exception:
+        pass
+    
+    # 去重关键词
+    result["keywords"] = list(dict.fromkeys(result["keywords"][:10]))
+    
+    return result
+
+
+def weave_search_filter(query: str = "") -> str:
+    """V2.9.5: 织布机 → 搜索滤镜 格式化输出。
+    返回 LLM 可注入的文本块。
+    """
+    w = weave_output(query)
+    lines = []
+    
+    if w["insight"]:
+        lines.append(f"因果: {w['insight'][:120]}")
+    if w["contradictions"]:
+        for c in w["contradictions"][:2]:
+            if isinstance(c, dict) and c.get("text"):
+                lines.append(f"矛盾: {c['text'][:100]}")
+    if w["offset_guide"]:
+        lines.append(w["offset_guide"])
+    if w["emotion_note"]:
+        lines.append(w["emotion_note"])
+    if w["scene_context"]:
+        lines.append(f"场景: {w['scene_context']}")
+    if w["keywords"]:
+        lines.append("关键词: " + " · ".join(w["keywords"][:8]))
+    
+    header = "织布机输出"
+    return header + "\n" + "\n".join(lines) if lines else ""

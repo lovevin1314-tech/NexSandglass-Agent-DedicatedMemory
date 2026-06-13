@@ -251,6 +251,13 @@ class NexSandglassProvider(MemoryProvider):
                     tasks_block = "待办\n" + tasks_lines
             except: pass
 
+            # 织布机搜索滤镜 — V2.9.5: 因果+矛盾+场景+偏移+情绪统一
+            weave_block = ""
+            try:
+                from weave_l3 import weave_search_filter
+                weave_block = weave_search_filter(stage)
+            except: pass
+
 
 
             # 纪律
@@ -281,6 +288,7 @@ class NexSandglassProvider(MemoryProvider):
 纪律
 {rules_lines or '尚无纪律——可询问主人是否要设定铁律(如"永远说实话""优先本地方案"等)'}
 {tasks_block}
+{weave_block}
 {doing_lines}
 {ctx[:200] if ctx else ""}
 阶段: {stage}{stage_scenes} | 沙漏: {total}条"""
