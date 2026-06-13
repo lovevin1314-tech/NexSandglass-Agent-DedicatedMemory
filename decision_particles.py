@@ -38,9 +38,11 @@ _DIRECTION_MAP = {
 # 本地标签（baseline）
 # ═══════════════════════════════════════════════
 
-# 自进化词库缓存
+# 自进化词库缓存（雷军TOCTOU修复: Lock + 元组原子赋值）
+import threading
 _VOCAB_CACHE = None
 _VOCAB_CACHE_MTIME = 0
+_VOCAB_LOCK = threading.Lock()
 
 def _tag_local(choice: str) -> str:
     """本地标签匹配 — 硬编码TAG_MAP + 自进化词库(VOCAB)"""
@@ -54,14 +56,17 @@ def _tag_local(choice: str) -> str:
                 if t not in seen:
                     tags.append(t)
                     seen.add(t)
-    # 2. 自进化词库（mtime缓存失效 — 托尼P0修复）
+    # 2. 自进化词库（mtime缓存失效 + Lock防TOCTOU）
     try:
         if os.path.exists(_VOCAB):
             mtime = os.path.getmtime(_VOCAB)
             if _VOCAB_CACHE is None or mtime > _VOCAB_CACHE_MTIME:
-                with open(_VOCAB, "r", encoding="utf-8") as f:
-                    _VOCAB_CACHE = [l.strip() for l in f if l.strip() and len(l.strip()) < 50]
-                _VOCAB_CACHE_MTIME = mtime
+                with _VOCAB_LOCK:
+                    # 双重检查: 锁内再验一次mtime
+                    if _VOCAB_CACHE is None or mtime > _VOCAB_CACHE_MTIME:
+                        with open(_VOCAB, "r", encoding="utf-8") as f:
+                            new_cache = [l.strip() for l in f if l.strip() and len(l.strip()) < 50]
+                        _VOCAB_CACHE, _VOCAB_CACHE_MTIME = new_cache, mtime  # 元组原子赋值
             if _VOCAB_CACHE:
                 for t in _VOCAB_CACHE:
                     if t and t not in seen and t.lower() in choice.lower():
