@@ -161,7 +161,8 @@ class NexSandglassProvider(MemoryProvider):
         try:
             from sandglass_vault import count
             from sandglass_think import comprehensive_offset, _current_stage, task_pending
-            from sandglass_think import iron_rules, _emotional_entropy, _sentiment_wind
+            from sandglass_think import _emotional_entropy, _sentiment_wind
+            from discipline import iron_rules_with_counts
             from sandglass_think import session_context
 
             total = count()
@@ -202,7 +203,7 @@ class NexSandglassProvider(MemoryProvider):
                         break
                 anchors.reverse()
                 if anchors:
-                    ctx = "近期摘要: " + " · ".join(anchors)
+                    ctx = ""
             except: pass
 
             # 偏移方向
@@ -236,7 +237,7 @@ class NexSandglassProvider(MemoryProvider):
                     unique.reverse()
                     if unique:
                         decisions_lines = "最近决策\n" + "\n".join(
-                            f"{i+1}. {d['decision']}" for i, d in enumerate(unique)
+                            f"{i+1}. {d['decision'][:60]}" for i, d in enumerate(unique[:2])
                         )
             except: pass
 
@@ -260,13 +261,16 @@ class NexSandglassProvider(MemoryProvider):
 
 
 
-            # 纪律
+            # 纪律（按提醒次数排序，最多3条）
             rules_lines = ""
             try:
-                rules = iron_rules()
+                rules = iron_rules_with_counts(3)
                 if rules:
-                    nums = ["1.","2.","3.","4.","5."]
-                    rules_lines = "\n".join(f"{nums[i]} {r}" for i, r in enumerate(rules[:5]))
+                    # 有计数的显示「×N」，全0的只显示规则文本
+                    if any(c > 0 for _, c in rules):
+                        rules_lines = "\n".join(f"{r}  ×{c}" for r, c in rules)
+                    else:
+                        rules_lines = "\n".join(r for r, _ in rules)
             except: pass
 
             # 阶段 + 场景语义
@@ -283,14 +287,14 @@ class NexSandglassProvider(MemoryProvider):
             except: pass
 
             note = f"""NexSandglass灵魂注入
-偏移: {off_d} | 情绪: {mood}
-{decisions_lines}
 纪律
 {rules_lines or '尚无纪律——可询问主人是否要设定铁律(如"永远说实话""优先本地方案"等)'}
+偏移: {off_d} | 情绪: {mood}
+{decisions_lines}
+{ctx[:200] if ctx else ""}
 {tasks_block}
 {weave_block}
 {doing_lines}
-{ctx[:200] if ctx else ""}
 阶段: {stage}{stage_scenes} | 沙漏: {total}条"""
             return note.strip()
         except Exception:
