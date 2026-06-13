@@ -184,7 +184,9 @@ class NexSandglassProvider(MemoryProvider):
                         if len(parts) >= 3:
                             msg = parts[2].strip()
                             # 过滤测试数据
-                            if re.match(r'^(perf_|_linealign|_signal_|V\d+|_speed_|_perf_|_audit_|_test_|_bench_|_fix_|_v\d|bench_|\d+$|\[L0-auto\]|第\d+条测试|第\d+行测试|AR测试|CR测试)', msg):
+                            if re.match(r'^(perf_|_linealign|_signal_|V\d+|_speed_|_perf_|_audit_|_test_|_bench_|_fix_|_v\d|_diag|_cleanup|_p\d|bench_|bench-|\d+$|\[L0-auto\]|第\d+条|第\d+行|AR测试|CR测试)', msg):
+                                continue
+                            if '测试' in msg[:10]:  # 开头含测试的无意义
                                 continue
                             if len(msg) < 4:  # 太短的无意义
                                 continue
