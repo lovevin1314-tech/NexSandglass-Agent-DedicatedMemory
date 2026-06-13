@@ -1,9 +1,9 @@
 #!/bin/bash
-# NexSandglass V2.4.0 — macOS/Linux 安装脚本
+# NexSandglass V2.9.2 — macOS/Linux 安装脚本
 set -e
 
 echo "╔══════════════════════════════════╗"
-echo "║  NexSandglass V2.4.0 安装程序    ║"
+echo "║  NexSandglass V2.9.2 安装程序    ║"
 echo "╚══════════════════════════════════╝"
 echo ""
 
