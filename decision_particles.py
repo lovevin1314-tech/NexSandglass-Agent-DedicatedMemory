@@ -38,15 +38,37 @@ _DIRECTION_MAP = {
 # 本地标签（baseline）
 # ═══════════════════════════════════════════════
 
+# 自进化词库缓存
+_VOCAB_CACHE = None
+_VOCAB_CACHE_MTIME = 0
+
 def _tag_local(choice: str) -> str:
+    """本地标签匹配 — 硬编码TAG_MAP + 自进化词库(VOCAB)"""
+    global _VOCAB_CACHE, _VOCAB_CACHE_MTIME
     tags = []
     seen = set()
+    # 1. 硬编码 TAG_MAP
     for pattern, tag_list in _TAG_MAP.items():
         if any(w in choice.lower() for w in pattern.split("|")):
             for t in tag_list:
                 if t not in seen:
                     tags.append(t)
                     seen.add(t)
+    # 2. 自进化词库（mtime缓存失效 — 托尼P0修复）
+    try:
+        if os.path.exists(_VOCAB):
+            mtime = os.path.getmtime(_VOCAB)
+            if _VOCAB_CACHE is None or mtime > _VOCAB_CACHE_MTIME:
+                with open(_VOCAB, "r", encoding="utf-8") as f:
+                    _VOCAB_CACHE = [l.strip() for l in f if l.strip() and len(l.strip()) < 50]
+                _VOCAB_CACHE_MTIME = mtime
+            if _VOCAB_CACHE:
+                for t in _VOCAB_CACHE:
+                    if t and t not in seen and t.lower() in choice.lower():
+                        tags.append(t)
+                        seen.add(t)
+    except Exception:
+        pass
     return ",".join(tags) if tags else ""
 
 
@@ -248,6 +270,10 @@ def _tag_llm(question: str, choice: str) -> str:
         result = _llm(system, user_prompt, max_tokens=80)
         if result:
             tags = [t.strip() for t in result.split(",") if t.strip()]
+            # 托尼P1: 任何标签>50字=LLM返回分析段落→不存
+            if any(len(t) > 50 for t in tags):
+                return ""
+            tags = [t for t in tags if len(t) <= 30]
             return ",".join(tags[:5])
     except Exception:
         pass
@@ -259,21 +285,26 @@ def _tag_llm(question: str, choice: str) -> str:
 # ═══════════════════════════════════════════════
 
 def _learn(tags: str, choice: str = "") -> None:
-    """LLM 产出的标签 → 写入 vocab 文件，下次检索直接命中。"""
+    """LLM 产出的标签 → 写入 vocab 文件。V2.9.9: 不再读全文件去重(依赖缓存mtime刷新)"""
     if not tags:
         return
-    existing = set()
-    if os.path.exists(_VOCAB):
-        with open(_VOCAB, "r", encoding="utf-8") as f:
-            for line in f:
-                t = line.strip()
-                if t:
-                    existing.add(t)
-    new_tags = [t.strip() for t in tags.split(",") if t.strip() and t.strip() not in existing]
+    new_tags = [t.strip() for t in tags.split(",") if t.strip() and len(t.strip()) < 30]
     if new_tags:
-        with open(_VOCAB, "a", encoding="utf-8") as f:
-            for t in new_tags:
-                f.write(f"{t}\n")
+        # 简单去重: 只查最近200条
+        existing = set()
+        if os.path.exists(_VOCAB):
+            try:
+                with open(_VOCAB, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                    for line in lines[-200:]:
+                        existing.add(line.strip())
+            except Exception:
+                pass
+        truly_new = [t for t in new_tags if t not in existing]
+        if truly_new:
+            with open(_VOCAB, "a", encoding="utf-8") as f:
+                for t in truly_new:
+                    f.write(f"{t}\n")
 
 
 # ═══════════════════════════════════════════════
