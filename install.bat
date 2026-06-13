@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ╔══════════════════════════════════╗
-echo ║  NexSandglass V2.3.8 安装程序    ║
+echo ║  NexSandglass V2.9.2 安装程序    ║
 echo ╚══════════════════════════════════╝
 echo.
 echo 正在部署沙漏记忆系统...
