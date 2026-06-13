@@ -204,7 +204,8 @@ class NexSandglassProvider(MemoryProvider):
                 anchors.reverse()
                 if anchors:
                     ctx = ""
-            except: pass
+            except Exception:
+                logger.debug("锚点提取失败", exc_info=True)
 
             # 偏移方向
             dirs = {"frugal": f"省钱({off.get('offset',0):+d}%)",
@@ -250,14 +251,16 @@ class NexSandglassProvider(MemoryProvider):
                     nums = ["1.","2.","3.","4.","5."]
                     tasks_lines = "\n".join(f"{nums[i]} {t['task']}" for i, t in enumerate(tp[:5]))
                     tasks_block = "待办\n" + tasks_lines + "\n" + "\n"
-            except: pass
+            except Exception:
+                logger.debug("待办提取失败", exc_info=True)
 
             # 织布机搜索滤镜 — V2.9.5: 因果+矛盾+场景+偏移+情绪统一
             weave_block = ""
             try:
                 from weave_l3 import weave_search_filter
                 weave_block = weave_search_filter(stage)
-            except: pass
+            except Exception:
+                logger.warning("织布机搜索滤镜失败", exc_info=True)
 
             # V2.9.7 织线摘要注入（数据门控：<20条三元组不注入）
             thread_block = ""
@@ -266,7 +269,8 @@ class NexSandglassProvider(MemoryProvider):
                 stats = wthread_stats()
                 if stats["total_triples"] >= 20:
                     thread_block = wthread_weave(limit=3)
-            except: pass
+            except Exception:
+                logger.debug("织线摘要注入失败(可能三元组不足)", exc_info=True)
 
 
 
