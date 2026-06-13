@@ -184,7 +184,7 @@ class NexSandglassProvider(MemoryProvider):
                         if len(parts) >= 3:
                             msg = parts[2].strip()
                             # 过滤纯测试数据
-                            if not re.match(r'^(perf_|_linealign|_signal_|V\d+|\d+$)', msg):
+                            if not re.match(r'^(perf_|_linealign|_signal_|V\d+|\d+$|\[L0-auto\]|bench_)', msg):
                                 user_msgs.append(msg[:40])  # 截断长消息
                 # 去重取最近5条
                 seen = set()
@@ -193,7 +193,7 @@ class NexSandglassProvider(MemoryProvider):
                     if m not in seen and len(m) >= 2:
                         seen.add(m)
                         anchors.append(m)
-                    if len(anchors) >= 30:
+                    if len(anchors) >= 20:
                         break
                 anchors.reverse()
                 if anchors:
