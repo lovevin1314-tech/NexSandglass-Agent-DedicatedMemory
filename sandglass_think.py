@@ -708,14 +708,18 @@ def search_filter(query: str) -> dict:
                             if tag and tag not in result["keywords"]:
                                 result["keywords"].append(tag)
                                 result["weights"][tag] = 1.3
-            # 实体名注入 — 精确匹配行号，避免LIKE误命中
+            # 实体名注入 — 精确匹配行号+反向查实体名
             entities = []
             for (name, line_nums_str) in db.execute("SELECT name, line_nums FROM entities LIMIT 100").fetchall():
                 parts = set(line_nums_str.split(","))
+                # 行号匹配
                 if any(str(ln) in parts for ln in line_nums):
                     entities.append((name,))
-                    if len(entities) >= 3:
-                        break
+                # V2.9.9.5: 查询词命中实体名也注入
+                elif query and query.lower() in name.lower():
+                    entities.append((name,))
+                if len(entities) >= 5:
+                    break
             for (name,) in entities:
                 if name.lower() not in [k.lower() for k in result["keywords"]]:
                     result["keywords"].append(name)
