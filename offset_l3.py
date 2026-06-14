@@ -400,19 +400,24 @@ def _log_decision(decision_text: str, offset_result: dict) -> None:
 
 
 def _read_decision_log(limit: int = 20) -> list:
-    """读最近决策日志。V2.9.9: 优先读快照(点线面三维)，降级读日志。"""
-    # 优先：三维快照
+    """读最近决策日志。V2.9.9: 合并快照+日志，去重。"""
+    entries = []
+    seen_ts = set()
+
+    # 1. 三维快照（优先，数据更丰富）
     snap_path = os.path.join(_NB, "decision_snapshots.txt")
     if os.path.exists(snap_path):
-        entries = []
         with open(snap_path, "r", encoding="utf-8") as f:
             for line in f:
                 try:
                     e = json.loads(line.strip())
+                    ts = e.get("ts", "")
+                    if ts in seen_ts:
+                        continue
+                    seen_ts.add(ts)
                     snap = e.get("snapshot", {})
-                    # 展平: 把 point/line/surface 提成和日志兼容的字段
                     entries.append({
-                        "ts": e.get("ts", ""),
+                        "ts": ts,
                         "decision": e.get("decision", ""),
                         "direction": snap.get("point", {}).get("direction", "neutral"),
                         "offset": snap.get("point", {}).get("offset", 0),
@@ -421,18 +426,23 @@ def _read_decision_log(limit: int = 20) -> list:
                     })
                 except (json.JSONDecodeError, KeyError):
                     continue
-        if entries:
-            return entries[-limit:]
-    # 降级：传统日志
-    if not os.path.exists(_DECISION_LOG):
-        return []
-    entries = []
-    with open(_DECISION_LOG, "r", encoding="utf-8") as f:
-        for line in f:
-            try:
-                entries.append(json.loads(line.strip()))
-            except json.JSONDecodeError:
-                continue
+
+    # 2. 传统日志（补充快照缺失的）
+    if os.path.exists(_DECISION_LOG):
+        with open(_DECISION_LOG, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    e = json.loads(line.strip())
+                    ts = e.get("ts", "")
+                    if ts not in seen_ts:
+                        seen_ts.add(ts)
+                        e["source"] = "log"
+                        entries.append(e)
+                except json.JSONDecodeError:
+                    continue
+
+    # 按时间排序，取最近 limit 条
+    entries.sort(key=lambda e: e.get("ts", ""))
     return entries[-limit:]
 
 
