@@ -96,7 +96,8 @@ def log_message(text: str, sender: str = "agent") -> bool:
         # 影子沙——落沙后同步索引
         try:
             from shadow_sand import shadow_index
-            shadow_index(text, line_num=0)
+            current_ln = sum(1 for _ in open(_SANDGLASS, "rb"))
+            shadow_index(text, line_num=current_ln)
         except Exception as e:
             logger.warning(f"影子沙索引同步跳过(锁冲突): {e}")
 
@@ -104,7 +105,7 @@ def log_message(text: str, sender: str = "agent") -> bool:
         if sender == "user":
             try:
                 from weavethread import wthread_store
-                wthread_store(text, line_num=0)
+                wthread_store(text, line_num=current_ln)
             except Exception:
                 pass
 
