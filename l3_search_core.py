@@ -46,7 +46,7 @@ def _tokenize_for_density(text: str) -> set:
                 prev_cjk = None
     if lang in ("en", "mixed"):
         # 英文整词 + 2-3gram
-        for w in __import__('re').findall(r'[a-zA-Z]+', text.lower()):
+        for w in re.findall(r'[a-zA-Z]+', text.lower()):
             if len(w) >= 2:
                 tokens.add(w)
                 for n in (2, 3):
