@@ -259,6 +259,14 @@ class NexSandglassProvider(MemoryProvider):
                     layer1.append(persona_text)
                 if scene_text:
                     layer1.append(f"📍 {scene_text}")
+                # V2.9.9.7: 溯源异常告警 — 仅hash不匹配时出现
+                try:
+                    from l3_persona_verify import persona_verify
+                    pv = persona_verify()
+                    if pv.get("failed", 0) > 0:
+                        layer1.append(f"⚠️ 画像溯源异常：{pv['failed']}条声明源行已变更，可能过时")
+                except Exception:
+                    pass
                 blocks.append("\n".join(layer1))
 
             # ═══════ 第二层：你在往哪走 ═══════
