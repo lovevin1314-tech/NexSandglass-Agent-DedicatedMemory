@@ -400,7 +400,30 @@ def _log_decision(decision_text: str, offset_result: dict) -> None:
 
 
 def _read_decision_log(limit: int = 20) -> list:
-    """读最近决策日志。"""
+    """读最近决策日志。V2.9.9: 优先读快照(点线面三维)，降级读日志。"""
+    # 优先：三维快照
+    snap_path = os.path.join(_NB, "decision_snapshots.txt")
+    if os.path.exists(snap_path):
+        entries = []
+        with open(snap_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    e = json.loads(line.strip())
+                    snap = e.get("snapshot", {})
+                    # 展平: 把 point/line/surface 提成和日志兼容的字段
+                    entries.append({
+                        "ts": e.get("ts", ""),
+                        "decision": e.get("decision", ""),
+                        "direction": snap.get("point", {}).get("direction", "neutral"),
+                        "offset": snap.get("point", {}).get("offset", 0),
+                        "tags": snap.get("point", {}).get("tags", ""),
+                        "source": "snapshot",
+                    })
+                except (json.JSONDecodeError, KeyError):
+                    continue
+        if entries:
+            return entries[-limit:]
+    # 降级：传统日志
     if not os.path.exists(_DECISION_LOG):
         return []
     entries = []
