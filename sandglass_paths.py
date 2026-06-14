@@ -21,7 +21,7 @@ _SHADOW_DB = os.path.join(_NB, "shadow_sand.db")
 _DECISION_PARTICLES = os.path.join(_NB, "decision_particles.txt")
 _DECISION_VOCAB = os.path.join(_NB, "decision_vocab.txt")
 _ECHO_WIND = os.path.join(_NB, "echo_wind.jsonl")
-_EMOTION_VOCAB = os.path.join(_NB, "emotion_vocab.jsonl")
+_EMOTION_VOCAB = os.path.join(_NB, "emotion_vocab.json")
 _IRON_RULES = os.path.join(_NB, "iron_rules.txt")
 
 # 启动时必须存在的目录
