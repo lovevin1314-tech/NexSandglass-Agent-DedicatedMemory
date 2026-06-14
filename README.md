@@ -121,8 +121,13 @@
 121|
 122|# 安装到自定义路径
 123|export NEXSANDBASE_HOME=/your/path && python install.py
-124|```
-125|python -c "from sandglass_log import log_message; log_message('hello', 'user')"
+```
+
+## 快速体验
+
+```bash
+# 写入记忆
+python -c "from sandglass_log import log_message; log_message('hello', 'user')"
 126|
 127|# 搜索
 128|python -c "from sandglass_vault import search; print(search('关键词'))"
