@@ -133,6 +133,16 @@ NEXSANDBASE_HOME=~/.neurobase-claude python sandglass_mcp.py
 NEXSANDBASE_HOME=~/.neurobase-codex python sandglass_mcp.py
 ```
 
+## 一键搬家
+
+```bash
+# 打包全部记忆为 tar.gz（解压到新电脑即刻恢复）
+python -c "from sandglass_think import memory_migrate; print(memory_migrate())"
+
+# 或导出沙漏文本文件
+python -c "from sandglass_vault import sandglass_export; print(sandglass_export())"
+```
+
 ---
 
 ## 冒烟测试
