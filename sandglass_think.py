@@ -176,11 +176,9 @@ def full_sanity() -> dict:
         # 只测不会产生副作用的读接口
         checks = {}
         try:
-            from sandglass_think import _emotional_entropy
             checks["情绪熵"] = "✅" if _emotional_entropy() >= 0 else "?"
         except: checks["情绪熵"] = "❌"
         try:
-            from sandglass_think import comprehensive_offset
             o = comprehensive_offset()
             checks["偏移率"] = f"✅ {o['offset']:+d}% ({o['sample']}条)"
         except: checks["偏移率"] = "❌"
