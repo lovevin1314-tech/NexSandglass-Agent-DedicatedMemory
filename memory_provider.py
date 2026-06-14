@@ -71,6 +71,34 @@ _TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "sandglass_migrate",
+            "description": "一键导出全部记忆数据为 tar.gz。换电脑时解压即用。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "output": {"type": "string", "description": "输出路径", "default": ""},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "sandglass_export",
+            "description": "导出沙漏为可迁移文本文件。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "output_path": {"type": "string", "description": "输出路径"},
+                    "limit": {"type": "integer", "description": "导出条数"},
+                    "month": {"type": "string", "description": "指定月份 YYYY-MM"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "sandglass_recent",
             "description": "获取最近 N 条记忆。",
             "parameters": {
