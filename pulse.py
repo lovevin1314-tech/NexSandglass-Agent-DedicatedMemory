@@ -151,7 +151,7 @@ def pulse(user_message: str = "") -> str:
         if reminder:
             signals.append(reminder)
         fresh = persona_freshness()
-        if fresh.get("stale") and fresh.get("level", 0) >= 1:
+        if fresh.get("stale"):
             count = fresh.get("since_sands", 0)
             msg = f"📊 觉察：画像已滞后 {count}条沙子，建议更新。" if count > 0 else "📊 觉察：画像需要更新。"
             signals.append(msg)
