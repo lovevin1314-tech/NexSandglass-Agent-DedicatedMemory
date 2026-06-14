@@ -162,6 +162,26 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
                     (name, str(line_num))
                 )
 
+    # V2.9.9.5: 关键词标签提取 — 零依赖,纯本地
+    if category == "general" and not tags:
+        t = text.lower()
+        extracted_tags = []
+        # 技术类
+        if any(w in t for w in ["python", "代码", "编程", "api", "数据库", "sql", "git", "算法"]):
+            extracted_tags.append("技术")
+        # 决策类
+        if any(w in t for w in ["选", "决定", "放弃", "取代", "替代", "换", "改用"]):
+            extracted_tags.append("决策")
+        # 成本类
+        if any(w in t for w in ["免费", "花钱", "付费", "省钱", "贵", "便宜", "开源", "性价比"]):
+            extracted_tags.append("成本")
+        # 情绪类
+        if any(w in t for w in ["太棒", "开心", "烦", "累", "焦虑", "算了", "随便", "终于"]):
+            extracted_tags.append("情绪")
+        if extracted_tags:
+            category = "auto"
+            tags = ",".join(extracted_tags)
+
     # 写入信任记录
     db.execute(
         "INSERT OR IGNORE INTO trust (line_num, score) VALUES (?, 0.5)",
