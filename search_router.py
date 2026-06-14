@@ -85,7 +85,7 @@ def dynamic_expand(candidates, tokens, limit: int) -> list:
 class ShadowSearch:
     def __init__(self, sandfile=None):
         self.sandfile = sandfile or _SANDGLASS
-    def search(self, query: str, limit: int = 10) -> list:
+    def search(self, query: str, limit: int = 30) -> list:
         try:
             from shadow_sand import shadow_search
             return shadow_search(query, limit)
@@ -94,7 +94,7 @@ class ShadowSearch:
 
 
 class Fts5Search:
-    def search(self, query: str, limit: int = 10) -> list:
+    def search(self, query: str, limit: int = 30) -> list:
         try:
             from sandglass_sqlite import search as fts5_search, sync_incremental
             sync_incremental()
@@ -180,7 +180,7 @@ class TfidfSearch:
 class MmapFallback:
     def __init__(self, sandfile=None):
         self.sandfile = sandfile or _SANDGLASS
-    def search(self, query: str, limit: int = 10) -> list:
+    def search(self, query: str, limit: int = 30) -> list:
         results = []
         results_token = []
         try:
@@ -230,7 +230,7 @@ class SearchRouter:
         self.tfidf = tfidf or TfidfSearch()
         self.mmapfallback = mmap or MmapFallback()
 
-    def search(self, query: str, limit: int = 10) -> list:
+    def search(self, query: str, limit: int = 30) -> list:
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
             fut_shadow = ex.submit(self.shadow.search, query, limit)
             fut_fts5 = ex.submit(self.fts5.search, query, max(limit * 2, 30))
