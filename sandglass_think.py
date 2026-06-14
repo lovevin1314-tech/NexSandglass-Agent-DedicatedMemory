@@ -465,7 +465,8 @@ def persona_maintain() -> dict:
         persona_canvas()
         return {"triggered": True,
                 "reason": "自动维护：" + str(fresh["since_sands"]) + "条新沙子，偏移稳定，画像已更新",
-                "result": result_path}
+                "result": result_path,
+                "verify": persona_verify()}
     return {"triggered": False, "reason": "更新失败"}
 
 def search_with_stage_label(query: str, limit: int = 5) -> list:
