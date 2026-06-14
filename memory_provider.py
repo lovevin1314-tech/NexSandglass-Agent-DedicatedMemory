@@ -326,8 +326,14 @@ class NexSandglassProvider(MemoryProvider):
             except Exception:
                 logger.debug("矛盾检测失败", exc_info=True)
 
+            # V2.9.9.7: 情绪行扩语气 — 极值熵加陪伴提醒
             if mood != "平稳":
-                layer2.append(f"🎭 情绪：{mood}")
+                tone = ""
+                if ent > 1.0: tone = " — 安静陪着"
+                elif ent < 0.3: tone = " — 状态稳"
+                layer2.append(f"🎭 情绪：{mood}{tone}")
+            elif ent < 0.3:
+                layer2.append("🎭 情绪：平稳 — 状态稳")
 
             blocks.append("\n".join(layer2))
 
