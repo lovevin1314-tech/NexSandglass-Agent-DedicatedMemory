@@ -34,6 +34,7 @@ def persona_build() -> str:
     """首次全量构建人格画像。从最近500条沙子提炼。返回 persona.md 路径。"""
     _lazy_import()
     from sandglass_vault import recent, count
+    from sandglass_think import comprehensive_offset
 
     total = count()
     limit = min(total, 500)
@@ -59,7 +60,7 @@ def persona_build() -> str:
             user_prompt += f"=== 玻璃画像（2D轮廓+3D注解） ===\n{glass}\n\n"
     except Exception: pass
     try:
-        off
+        off = comprehensive_offset()
         if off.get("direction") and off["direction"] != "neutral":
             proj = persona_project(off["direction"], off.get("offset", 0))
             if proj.get("shadow_persona"):
