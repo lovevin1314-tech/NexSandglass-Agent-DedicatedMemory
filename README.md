@@ -5,8 +5,8 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Lines](https://img.shields.io/badge/Lines-8200-lightgrey)]()
-[![Size](https://img.shields.io/badge/Size-266KB-brightgreen)]()
+[![Lines](https://img.shields.io/badge/Lines-10000-lightgrey)]()
+[![Size](https://img.shields.io/badge/Size-280KB-brightgreen)]()
 
 > **Remember. Understand. Know you. Think of you.**
 
@@ -15,7 +15,7 @@
 
 > **V2.9.9.2 Minimal Injection:** 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完。~60token。LLM 按需 sandglass_search 主动查。
 
-> **Soul Distillation:** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity**, this mechanism captures continuous deviations from the baseline.
+> **Soul Distillation:** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories — we forge a unique, evolving soul that resonates with the user.
 
 ---
 
