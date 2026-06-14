@@ -25,8 +25,8 @@ try:
     )
     from persona_l3 import _WAVE_THRESHOLDS
     _3D_ANNOTATIONS = __import__('sandglass_think')._3D_ANNOTATIONS
-except:
-    _fail_open = lambda d: lambda f: f
+except ImportError:
+    _read_decision_log = lambda n: []
     _llm = None
     _three_d_ready = lambda: False
     _latest_annotation = lambda: {}
