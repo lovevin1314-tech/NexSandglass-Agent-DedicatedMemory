@@ -306,12 +306,22 @@ class NexSandglassProvider(MemoryProvider):
             if decisions:
                 layer2.append(f"📋 最近：{'；'.join(decisions)}")
 
-            # V2.9.9: 情绪×偏移预判
+            # V2.9.9.7: 情绪×偏移预判+语气合并行
             try:
                 from offset_l3 import psychology_hint
                 hint = psychology_hint()
-                if hint:
-                    layer2.append(hint)
+                emo = ""
+                if mood != "平稳":
+                    tone = ""
+                    if ent > 1.0: tone = " — 安静陪着"
+                    elif ent < 0.3: tone = " — 状态稳"
+                    emo = f" 🎭 {mood}{tone}"
+                elif ent < 0.3:
+                    emo = " 🎭 平稳 — 状态稳"
+                if hint or emo:
+                    line = (hint or "") + emo
+                    if line.strip():
+                        layer2.append(line.strip())
             except Exception:
                 pass
 
@@ -326,14 +336,6 @@ class NexSandglassProvider(MemoryProvider):
             except Exception:
                 logger.debug("矛盾检测失败", exc_info=True)
 
-            # V2.9.9.7: 情绪行扩语气 — 极值熵加陪伴提醒
-            if mood != "平稳":
-                tone = ""
-                if ent > 1.0: tone = " — 安静陪着"
-                elif ent < 0.3: tone = " — 状态稳"
-                layer2.append(f"🎭 情绪：{mood}{tone}")
-            elif ent < 0.3:
-                layer2.append("🎭 情绪：平稳 — 状态稳")
 
             blocks.append("\n".join(layer2))
 
