@@ -8,9 +8,11 @@ NexSandglass 决策粒子 — 第三层通用燃料 V2
 ==========================================
 """
 
-import os, json, time
+import os, json, time, logging
 from datetime import datetime
 from sandglass_paths import _NB
+
+logger = logging.getLogger(__name__)
 
 _PARTICLES = os.path.join(_NB, "decision_particles.txt")
 _VOCAB = os.path.join(_NB, "decision_vocab.txt")
@@ -542,6 +544,7 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
 
     os.makedirs(os.path.dirname(_PARTICLES), exist_ok=True)
     with open(_PARTICLES, "a", encoding="utf-8") as f:
+        record = f"{options} | {resolved} | {direction} | {emotion_tag} | {tags}"
         f.write(f"{ts} | {record}\n")
 
     # 影子沙同步
