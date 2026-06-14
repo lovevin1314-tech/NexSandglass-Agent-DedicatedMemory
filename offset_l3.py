@@ -388,6 +388,7 @@ def _log_decision(decision_text: str, offset_result: dict) -> None:
 
     # 决策全维度快照（点线面）—— 传offset_result断递归
     try:
+        from sandglass_think import decision_snapshot  # lazy import 防循环引用
         snapshot = decision_snapshot(decision_text, offset_result)
         snap_path = os.path.join(_NB, "decision_snapshots.txt")
         with open(snap_path, "a", encoding="utf-8") as f:
