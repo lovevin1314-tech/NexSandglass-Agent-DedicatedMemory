@@ -1,0 +1,27 @@
+{
+  "_comment": "NexSandglass V2.9.9 配置文件 — 迁移硬编码参数",
+  "injection": {
+    "persona_max_chars": 250,
+    "thread_min_triples": 20,
+    "pending_tasks_limit": 3
+  },
+  "decision": {
+    "tag_max_length": 30,
+    "llm_reject_length": 50,
+    "vocab_dedupe_window": 200
+  },
+  "search": {
+    "tfidf_top_k": 20,
+    "simhash_threshold": 3
+  },
+  "stage": {
+    "threshold": 200,
+    "auto_switch": true
+  },
+  "persona": {
+    "freshness_fresh": 30,
+    "freshness_aging": 80,
+    "maintain_min_sands": 80,
+    "maintain_min_hours": 24
+  }
+}
