@@ -12,19 +12,32 @@ _DB = os.path.join(_NB, "shadow_sand.db")
 
 # ── 关系提取模式（正则）──
 _EXTRACT_PATTERNS = [
-    # 决策类
+    # 决策类(中文)
     (r'(?:决定用|最终用|换用|改用|选了|选择用|采用了|用了|用上了)\s*([\u4e00-\u9fff\w]+)', '使用'),
     (r'(?:放弃|不用|砍掉|去掉|移除|弃用|拒了|不用了)\s*了?\s*([\u4e00-\u9fff\w]+)', '放弃'),
     (r'([\u4e00-\u9fff\w]{2,8})\s*(?:比|优于|好过|胜过|强于|不如)\s*([\u4e00-\u9fff\w]+)', '对比'),
     (r'(?:把|将)\s*([\u4e00-\u9fff\w]+)\s*(?:换成|替换为|改成|迁移到|切到|替代为)\s*([\u4e00-\u9fff\w]+)', '替换为'),
     (r'用了?\s*([\u4e00-\u9fff\w]+)\s*替代\s*([\u4e00-\u9fff\w]+)', '替代'),
     (r'从\s*([\u4e00-\u9fff\w]+)\s*迁到\s*([\u4e00-\u9fff\w]+)', '迁移'),
-    # 关系类
+    # 关系类(中文)
     (r'(?:装了|安装了|部署了|搭建了)\s*([\u4e00-\u9fff\w]+)', '安装'),
     (r'(?:依赖|基于|构建在)\s*([\u4e00-\u9fff\w]+)上?', '依赖'),
-    # 偏好类
+    # 偏好类(中文)
     (r'(?:喜欢|偏好|倾向|偏爱)\s*([\u4e00-\u9fff\w]+)', '偏好'),
     (r'(?:讨厌|不喜欢|反感|烦)\s*([\u4e00-\u9fff\w]+)', '反感'),
+    # V2.9.9.7: 英文决策类
+    (r'(?:decided to|chose|switched to|adopted|started using)\s+(\w[\w\s]{1,40}\w)', 'use'),
+    (r'(?:gave up|abandoned|stopped using|quit|dropped)\s+(\w[\w\s]{1,40}\w)', 'abandon'),
+    (r'(\w[\w\s]{1,30}\w)\s+(?:is better than|prefer|like more than|over)\s+(\w[\w\s]{1,30}\w)', 'compare'),
+    # 英文关系类
+    (r'(?:installed|deployed|set up|built)\s+(\w[\w\s]{1,40}\w)', 'install'),
+    (r'(?:depends on|based on|uses|relies on)\s+(\w[\w\s]{1,40}\w)', 'depend'),
+    # 英文偏好类
+    (r'(?:likes?|prefers?|loves?|enjoys?)\s+(\w[\w\s]{1,40}\w)', 'prefer'),
+    (r'(?:dislikes?|hates?|doesn\'t like|dislike)\s+(\w[\w\s]{1,40}\w)', 'dislike'),
+    # 英文时间类 (Temporal关键)
+    (r'(?:in|on|at)\s+(\d{4}|\w+ \d{4}|\w+ \d{1,2}(?:st|nd|rd|th)?)', 'time'),
+    (r'(?:last|next|previous)\s+(\w+)', 'relative_time'),
 ]
 
 
