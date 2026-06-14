@@ -510,11 +510,4 @@ def _feed_emotion_to_synonyms():
         pass
 
 
-# ======================== V2.8: sand density + dynamic expand + lang detect ========================
-
-def _detect_lang(query: str) -> str:
-    has_cjk = any(chr(0x4e00) <= c <= chr(0x9fff) for c in query)
-    has_alpha = any(c.isascii() and c.isalpha() for c in query)
-    if has_cjk and has_alpha: return 'mixed'
-    elif has_cjk: return 'zh'
-    else: return 'en'
+# ======================== V2.8: sand density + dynamic expand ========================
