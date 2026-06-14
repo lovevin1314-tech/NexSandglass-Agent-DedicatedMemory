@@ -11,6 +11,9 @@ import re
 import math
 import os
 import hashlib
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════
@@ -307,7 +310,10 @@ def _synonym_expand(query: str) -> list:
                     if w.lower() not in seen:
                         keywords.append(w)
                         seen.add(w.lower())
-    except: pass
+    except ImportError:
+        pass  # emotion_vocab 模块未安装
+    except Exception:
+        logger.debug("情绪词库扩展失败", exc_info=True)
     return keywords
 
 
@@ -479,7 +485,7 @@ def _feed_emotion_to_synonyms():
                     w = e.get("word", "")
                     if w and len(w) >= 2:
                         emotion_words[w] = emotion_words.get(w, 0) + 1
-                except: pass
+                except (json.JSONDecodeError, KeyError): pass
         # 频次≥2的情绪词注入同义词
         top = [w for w, c in sorted(emotion_words.items(), key=lambda x: x[1], reverse=True)[:30] if c >= 2]
         for w in top:
