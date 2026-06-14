@@ -464,7 +464,6 @@ class NexSandglassProvider(MemoryProvider):
                         "ts": __import__("datetime").datetime.now().isoformat(),
                         "dominant": max(mood_counts, key=mood_counts.get),
                         "distribution": {k: round(v/total, 2) for k, v in mood_counts.items()},
-                        "total": total,
                     }
                     emo_path = os.path.join(_NB, "emotion_session.jsonl")
                     with open(emo_path, "a", encoding="utf-8") as f:
