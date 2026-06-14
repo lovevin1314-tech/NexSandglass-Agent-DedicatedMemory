@@ -430,7 +430,7 @@ class NexSandglassProvider(MemoryProvider):
             return tool_error(f"fact_feedback error: {e}")
 
     def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
-        """会话结束——蒸馏 + 偏移检查。"""
+        """会话结束——落沙 + 偏移检查 + V2.9.9.1情绪摘要。"""
         try:
             # 落最后一轮对话
             for msg in messages[-5:]:
@@ -445,6 +445,32 @@ class NexSandglassProvider(MemoryProvider):
             off = comprehensive_offset()
             if abs(off.get("offset", 0)) >= 30:
                 logger.info(f"会话结束偏移: {off['offset']:+d}% ({off['direction']})")
+
+            # V2.9.9.1: 情绪会话摘要
+            try:
+                from emotion_vocab import detect as emotion_detect
+                from sandglass_paths import _NB
+                import os, json
+                mood_counts = {}
+                for msg in messages:
+                    if msg.get("role") == "user":
+                        det = emotion_detect(msg.get("content", ""))
+                        mood = det.get("mood", "")
+                        if mood:
+                            mood_counts[mood] = mood_counts.get(mood, 0) + 1
+                if mood_counts:
+                    total = sum(mood_counts.values())
+                    entry = {
+                        "ts": __import__("datetime").datetime.now().isoformat(),
+                        "dominant": max(mood_counts, key=mood_counts.get),
+                        "distribution": {k: round(v/total, 2) for k, v in mood_counts.items()},
+                        "total": total,
+                    }
+                    emo_path = os.path.join(_NB, "emotion_session.jsonl")
+                    with open(emo_path, "a", encoding="utf-8") as f:
+                        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            except Exception:
+                pass
 
         except Exception:
             pass
