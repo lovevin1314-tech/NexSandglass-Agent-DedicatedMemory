@@ -265,7 +265,9 @@ class SearchRouter:
         if all_candidates:
             tokens = _query_tokens(query)
             ranked = sand_density(all_candidates, tokens, query)
-            ranked = simhash_rerank(ranked, query)
+            # V2.9.9.3: 英文查询跳过simhash（短问题vs长文本汉明距离不公平）
+            if _detect_lang(query) != "en":
+                ranked = simhash_rerank(ranked, query)
             ranked = dynamic_expand(ranked, tokens, limit)
             return ranked[:limit]
         return self.mmapfallback.search(query, limit)
