@@ -342,7 +342,7 @@ def _mmap_search(query: str, limit: int, month: str, stage_filter: bool = False)
                     line = mm[line_start:line_end].decode("utf-8", errors="replace")
                     ts, sender, text = _parse_line(line)
                     if ts and query.lower() in text.lower():
-                        if not month or ts.startswith(month):
+                        if not scan_months or any(ts.startswith(m) for m in scan_months):
                             results.append((line_num, ts, text))
                             if limit > 0 and len(results) >= limit: break
                     line_start = line_end + 1
