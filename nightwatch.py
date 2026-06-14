@@ -53,10 +53,10 @@ def night_watch() -> str:
     if os.path.exists(_LAST_COUNT):
         with open(_LAST_COUNT, "r") as f:
             try: prev_lines = int(f.read().strip())
-            except: pass
-    if prev_lines and current_lines < prev_lines - 10:
+            except Exception: pass
         lost = prev_lines - current_lines
-        alerts.append(f"🔴 L0 告急！沙漏从 {prev_lines} 条降到 {current_lines} 条（疑似 compaction 吞了 {lost} 条沙子）。L1 沙漏未受影响，但会话层（L0）可能丢失了对话。")
+        if lost > 0:
+            alerts.append(f"🔴 L0 告急！沙漏从 {prev_lines} 条降到 {current_lines} 条（疑似 compaction 吞了 {lost} 条沙子）。L1 沙漏未受影响，但会话层（L0）可能丢失了对话。")
     with open(_LAST_COUNT, "w") as f:
         f.write(str(current_lines))
 

@@ -11,13 +11,16 @@ _DECISION_LOG = os.path.join(_PERSONA_DIR, "decision-log.jsonl")
 logger = logging.getLogger(__name__)
 
 try: from offset_l3 import _read_decision_log
-except: _read_decision_log = lambda n: []
+except ImportError:
+    _read_decision_log = lambda n: []
 
 try: from sandglass_think import _fail_open, _llm, _emotional_entropy, comprehensive_offset
-except: _fail_open = lambda d: lambda f: f; _llm = None; _emotional_entropy = lambda n=10: 0.0; comprehensive_offset = lambda: {"offset":0,"direction":"neutral","sample":0}
+except ImportError:
+    _fail_open = lambda d: lambda f: f; _llm = None; _emotional_entropy = lambda n=10: 0.0; comprehensive_offset = lambda: {"offset":0,"direction":"neutral","sample":0}
 
 try: from persona_l3 import _STAGE_THRESHOLD
-except: _STAGE_THRESHOLD = 60
+except ImportError:
+    _STAGE_THRESHOLD = 60
 
 _SCENE_MODE = None  # None=自动, 'exam'=考试, 'normal'=日常
 def scene_mode(mode: str = None) -> str:
@@ -35,7 +38,9 @@ def scene_mode(mode: str = None) -> str:
         if e < 0.3 and abs(off.get('offset',0)) < 20:
             return 'exam'
         return 'normal'
-    except: return 'normal'
+    except Exception:
+        logger.debug("emotion检测失败")
+        return 'normal'
 
 # ── LLM 配置 ──
 from offset_signals import _LLM_KEY, _LLM_ENDPOINT, _LLM_MODEL
