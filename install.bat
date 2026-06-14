@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ╔══════════════════════════════════╗
-echo ║  NexSandglass V2.9.9.3 安装程序    ║
+echo ║  NexSandglass V2.9.9.5 安装程序    ║
 echo ║  极简注入 · 五大支柱 · 零依赖    ║
 echo ╚══════════════════════════════════╝
 echo.
@@ -38,7 +38,7 @@ if exist "%%~dp0memory_provider.py" copy /Y "%%~dp0memory_provider.py" "%LOCALAP
 if exist "%%~dp0plugin.py" copy /Y "%%~dp0plugin.py" "%LOCALAPPDATA%\hermes\plugins\sandglass\__init__.py" >nul
 
 echo.
-echo ✅ NexSandglass V2.9.9.3 安装完成！
+echo ✅ NexSandglass V2.9.9.5 安装完成！
 echo.
 echo 📂 33模块 + MemoryProvider插件
 echo 🔐 明文存储 — OS层全盘加密保护
