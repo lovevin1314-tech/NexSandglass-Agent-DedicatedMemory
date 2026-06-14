@@ -551,7 +551,7 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
     try:
         from shadow_sand import shadow_index
         shadow_index(choice, "decision", tags)
-    except: pass
+    except Exception: pass
 
     feed_all(resolved, tags, direction)
 
@@ -561,7 +561,7 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
         off = comprehensive_offset()
         if off.get("direction") and off["direction"] != "neutral":
             persona_project(off["direction"], off.get("offset", 0))
-    except: pass
+    except Exception: pass
 
     # 回音折回读——落粒子时读取情感残留
     try:
@@ -578,8 +578,8 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
                             with open(_PARTICLES, "a", encoding="utf-8") as af:
                                 af.write(f"{ts} | echo_wind | {rec['sentiment']}({rec.get('spread_weight',1.0)}) | echo | 回音折残留\n")
                             break
-                    except: pass
-    except: pass
+                    except (json.JSONDecodeError, KeyError, ValueError): pass
+    except Exception: pass
 
 
 def _has_llm() -> bool:
