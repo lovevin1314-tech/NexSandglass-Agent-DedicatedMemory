@@ -56,6 +56,21 @@ _TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "sandglass_semantic",
+            "description": "精炼语义搜索——六维滤镜+影子沙+同义词+情感重排。概念查询更准。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "搜索关键词"},
+                    "limit": {"type": "integer", "default": 5},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "sandglass_recent",
             "description": "获取最近 N 条记忆。",
             "parameters": {
@@ -484,6 +499,14 @@ class NexSandglassProvider(MemoryProvider):
             if name == "sandglass_search":
                 from sandglass_vault import search
                 results = search(args.get("query", ""), limit=args.get("limit", 10))
+                return json.dumps(
+                    [{"line": ln, "ts": ts, "text": txt[:200]} for ln, ts, txt in results],
+                    ensure_ascii=False,
+                )
+
+            if name == "sandglass_semantic":
+                from sandglass_think import search_semantic
+                results = search_semantic(args.get("query", ""), limit=args.get("limit", 5))
                 return json.dumps(
                     [{"line": ln, "ts": ts, "text": txt[:200]} for ln, ts, txt in results],
                     ensure_ascii=False,
