@@ -30,17 +30,11 @@ NexSandglass is a **local-first AI agent memory engine**.
 - **Soul Distillation** — builds a living persona from accumulated drifts
 - **Zero Dependencies** — pure Python stdlib + SQLite
 
-**Agent 一键安装（推荐）：**
+**⚡ 安装（给 Agent 的链接，一行搞定）：**
 ```bash
 curl -sSL https://raw.githubusercontent.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory/main/remote_install.py | python
 ```
-这行命令会自动：克隆仓库 → 安装 33 模块 → 验证。Agent 也能正确执行。
-
-**手动安装：**
-```bash
-git clone https://github.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory
-cd NexSandglass-Agent-DedicatedMemory && python install.py
-```
+> 然后把 `NEXSANDBASE_HOME` 写入 Hermes 的 `.env`，重启 Gateway 即刻生效。
 
 ---
 
@@ -98,17 +92,23 @@ NexSandglass 用"阶段+偏移"解决这两个问题。
 
 ---
 
-## 一键安装
+## 安装指引
 
-**Agent 推荐（一行搞定）：**
+**Herems 用户（推荐）：**
 ```bash
 curl -sSL https://raw.githubusercontent.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory/main/remote_install.py | python
 ```
+然后确保 Hermes 的 `.env` 有 `NEXSANDBASE_HOME=~/.neurobase`，重启 Gateway。
 
-**手动安装：**
+**MCP 用户（独立服务）：**
 ```bash
 git clone https://github.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory
-cd NexSandglass-Agent-DedicatedMemory && python install.py
+cd NexSandglass-Agent-DedicatedMemory && python sandglass_mcp.py
+```
+
+**Docker：**
+```bash
+docker-compose up -d
 ```
 
 ## 快速体验
