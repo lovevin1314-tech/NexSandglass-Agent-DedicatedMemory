@@ -413,9 +413,10 @@ def sandglass_import(source_path: str, source_format: str = "sandglass") -> dict
         try:
             from sandglass_sqlite import sync_incremental
             sync_incremental()
-        except: pass
-        
-        return {"imported": imported, "skipped": skipped, "total": imported + skipped}
+        except Exception:
+            pass
+
+        # 合并
     except Exception as e:
         logger.error(f"导入失败: {e}")
         return {"error": str(e), "imported": imported, "skipped": skipped}

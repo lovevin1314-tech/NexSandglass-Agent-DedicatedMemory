@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from sandglass_think import _fail_open, _llm, comprehensive_offset, cross_stage_offset, stage_list, search_with_stage_label, weave_links
-except:
+except ImportError:
     _fail_open = lambda d: lambda f: f
     _llm = None
     comprehensive_offset = lambda: {"offset": 0, "direction": "neutral", "sample": 0}
@@ -113,7 +113,7 @@ def weave_contradiction() -> dict:
     # 矛盾2：场景占比变了但阶段没切
     try:
         from scene_l3 import scene_dominance
-    except:
+    except ImportError:
         from sandglass_think import scene_dominance
     dom = scene_dominance()
     if dom.get("shift"):
@@ -128,12 +128,12 @@ def weave_contradiction() -> dict:
     # 矛盾3：稳定性低但无切换预测
     try:
         from sandglass_think import decision_stability
-    except:
+    except ImportError:
         decision_stability = lambda: {"overall": {"volatility": 0}}
     stab = decision_stability()
     try:
         from scene_l3 import stage_switch_prediction
-    except:
+    except ImportError:
         stage_switch_prediction = lambda: {"predicted": False}
     pred = stage_switch_prediction()
     if stab["overall"]["volatility"] >= 40 and not pred.get("predicted"):
@@ -146,7 +146,7 @@ def weave_contradiction() -> dict:
     # 矛盾4：3D 立体注解 vs 2D 偏移
     try:
         from sandglass_think import _latest_annotation
-    except:
+    except ImportError:
         _latest_annotation = lambda: {}
     three_d = _latest_annotation()
     if three_d and three_d.get("persona_type"):
