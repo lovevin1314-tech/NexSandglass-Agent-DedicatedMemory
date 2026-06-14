@@ -351,7 +351,16 @@ def _enrich_choice_with_llm(question: str, choice: str) -> str:
 
 def _tag(question: str, choice: str) -> str:
     local = _tag_local(choice)
+    t0 = time.time()
     llm_tags = _tag_llm(question, choice)
+    # V2.9.9 metrics 埋点
+    try:
+        from metrics import emit_metric
+        emit_metric('tag_result', local_hit=bool(local), llm_used=bool(llm_tags))
+        if llm_tags:
+            emit_metric('tag_llm_call', latency_ms=int((time.time()-t0)*1000))
+    except Exception:
+        pass
 
     if llm_tags:
         _learn(llm_tags, choice)
@@ -523,10 +532,13 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
     emotion_tag = "neutral"
     try:
         from emotion_vocab import detect as emotion_detect
-        det = emotion_detect(question + " " + choice)
-        if det.get("mood"): emotion_tag = det["mood"]
-    except: pass
-    record = f"{options} | {resolved} | {direction} | {emotion_tag} | {tags}"
+        det = emotion_detect(question + ' ' + choice)
+        if det.get('mood'):
+            emotion_tag = det['mood']
+    except ImportError:
+        pass  # emotion_vocab 模块未安装
+    except Exception:
+        logger.debug('情绪检测失败', exc_info=True)
 
     os.makedirs(os.path.dirname(_PARTICLES), exist_ok=True)
     with open(_PARTICLES, "a", encoding="utf-8") as f:
