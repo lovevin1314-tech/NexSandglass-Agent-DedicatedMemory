@@ -298,13 +298,16 @@ class NexSandglassProvider(MemoryProvider):
             # 纪律
             rules = []
             try:
-                from discipline import iron_rules_with_counts
+                from discipline import iron_rules_with_counts, iron_rule_inject_bump
                 raw_rules = iron_rules_with_counts(3)
                 if raw_rules:
                     if any(c > 0 for _, c in raw_rules):
                         rules = [f"{r} ×{c}" for r, c in raw_rules]
                     else:
                         rules = [r for r, _ in raw_rules]
+                    # V2.9.9: 会话级去重bump — 每条规则每session+1
+                    for r, _ in raw_rules:
+                        iron_rule_inject_bump(r)
             except Exception:
                 pass
 
