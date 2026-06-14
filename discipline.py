@@ -56,6 +56,18 @@ def iron_rule_bump(rule_text: str):
             return
 
 
+# V2.9.9: 会话级去重——注入时每条规则每session只bump一次
+_injected_this_session = set()
+
+def iron_rule_inject_bump(rule_text: str):
+    """注入时bump——去重，每条规则每session只+1"""
+    key = rule_text.strip().lower()
+    if key in _injected_this_session:
+        return
+    _injected_this_session.add(key)
+    iron_rule_bump(rule_text)
+
+
 def iron_rules_set(rules: list) -> bool:
     """设定纪律。覆盖写入，最多5条。"""
     os.makedirs(os.path.dirname(_IRON_RULES), exist_ok=True)
