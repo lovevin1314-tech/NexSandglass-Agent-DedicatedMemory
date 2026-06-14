@@ -30,9 +30,16 @@ NexSandglass is a **local-first AI agent memory engine**.
 - **Soul Distillation** — builds a living persona from accumulated drifts
 - **Zero Dependencies** — pure Python stdlib + SQLite
 
-**一键安装：**
+**Agent 一键安装（推荐）：**
 ```bash
-python install.py              # 全平台通用，安装+自动验证
+curl -sSL https://raw.githubusercontent.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory/main/remote_install.py | python
+```
+这行命令会自动：克隆仓库 → 安装 33 模块 → 验证。Agent 也能正确执行。
+
+**手动安装：**
+```bash
+git clone https://github.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory
+cd NexSandglass-Agent-DedicatedMemory && python install.py
 ```
 
 ---
@@ -93,8 +100,15 @@ NexSandglass 用"阶段+偏移"解决这两个问题。
 
 ## 一键安装
 
+**Agent 推荐（一行搞定）：**
 ```bash
-python install.py
+curl -sSL https://raw.githubusercontent.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory/main/remote_install.py | python
+```
+
+**手动安装：**
+```bash
+git clone https://github.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory
+cd NexSandglass-Agent-DedicatedMemory && python install.py
 ```
 
 ## 快速体验
