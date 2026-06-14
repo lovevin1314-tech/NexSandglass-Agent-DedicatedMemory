@@ -677,6 +677,15 @@ def search_filter(query: str) -> dict:
     except Exception:
         pass
 
+    # V2.9.9: 偏移引导 — 根据画像自动偏置搜索方向
+    try:
+        guide = offset_guide(query)
+        if guide.get("bias") and guide["bias"] != "neutral":
+            prefix = f"偏移趋向:{guide['bias']};"
+            result["decision_bias"] = prefix + result.get("decision_bias", "")
+    except Exception:
+        pass
+
     # ── 影子沙注入（脱口而出层的实体标签 → 搜索权重）──
     try:
         from shadow_sand import shadow_search
