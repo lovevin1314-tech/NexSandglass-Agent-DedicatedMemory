@@ -226,6 +226,27 @@ def comprehensive_offset(scene: str = "") -> dict:
     return result
 
 
+# V2.9.9: 情绪x偏移预判 — 零依赖,纯本地
+def psychology_hint() -> str:
+    """偏移方向 + 情绪熵 -> 预判心理状态。"""
+    try:
+        from sandglass_think import _emotional_entropy
+        off = comprehensive_offset()
+        ent = _emotional_entropy()
+        d = off.get("direction", "")
+        if d == "frugal" and ent > 1.0:
+            return "高熵省钱 -> 可能补偿心理"
+        if d == "spend" and ent > 1.0:
+            return "高熵花钱 -> 可能冲动消费"
+        if d == "drift" and ent < 0.5:
+            return "低熵放弃 -> 可能冷静决策"
+        if d == "frugal" and ent < 0.3:
+            return "低熵省钱 -> 理性节制"
+    except Exception:
+        pass
+    return ""
+
+
 @__import__("offset_signals")._fail_open({})
 def cross_stage_offset(decision_text: str) -> dict:
     """跨阶段偏移对比——同一个决策放到每个历史阶段的画像上量偏移率。

@@ -255,6 +255,15 @@ class NexSandglassProvider(MemoryProvider):
             if decisions:
                 layer2.append(f"📋 最近：{'；'.join(decisions)}")
 
+            # V2.9.9: 情绪×偏移预判
+            try:
+                from offset_l3 import psychology_hint
+                hint = psychology_hint()
+                if hint:
+                    layer2.append(hint)
+            except Exception:
+                pass
+
             # 矛盾检测
             try:
                 from weave_l3 import weave_contradiction
