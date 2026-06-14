@@ -263,6 +263,9 @@ class SearchRouter:
                         seen.add(ln)
                         all_candidates.append((ln, ts, text))
         if all_candidates:
+            # V2.9.9.4: 英文查询去掉时间停用词（when/first/last等挤掉正确结果）
+            if _detect_lang(query) == "en":
+                query = re.sub(r'\b(first|last|when|time)\b', '', query, flags=re.IGNORECASE).strip()
             tokens = _query_tokens(query)
             ranked = sand_density(all_candidates, tokens, query)
             # V2.9.9.3: 英文查询跳过simhash（短问题vs长文本汉明距离不公平）
