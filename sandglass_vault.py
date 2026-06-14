@@ -429,7 +429,6 @@ def sandglass_export(output_path: str = None, limit: int = None, month: str = ""
     返回导出文件路径。
     """
     if output_path is None:
-        from sandglass_paths import _NB
         output_path = os.path.join(_NB, "sandglass_export.txt")
     
     lines = []
