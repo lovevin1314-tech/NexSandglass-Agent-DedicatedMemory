@@ -1423,19 +1423,45 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
 
 def _emotional_entropy(recent_n: int = 10) -> float:
     """
-    香农熵----量化情绪波动程度。
+    香农熵——量化情绪波动程度。V2.9.9.1: 优先读会话摘要，降级扫沙子。
     0 = 完全平静（全是同一种情绪）
     ~1.95 = 高熵（7种情绪均匀分布，波动大）
     """
-    import math
+    import math, os, json
+    from sandglass_paths import _NB
+
+    # 优先: 会话级情绪摘要 (V2.9.9.1)
+    emo_path = os.path.join(_NB, "emotion_session.jsonl")
+    if os.path.exists(emo_path):
+        sessions = []
+        with open(emo_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    sessions.append(json.loads(line.strip()))
+                except json.JSONDecodeError:
+                    continue
+        if sessions:
+            recent = sessions[-20:]  # 最近20个会话
+            mood_counts = {}
+            total = 0
+            for s in recent:
+                for mood, weight in s.get("distribution", {}).items():
+                    mood_counts[mood] = mood_counts.get(mood, 0) + weight
+                    total += weight
+            if total > 0:
+                entropy = 0.0
+                for count in mood_counts.values():
+                    p = count / total
+                    if p > 0:
+                        entropy -= p * math.log(p)
+                return round(entropy, 4)
+
+    # 降级: 扫最近沙子
     from emotion_vocab import detect as emotion_detect
     from sandglass_vault import recent
-
-    sands = recent(recent_n + 5)  # 多取几条，过滤空
+    sands = recent(recent_n + 5)
     if not sands:
         return 0.0
-
-    # 收集最近消息的情绪标签
     mood_counts = {}
     total = 0
     for _, _, text in sands[-recent_n:]:
@@ -1444,11 +1470,8 @@ def _emotional_entropy(recent_n: int = 10) -> float:
         if det.get("mood"):
             mood_counts[det["mood"]] = mood_counts.get(det["mood"], 0) + 1
             total += 1
-
     if total == 0:
         return 0.0
-
-    # H = -Σ p_i × log(p_i)
     entropy = 0.0
     for count in mood_counts.values():
         p = count / total
