@@ -93,12 +93,16 @@ def persona_build() -> str:
             pass
         return _PERSONA
 
-    # LLM 不可用 → 本地关键词提取兜底（V1.3 自生长能力）
-    local = _local_persona_extract()
-    if local and local != "数据不足":
+    # V2.9.12: LLM 不可用 → 管道聚合构建（fact_tags + offset + particles + scenes）
+    content = _pipe_build(first_line, last_line, total)
+    if content:
         os.makedirs(os.path.dirname(_PERSONA), exist_ok=True)
+        prev = os.path.join(_PERSONA_DIR, "persona.prev.md")
+        if os.path.exists(_PERSONA):
+            import shutil
+            shutil.copy2(_PERSONA, prev)
         with open(_PERSONA, "w", encoding="utf-8") as f:
-            f.write(local)
+            f.write(content)
         return _PERSONA
     return ""
 
@@ -228,6 +232,134 @@ def _data_driven_refresh(existing: str, first_line: int, last_line: int, total: 
         new_lines.append(line)
     
     return "\n".join(new_lines)
+
+
+def _pipe_build(first_line: int, last_line: int, total: int) -> str:
+    """V2.9.12: 管道聚合首次构建画像 — 纯本地，零LLM。
+    
+    从 fact_tags + offset + decision_particles + scenes 生成四层 persona.md。
+    新用户空管道 → 输出"待积累"骨架；老用户管道丰富 → 输出完整画像。
+    越用管道数据越多，画像越准——自然生长。
+    """
+    import sqlite3
+    from collections import Counter
+    from sandglass_think import comprehensive_offset
+    
+    now_ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+    
+    # 1. fact_tags 高频标签 + 工具推断
+    tops = []
+    tool_hints = []
+    try:
+        db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"))
+        tags = Counter()
+        for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
+            for t in r[0].split(","):
+                t = t.strip()
+                if t and len(t) > 1: tags[t] += 1
+        db.close()
+        tops = [(t, c) for t, c in tags.most_common(8) if c >= 2]
+        # 从标签反推工具
+        tool_tags = {"python": "Python", "代码": "Python", "hermes": "Hermes", "沙漏": "沙漏",
+                     "sqlite": "SQLite", "github": "GitHub", "微信": "微信", "obsidian": "Obsidian"}
+        for t, _ in tops:
+            if t.lower() in tool_tags:
+                tool_hints.append(tool_tags[t.lower()])
+    except Exception:
+        pass
+    
+    # 2. 偏移率
+    off = comprehensive_offset()
+    off_dir = off.get("direction", "neutral")
+    off_pct = off.get("offset", 0)
+    
+    # 3. 决策粒子最近模式
+    dp_chain = ""
+    try:
+        dp_path = os.path.join(_NB, "decision_particles.txt")
+        if os.path.exists(dp_path):
+            with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
+                dps = [l.strip() for l in f if l.strip() and not l.startswith("#")]
+            if dps:
+                last = dps[-1]
+                if "→" in last:
+                    dp_chain = last.split("→")[-1].strip()[:60]
+    except Exception:
+        pass
+    
+    # 4. 场景
+    scenes_text = ""
+    try:
+        from scene_l3 import scene_current
+        sc = scene_current()
+        if sc: scenes_text = "、".join(sc[:3])
+    except Exception:
+        pass
+    
+    # ── 组装 persona.md ──
+    parts = []
+    parts.append(f"<!-- L: first_line={first_line} last_line={last_line} total={total} -->")
+    parts.append("# 主人画像 — 管道聚合构建")
+    parts.append("")
+    parts.append(f"> 首次构建：{now_ts}（管道聚合 · V2.9.12）")
+    parts.append(f"> 沙子来源：L{first_line} ~ L{last_line}（共 {total} 条）")
+    parts.append(f"> 更新方式：fact_tags + decision_particles + offset → 自然累积")
+    parts.append("")
+    
+    # 🟢 基础锚点
+    parts.append("## 🟢 基础锚点")
+    if tops:
+        top_names = [t for t, _ in tops[:4]]
+        parts.append(f"- **标签云**：{' · '.join(top_names)}")
+    if tool_hints:
+        parts.append(f"- **技术环境**：{', '.join(dict.fromkeys(tool_hints[:5]))}")
+    if scenes_text:
+        parts.append(f"- **当前场景**：{scenes_text}")
+    if off_dir != "neutral":
+        dir_cn = {"frugal": "省钱", "spend": "愿投", "drift": "放弃"}
+        parts.append(f"- **决策倾向**：{dir_cn.get(off_dir, off_dir)} {off_pct:+d}%")
+    if dp_chain:
+        parts.append(f"- **最近决策**：{dp_chain}")
+    if not tops and not tool_hints:
+        parts.append("- 身份：待积累（使用中自动发现）")
+    parts.append("")
+    
+    # 🔵 兴趣图谱
+    parts.append("## 🔵 兴趣图谱")
+    if tops:
+        focus_tags = [t for t, _ in tops[4:]] if len(tops) > 4 else []
+        if focus_tags:
+            parts.append(f"- **关注方向**：{' · '.join(focus_tags)}")
+    if scenes_text:
+        parts.append(f"- **活跃场景**：{scenes_text}")
+    if not tops:
+        parts.append("- 待积累（随着使用自动生长）")
+    parts.append("")
+    
+    # 🟡 交互协议
+    parts.append("## 🟡 交互协议")
+    parts.append("- **沟通风格**：待积累")
+    parts.append("- **雷区/禁区**：待积累")
+    parts.append("- **交付偏好**：待积累")
+    parts.append("")
+    
+    # 🔴 认知内核
+    parts.append("## 🔴 认知内核")
+    if off_dir != "neutral":
+        parts.append(f"- **决策模式**：偏移率 {dir_cn.get(off_dir, off_dir)}{off_pct:+d}%")
+    if tops:
+        parts.append(f"- **价值观信号**：{' · '.join([t for t, _ in tops[:3]])}")
+    if dp_chain:
+        parts.append(f"- **行为模式**：{dp_chain}")
+    if not tops:
+        parts.append("- 待积累")
+    parts.append("")
+    
+    # 🔗 项链
+    parts.append("## 🔗 项链（关键声明溯源）")
+    parts.append(f"- [管道首次构建] → sandglass L{first_line}~L{last_line}")
+    
+    return "\n".join(parts)
 
 
 @__import__("offset_signals")._fail_open("")
