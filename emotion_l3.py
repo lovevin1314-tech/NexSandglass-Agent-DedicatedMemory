@@ -73,7 +73,7 @@ def entropy_mirror(question: str) -> dict:
     dp_path = os.path.join(_NB, "decision_particles.txt")
     if os.path.exists(dp_path):
         try:
-            with open(dp_path, "r", encoding="utf-8") as f:
+            with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
                 lines = f.readlines()
             # 关键词匹配
             keywords = set(question.lower().split())
@@ -164,7 +164,7 @@ def entropy_ghost(question: str) -> dict:
     dp_path = os.path.join(_NB, "decision_particles.txt")
     if os.path.exists(dp_path):
         try:
-            with open(dp_path, "r", encoding="utf-8") as f:
+            with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
                 lines = f.readlines()
             keywords = set(question.lower().split())
             matches = []
@@ -379,7 +379,7 @@ def memo_mode() -> str:
     lines.append("【最近决策粒子】")
     dp_path = os.path.join(_NB, "decision_particles.txt")
     if os.path.exists(dp_path):
-        with open(dp_path, "r", encoding="utf-8") as f:
+        with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
             particles = f.readlines()[-5:]
         for p in particles:
             lines.append(f"  {p.strip()[:100]}")
