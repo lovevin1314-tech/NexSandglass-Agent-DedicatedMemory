@@ -185,7 +185,7 @@ God Module 拆分 + 信号链路全通 + L1/L2封框冻结
 四路并发搜索 + 织线知识图谱 + 四层问答式注入(~60token)
 
 ### V2.9.9.8 — MCP 合规
-19工具 inputSchema + 情绪熵重构 + 纪律因子自动触发
+19工具 inputSchema + 情绪熵重构 + 铁律因子自动触发
 
 ### V2.9.9.11 — 数据点自生长
 `persona_update()` 加 `_data_driven_refresh()` 本地兜底。_llm 返回空不再冻住画像，自动从 fact_tags + offset + decision_particles 聚合更新。清理 memory_provider.py 重复代码块。
@@ -214,6 +214,6 @@ God Module 拆分 + 信号链路全通 + L1/L2封框冻结
 | | 心理预判 | 7.0ms | — |
 | | 搜索滤镜 | 4.8ms | — |
 | | 决策标签 | **0.5ms** | — |
-| | 纪律因子 | **<0.1ms** | — |
+| | 铁律因子 | **<0.1ms** | — |
 
 > 测试环境：5900条沙子 · Windows 10 · i5-8265U · Python 3.11 · 完全隔离
