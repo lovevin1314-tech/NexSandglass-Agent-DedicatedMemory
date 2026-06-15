@@ -1252,7 +1252,7 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
     - 需要生成 → LLM 吃全量数据 → 保存为永久注解
     - 不接 LLM 返回空 dict → 上游走 2D 玻璃
     """
-    # V2.9.9.10: 本地3D合成 — 纯数据聚合,零LLM
+    # V2.9.9.14: 管道式3D合成 — fact_tags趋势 + offset拐点 + particles模式 + weave告警
     try:
         persona_text = ""
         if os.path.exists(_PERSONA):
@@ -1261,12 +1261,59 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
         comp = comprehensive_offset()
         ent = _emotional_entropy()
         mood = "平稳" if ent < 0.5 else ("波动" if ent < 1.0 else "高熵")
+        
+        # ── 管道洞察：fact_tags趋势 + offset拐点 + particles模式 + weave告警 ──
+        pipe_insights = []
+        try:
+            import sqlite3
+            from collections import Counter
+            db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"))
+            tags = Counter()
+            for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
+                for t in r[0].split(","):
+                    t = t.strip()
+                    if t and len(t) > 1: tags[t] += 1
+            db.close()
+            top_tags = [t for t, c in tags.most_common(3) if c >= 2]
+            if top_tags:
+                pipe_insights.append(f"标签: {'·'.join(top_tags)}")
+        except Exception: pass
+        
+        # offset 拐点
+        off_dir = comp.get("direction", "neutral")
+        off_pct = comp.get("offset", 0)
+        dir_cn = {"frugal": "省钱", "spend": "愿投", "drift": "放弃", "neutral": "平稳"}
+        if off_dir != "neutral":
+            pipe_insights.append(f"偏移: {dir_cn.get(off_dir, off_dir)}{off_pct:+d}%")
+        
+        # decision_particles 最近模式
+        try:
+            dp_path = os.path.join(_NB, "decision_particles.txt")
+            if os.path.exists(dp_path):
+                with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
+                    dps = [l.strip() for l in f if l.strip() and not l.startswith("#")]
+                if dps:
+                    last = dps[-1]
+                    if "→" in last:
+                        chain = last.split("→")[-1].strip()[:40]
+                        pipe_insights.append(f"决策: {chain}")
+        except Exception: pass
+        
+        # weave 告警
+        try:
+            from persona_l3 import sand_since_update
+            lag = sand_since_update()
+            if lag > 100:
+                pipe_insights.append(f"告警: 画像滞后{lag}条")
+        except Exception: pass
+        
         data = {
             "persona_type": persona_text.split(chr(10))[0].replace("#","").strip()[:30] if persona_text else "未知",
             "emotional_state": f"情绪熵{ent:.2f}({mood})",
             "decision_pattern": f'{comp["direction"]}倾向({comp["offset"]:+d}%), 样本{comp["sample"]}条',
             "reminder_tone": "数据汇报" if mood == "平稳" else "安静陪伴",
-            "source": "3D 本地合成",
+            "pipe_insights": " | ".join(pipe_insights) if pipe_insights else "管道待积累",
+            "source": "3D 管道合成",
             "timestamp": datetime.now().isoformat(),
             "offset": comp,
         }
