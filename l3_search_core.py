@@ -241,6 +241,36 @@ _SYNONYMS = {
     "dependency": ["library", "package", "module", "requirement", "import"],
     "file": ["document", "artifact", "asset", "resource", "attachment"],
     "network": ["internet", "online", "connection", "socket", "HTTP"],
+    # V2.9.9.10 扩展
+    "性能": ["速度", "效率", "优化", "加速", "performance", "latency"],
+    "费用": ["成本", "价格", "预算", "开销", "花费", "cost", "price"],
+    "速度": ["性能", "效率", "快", "延迟", "响应", "speed"],
+    "界面": ["UI", "前端", "交互", "页面", "设计", "interface"],
+    "架构": ["设计", "结构", "框架", "模式", "architecture"],
+    "部署": ["安装", "上线", "发布", "配置", "deploy"],
+    "监控": ["观察", "追踪", "日志", "告警", "monitor"],
+    "测试": ["验证", "检查", "调试", "test", "debug"],
+    "稳定": ["可靠", "健壮", "鲁棒", "stable", "reliable"],
+    "迁移": ["搬家", "转移", "导出", "导入", "migrate"],
+    "备份": ["存档", "保存", "恢复", "快照", "backup"],
+    "索引": ["检索", "搜索", "查找", "倒排", "index"],
+    "并发": ["同时", "并行", "async", "多线程", "concurrent"],
+    "兼容": ["适配", "支持", "跨平台", "compatible"],
+    "追踪": ["追溯", "跟踪", "链路", "日志", "trace"],
+    "评分": ["打分", "评级", "排序", "权重", "score"],
+    "推荐": ["建议", "提案", "优化", "方案", "recommend"],
+    "偏好": ["倾向", "习惯", "喜欢", "常用", "prefer"],
+    "模型": ["算法", "AI", "LLM", "神经网络", "model"],
+    "推理": ["推断", "判断", "分析", "思考", "reasoning"],
+    "幻觉": ["编造", "错误", "不实", "虚构", "hallucination"],
+    "记忆": ["存储", "回忆", "历史", "上下文", "memory"],
+    "上下文": ["背景", "环境", "前后文", "语境", "context"],
+    "分词": ["切词", "tokenize", "解析", "拆分", "segment"],
+    "语义": ["含义", "理解", "意图", "概念", "semantic"],
+    "排序": ["排名", "排列", "权重", "rank", "order"],
+    "过滤": ["筛选", "排除", "拦截", "净化", "filter"],
+    "聚合": ["合并", "汇总", "统计", "组合", "aggregate"],
+    "去重": ["唯一", "不重复", "独特", "distinct", "unique"],
     # 口腔诊所 (V2.6.13)
     "诊所": ["口腔", "牙科", "医院", "门诊", "医疗"],
     "患者": ["病人", "客户", "顾客", "就诊人", "用户"],
@@ -314,6 +344,23 @@ def _synonym_expand(query: str) -> list:
         pass  # emotion_vocab 模块未安装
     except Exception:
         logger.debug("情绪词库扩展失败", exc_info=True)
+    # V2.9.9.10: TF-IDF动态同义词 — 词典覆盖不足时自动发现相关词
+    if len(keywords) < 3:
+        try:
+            from l3_search_core import _tfidf_search
+            results = _tfidf_search(query, limit=3)
+            for _, _, text in results:
+                words = re.findall(r'[\u4e00-\u9fff]{2,}|[a-zA-Z]{3,}', text)
+                for w in words:
+                    if w.lower() not in seen and len(w) > 1:
+                        keywords.append(w)
+                        seen.add(w.lower())
+                        if len(keywords) >= 6:
+                            break
+                if len(keywords) >= 6:
+                    break
+        except Exception:
+            pass
     return keywords
 
 
