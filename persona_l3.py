@@ -194,7 +194,9 @@ def _data_driven_refresh(existing: str, first_line: int, last_line: int, total: 
         
         new_lines.append(line)
     
-    return "\n".join(new_lines)
+    result = "\n".join(new_lines)
+    _sync_five_facets()
+    return result
 
 
 def _pipe_build(first_line: int, last_line: int, total: int) -> str:
@@ -322,7 +324,50 @@ def _pipe_build(first_line: int, last_line: int, total: int) -> str:
     parts.append("## 🔗 项链（关键声明溯源）")
     parts.append(f"- [管道首次构建] → sandglass L{first_line}~L{last_line}")
     
-    return "\n".join(parts)
+    result = "\n".join(parts)
+    _sync_five_facets(first_line, last_line, total)
+    return result
+
+
+def _sync_five_facets(first_line: int = 0, last_line: int = 0, total: int = 0):
+    """V2.9.24: 管道自动生成 five-facets.json — 用户零操作。
+    从 persona.md + iron_rules.txt + offset + fact_tags 聚合。
+    """
+    import json
+    ff_path = os.path.join(_NB, "profile", "five-facets.json")
+    now = datetime.now().strftime("%Y-%m-%d")
+    
+    ff = {"_schema": "five-facet-profile-v1", "_updated": now, "_source": "pipe-auto"}
+    
+    # fact: 从 persona.md 提取
+    ff["fact"] = []
+    if os.path.exists(_PERSONA):
+        with open(_PERSONA, "r", encoding="utf-8", errors="replace") as f:
+            persona_text = f.read()
+        for line in persona_text.split("\n"):
+            line = line.strip()
+            if line.startswith("- **") and "：" in line:
+                key, val = line.replace("- **", "").split("：", 1)
+                ff["fact"].append({"title": key.strip(), "content": val.strip()[:80],
+                                   "importance": 0.8, "confidence": 0.9, "source": "pipe", "updated": now})
+    
+    # restriction: 从 iron_rules.txt
+    ff["restriction"] = []
+    ir_path = os.path.join(_NB, "iron_rules.txt")
+    if os.path.exists(ir_path):
+        with open(ir_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    ff["restriction"].append({"title": line[:30], "content": line,
+                                              "importance": 1.0, "confidence": 1.0, "source": "iron_rules", "updated": now})
+    
+    try:
+        os.makedirs(os.path.dirname(ff_path), exist_ok=True)
+        with open(ff_path, "w", encoding="utf-8") as f:
+            json.dump(ff, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
 
 @__import__("offset_signals")._fail_open("")
