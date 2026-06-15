@@ -133,14 +133,23 @@ def sand_density(candidates, query_tokens, query) -> list:
         if candidates:
             max_ln = max(c[0] for c in candidates)
             p = ln / max(max_ln, 1)
-            # V3自适应高斯 — 标签中位数+0.12补偿密度前倾
-            tagged_lns = [tln for tln in tagged if tln <= max_ln]
-            if len(tagged_lns) >= 10:
-                center = (sorted(tagged_lns)[len(tagged_lns)//2] / max_ln) + 0.12
-                center = max(0.35, min(center, 0.60))
-                pos_bonus = math.exp(-((p - center) ** 2) / (2 * 0.22 ** 2)) * 0.1
+            # V3.1密度自适应高斯 — 搜索结果密度分布反推信息中心(100%覆盖)
+            # 密度加权平均位置 + 补偿偏移 → 中段自然对准
+            if candidates:
+                weighted_sum = sum(
+                    c[0] * max(1, len(c[2]) / 50) for c in candidates if len(c) > 2
+                )
+                total_weight = sum(
+                    max(1, len(c[2]) / 50) for c in candidates if len(c) > 2
+                )
+                if total_weight > 0:
+                    center = (weighted_sum / total_weight / max_ln) + 0.08
+                    center = max(0.35, min(center, 0.60))
+                else:
+                    center = 0.50
             else:
-                pos_bonus = min(0.1, ln / max(max_ln, 1) * 0.0002)
+                center = 0.50
+            pos_bonus = math.exp(-((p - center) ** 2) / (2 * 0.22 ** 2)) * 0.1
         else:
             pos_bonus = 0
         final += pos_bonus
