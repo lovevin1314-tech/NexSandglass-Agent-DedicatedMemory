@@ -110,8 +110,9 @@ def simhash(text: str, bits: int = _SIMHASH_BITS) -> int:
     if cache_key in _simhash_cache:
         return _simhash_cache[cache_key]
     
-    # LRU驱逐——超过上限清空重建
+    # LRU驱逐——超过上限先存盘再清空
     if len(_simhash_cache) >= _SIMHASH_CACHE_MAX:
+        _save_simhash_cache()
         _simhash_cache.clear()
     
     # V2.9.23: 每500条新指纹自动持久化
