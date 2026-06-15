@@ -133,21 +133,12 @@ def sand_density(candidates, query_tokens, query) -> list:
         if candidates:
             max_ln = max(c[0] for c in candidates)
             p = ln / max(max_ln, 1)
-            # V2.9.9.8: 信息行高斯 — 标签/决策行中位数=真实信息峰值
-            info_lns = [tln for tln in tagged if tln <= max_ln]
-            if offset_vocab:
-                info_lns += [c[0] for c in candidates if any(w in c[2].lower() for w in offset_vocab) and c[0] <= max_ln]
-            if len(info_lns) >= 10:
-                center = sorted(info_lns)[len(info_lns)//2] / max_ln
-                # 一大两小: 主高斯+两侧小峰(跟随信息分布)
-                if len(info_lns) >= 3:
-                    import statistics
-                    spread = statistics.stdev([x/max_ln for x in info_lns]) if len(info_lns)>=3 else 0.1
-                else:
-                    spread = 0.1
-                pos_bonus = math.exp(-((p - center) ** 2) / (2 * spread ** 2)) * 0.07
-                for shift in (-spread, spread):
-                    pos_bonus += math.exp(-((p - (center+shift)) ** 2) / (2 * spread ** 2)) * 0.015
+            # V3自适应高斯 — 标签中位数+0.12补偿密度前倾
+            tagged_lns = [tln for tln in tagged if tln <= max_ln]
+            if len(tagged_lns) >= 10:
+                center = (sorted(tagged_lns)[len(tagged_lns)//2] / max_ln) + 0.12
+                center = max(0.35, min(center, 0.60))
+                pos_bonus = math.exp(-((p - center) ** 2) / (2 * 0.22 ** 2)) * 0.1
             else:
                 pos_bonus = min(0.1, ln / max(max_ln, 1) * 0.0002)
         else:
