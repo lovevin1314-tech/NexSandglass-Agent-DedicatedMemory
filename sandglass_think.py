@@ -37,12 +37,11 @@ from weave_l3 import (
 )
 from emotion_l3 import (
     entropy_mirror, entropy_ghost, glass_reminder,
-    entropy_reminder, memo_mode,
 )
 from discipline import iron_rules, iron_rules_set
 from l3_tasks import task_defer, task_pending, task_done, task_check_trigger
-from l3_persona_verify import persona_trace, persona_verify, persona_diff
-from l3_search_core import _synonym_expand, _tfidf_search, composite_rerank, _search_with_fallback, _sentiment_wind, sentiment_rerank, simhash_search
+from l3_persona_verify import persona_verify, persona_diff
+from l3_search_core import _synonym_expand, _tfidf_search, _sentiment_wind, sentiment_rerank
 from l3_persona import persona_project
 from persona_l3 import (
     persona_build, persona_update, persona_canvas,
@@ -80,32 +79,8 @@ def _extract_md_section(content, section_name):
 from offset_signals import _fail_open
 
 def _llm(system: str, user: str, max_tokens: int = 2048) -> str:
-    """调 LLM，失败返回空字符串。"""
-    if not _LLM_KEY:
-        return ""
-    payload = json.dumps({
-        "model": _LLM_MODEL,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "max_tokens": max_tokens,
-        "temperature": 0.3,
-    }).encode("utf-8")
-    headers = {
-        "Authorization": f"Bearer {_LLM_KEY}",
-        "Content-Type": "application/json",
-    }
-    if "openrouter" in _LLM_ENDPOINT:
-        headers["HTTP-Referer"] = "https://neurobase.local"
-        headers["X-Title"] = "Sandglass Layer 3"
-    try:
-        req = urllib.request.Request(_LLM_ENDPOINT, data=payload, headers=headers)
-        resp = urllib.request.urlopen(req, timeout=60)
-        body = json.loads(resp.read().decode("utf-8"))
-        return body["choices"][0]["message"].get("content") or body["choices"][0]["message"].get("reasoning_content", "")
-    except Exception:
-        return ""
+    """V2.9.9.9: 纯本地引擎 — 不调外部LLM, 所有功能已本地降级"""
+    return ""
 
 _FULL_SANITY = {
     "L1_plugin": ["plugin.py"],
@@ -507,7 +482,7 @@ def _tokenize_for_density(query: str) -> set:
                 prev_cjk = c
             else: prev_cjk = None
     if lang in ("en", "mixed"):
-        for w in __import__('re').findall(r'[a-zA-Z]+', query.lower()):
+        for w in re.findall(r'[a-zA-Z]+', query.lower()):
             if len(w) >= 2:
                 tokens.add(w)
                 for n in (2, 3):
@@ -564,6 +539,13 @@ def search_semantic(query: str, limit: int = 10) -> list:
     except Exception:
         pass
 
+    if not results:
+        try:
+            # V2.9.9.9: 本地TF-IDF语义搜索 — 无LLM降级
+            from l3_search_core import _tfidf_search
+            results = _tfidf_search(query, limit)
+        except Exception:
+            pass
     if not results:
         try:
             from sandglass_vault import search as vs
