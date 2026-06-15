@@ -136,9 +136,10 @@ def search(query: str, limit: int = 10) -> list:
         tokens = _tokenize(query)
         if not tokens.strip():
             return []
-        # 英文查询：OR语义（n-gram太多AND匹配不到）
+        # 英文查询：OR语义 + FTS5前缀匹配(零新依赖,FTS5原生支持)
         if any(c.isascii() and c.isalpha() for c in query):
-            tokens = " OR ".join(tokens.split())
+            parts = tokens.split()
+            tokens = " OR ".join(p + "*" for p in parts)
         with _lock:
             conn = _get_db()
             sql = "SELECT s.id, s.ts, s.text FROM sandglass_fts f JOIN sandglass s ON s.id = f.rowid WHERE sandglass_fts MATCH ? ORDER BY rank"
