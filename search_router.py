@@ -84,7 +84,7 @@ def sand_density(candidates, query_tokens, query) -> list:
         if fp == -1: sim_bonus = 0
         else:
             dist = bin(q_fp ^ fp).count('1')
-            sim_bonus = min(1.0 / (1 + dist / 128), 0.5)
+            sim_bonus = 0.5 * (1 - dist / 128)  # V2.9.27: 线性映射,d=0→0.5,d=128→0
         final = ratio * trust + sim_bonus
         scored.append((final, item))
     scored.sort(key=lambda x: x[0], reverse=True)
