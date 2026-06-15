@@ -62,7 +62,7 @@ def sand_density(candidates, query_tokens, query) -> list:
             sim_bonus = min(1.0 / (1 + dist / 128), 0.5)
         final = density * trust + sim_bonus
         # V2.9.9.8: 位置偏置 — 后期行小幅加权(对话越往后越常被问到)
-        pos_bonus = min(0.2, ln / 500 * 0.2)
+        pos_bonus = min(0.1, ln / 500 * 0.1)
         final += pos_bonus
         scored.append((final, item))
     scored.sort(key=lambda x: x[0], reverse=True)
