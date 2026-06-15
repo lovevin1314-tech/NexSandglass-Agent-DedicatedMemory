@@ -13,12 +13,6 @@ _OFFSET_SIGNALS = {
     "drift_烦躁": ["随便", "算了", "就这样", "烦死了", "受不了", "太麻烦", "真无语", "够了"],
 }
 
-# ── LLM 配置（单一来源）──
-_LLM_KEY = os.environ.get("DEEPSEEK_API_KEY", "") or os.environ.get("OPENROUTER_API_KEY", "")
-_deepseek_key = bool(os.environ.get("DEEPSEEK_API_KEY"))
-_LLM_ENDPOINT = "https://api.deepseek.com/v1/chat/completions" if _deepseek_key else "https://openrouter.ai/api/v1/chat/completions"
-_LLM_MODEL = "deepseek-v4-flash" if _deepseek_key else "deepseek/deepseek-v4-flash"
-
 
 def _fail_open(default):
     """装饰器：任何异常返回 default 值并 log warning。"""

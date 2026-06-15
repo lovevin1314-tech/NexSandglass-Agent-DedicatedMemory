@@ -243,7 +243,7 @@ def _read_context() -> str:
 # 本地深层推断标签
 # ═══════════════════════════════════════════════
 
-def _tag_llm(question: str, choice: str) -> str:
+def _tag_infer(question: str, choice: str) -> str:
     """纯本地引擎 — 标签由本地词库+自进化覆盖"""
     return ""
 
@@ -279,7 +279,7 @@ def _learn(tags: str, choice: str = "") -> None:
 # 本地丰富选择原因
 # ═══════════════════════════════════════════════
 
-def _enrich_choice_with_llm(question: str, choice: str) -> str:
+def _enrich_choice_desc(question: str, choice: str) -> str:
     """纯本地引擎 — 直接返回原选择"""
     return choice
 
@@ -291,21 +291,21 @@ def _enrich_choice_with_llm(question: str, choice: str) -> str:
 def _tag(question: str, choice: str) -> str:
     local = _tag_local(choice)
     t0 = time.time()
-    llm_tags = _tag_llm(question, choice)
+    infer_tags = _tag_infer(question, choice)
     # V2.9.9 metrics 埋点
     try:
         from metrics import emit_metric
-        emit_metric('tag_result', local_hit=bool(local), llm_used=bool(llm_tags))
-        if llm_tags:
-            emit_metric('tag_llm_call', latency_ms=int((time.time()-t0)*1000))
+        emit_metric('tag_result', local_hit=bool(local), infer_used=bool(infer_tags))
+        if infer_tags:
+            emit_metric('tag_infer', latency_ms=int((time.time()-t0)*1000))
     except Exception:
         pass
 
-    if llm_tags:
-        _learn(llm_tags, choice)
+    if infer_tags:
+        _learn(infer_tags, choice)
         local_set = set(local.split(",")) if local else set()
-        llm_list = [t.strip() for t in llm_tags.split(",")]
-        merged = (list(local_set) if local_set else []) + [t for t in llm_list if t not in local_set]
+        infer_list = [t.strip() for t in infer_tags.split(",")]
+        merged = (list(local_set) if local_set else []) + [t for t in infer_list if t not in local_set]
         return ",".join(merged[:5])
 
     return local if local else "未分类"
@@ -494,16 +494,6 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
                             break
                     except (json.JSONDecodeError, KeyError, ValueError): pass
     except Exception: pass
-
-
-def _has_llm() -> bool:
-    """统一LLM检测——从offset_signals获取。"""
-    try:
-        from offset_signals import _LLM_KEY
-        return bool(_LLM_KEY)
-    except ImportError:
-        return bool(os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENROUTER_API_KEY"))
-
 
 # ═══════════════════════════════════════════════
 # 读取 & 偏移比

@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 from sandglass_vault import recent, search as vs
 
 import os as _os
-from offset_signals import _LLM_KEY, _LLM_ENDPOINT, _LLM_MODEL
 try:
     from sandglass_think import (
         _fail_open, _three_d_ready, _latest_annotation,
@@ -27,7 +26,7 @@ try:
     _3D_ANNOTATIONS = __import__('sandglass_think')._3D_ANNOTATIONS
 except ImportError:
     _read_decision_log = lambda n: []
-    _llm = None
+    _infer = None
     _three_d_ready = lambda: False
     _latest_annotation = lambda: {}
     _should_synthesize = lambda: (False, "")
@@ -129,7 +128,7 @@ def entropy_ghost(question: str) -> dict:
         "similar_patterns": [],
         "causal_chain": [],
         "inference": "",
-        "llm_enhanced": False,
+        "infer_enhanced": False,
     }
 
     # ① 查历史类似决策
