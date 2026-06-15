@@ -13,7 +13,7 @@
 > Plaintext storage, zero-dependency. Four-way concurrent search — FTS5 · IDX · TF-IDF · Shadow Sand.
 > Knows not just who you are, but how you became this way. Remembers what you said three days ago.
 
-> **V2.9.9.8 Minimal Injection:** 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完。~60token。LLM 按需 sandglass_search 主动查。
+> **V2.9.9.11 Data-Driven Persona:** 画像更新完全去LLM化 — fact_tags + decision_particles + offset 数据点自然累积。_llm 纯本地降级，persona_update() 零外部依赖自动生长。
 
 > **Soul Distillation:** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories — we forge a unique, evolving soul that resonates with the user.
 
@@ -186,6 +186,9 @@ God Module 拆分 + 信号链路全通 + L1/L2封框冻结
 
 ### V2.9.9.8 — MCP 合规
 19工具 inputSchema + 情绪熵重构 + 纪律因子自动触发
+
+### V2.9.9.11 — 数据点自生长
+`persona_update()` 加 `_data_driven_refresh()` 本地兜底。_llm 返回空不再冻住画像，自动从 fact_tags + offset + decision_particles 聚合更新。清理 memory_provider.py 重复代码块。画像溯源标记标准化（`<!-- L: -->`）。
 
 ---
 
