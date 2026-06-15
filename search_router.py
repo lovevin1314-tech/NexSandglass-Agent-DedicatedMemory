@@ -106,6 +106,10 @@ def sand_density(candidates, query_tokens, query) -> list:
         text_tokens = _query_tokens(text)
         matched = len(query_tokens & text_tokens)
         density = matched / max(len(query_tokens), 1)
+        # 长度补偿: 长文本信息量大,轻微上调密度
+        text_len = len(text)
+        if text_len > 50:
+            density *= min(1.15, 1.0 + text_len / 2000)
         trust = trust_scores.get(ln, 0.5)
         fp = _l3_simhash(text[:500])
         if fp == -1:
