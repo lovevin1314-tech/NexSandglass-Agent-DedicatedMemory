@@ -266,13 +266,14 @@ class NexSandglassProvider(MemoryProvider):
                             conf = entry.get("confidence", 0)
                             all_entries.append((imp * conf, entry["content"]))
                     all_entries.sort(reverse=True)
-                    for _, content in all_entries[:8]:
-                        identity_parts.append(content[:60])
+                    for _, content in all_entries[:5]:
+                        # V2.9.28: 极简注入→只取标题（"："前的部分）
+                        title = content.split("：")[0].split(":")[0].split("=")[0].strip()[:20]
+                        if title and title not in identity_parts:
+                            identity_parts.append(title)
             except Exception: pass
             
-            # 决策：从偏移率
-            if off_label != "平稳":
-                identity_parts.append(f"决策: {off_label}倾向({off_pct:+d}%)")
+            # 决策：管道洞察已含偏移方向，此处不重复
             
             # 关注：从fact_tags高频标签
             try:
@@ -313,14 +314,12 @@ class NexSandglassProvider(MemoryProvider):
             except Exception:
                 pass
 
-            # ═══════ 第二层：你在往哪走 ═══════
-            layer2 = ["【你在往哪走】"]
-            if off_label != "平稳":
-                layer2.append(f"💰 {off_label}倾向({off_pct:+d}%)")
-            else:
-                layer2.append(f"💰 决策平稳")
-
-            # 最近决策
+            # ═══════ 第二层：你在往哪走（极简） ═══════
+            layer2 = []
+            # 情绪状态
+            if mood != "平稳":
+                layer2.append(f"【状态】🎭 {mood}")
+            # 最近决策（管道洞察已含，此处只补情绪）
             decisions = []
             try:
                 import json, os

@@ -1244,15 +1244,19 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
                         elif tangle_score > 0:
                             pipe_insights.append(f"纠结: 轻微({tangle_score}%)")
                     
-                    # 最近决策链条（保留完整模式，不止最后一步）
+                    # 最近决策链（压至箭头模式，去冗余描述）
                     if recent_chains:
                         last_chain = recent_chains[-1]
-                        pipe_insights.append(f"决策: {last_chain}")
+                        # 提取 A→B→A 模式，砍掉"倾向习惯回退"等冗余
+                        arrows = last_chain.split("→")
+                        compact = "→".join(a.strip()[:8] for a in arrows[:3])
+                        pipe_insights.append(f"链: {compact}")
                     else:
                         last = dps[-1]
                         if "→" in last:
-                            chain = last.split("→")[-1].strip()[:40]
-                            pipe_insights.append(f"决策: {chain}")
+                            arrows = last.split("→")
+                            compact = "→".join(a.strip()[:8] for a in arrows[:3])
+                            pipe_insights.append(f"链: {compact}")
         except Exception: pass
         
         # scene 场景感知（个人困惑=纠结场景）
