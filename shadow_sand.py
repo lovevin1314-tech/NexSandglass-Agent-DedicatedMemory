@@ -140,11 +140,13 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
     db = _get_conn()
     # V2.9.9.8: 行号由调用方传入，不自计数（防止与sandglass物理行号偏移）
 
-    # 提取实体
+    # 提取实体（同时收集为兜底 tags——接已有管线，不建新提取器）
+    entities_found = []
     for m in _ENTITY_RE.finditer(text):
-        name = m.group(1) or m.group(2) or m.group(3) or ""
+        name = m.group(1) or m.group(2) or m.group(3) or m.group(4) or ""
         name = name.strip()
         if name and len(name) > 1:
+            entities_found.append(name)
             row = db.execute(
                 "SELECT line_nums FROM entities WHERE name = ?", (name,)
             ).fetchone()
@@ -166,17 +168,32 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
         (line_num,)
     )
 
-    # 写入标签
-    if category != "general" or tags:
-        # V2.9.20: general 自动降级 → 用首标签作为分类（零新代码，接已有 tags）
-        if category in ("general", "exam_general") and tags:
-            first_tag = tags.split(",")[0].strip()
-            if first_tag:
-                category = first_tag[:30]
+    # 兜底 tags：无 tags 时用实体名填充（接已有 _ENTITY_RE 管线，零新提取器）
+    if not tags and entities_found:
+        # 去重取前5个实体作为标签
+        seen = set()
+        unique_entities = []
+        # 若调用方未传 tags → 用已提取的实体作为兜底标签（接已有 _ENTITY_RE 管道）
+        if not tags and entities_found:
+            tags = ",".join(entities_found[:10])
+
+        # 写入信任记录
         db.execute(
-            "INSERT OR REPLACE INTO fact_tags (line_num, category, tags) VALUES (?, ?, ?)",
-            (line_num, category, tags)
+            "INSERT OR IGNORE INTO trust (line_num, score) VALUES (?, 0.5)",
+            (line_num,)
         )
+
+        # 写入标签
+        if category != "general" or tags:
+            # V2.9.20: general 自动降级 → 用首标签作为分类
+            if category in ("general", "exam_general") and tags:
+                first_tag = tags.split(",")[0].strip()
+                if first_tag:
+                    category = first_tag[:30]
+            db.execute(
+                "INSERT OR REPLACE INTO fact_tags (line_num, category, tags) VALUES (?, ?, ?)",
+                (line_num, category, tags)
+            )
 
     _maybe_commit()
 
