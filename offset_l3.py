@@ -18,8 +18,6 @@ logger = logging.getLogger(__name__)
 
 from offset_signals import _OFFSET_SIGNALS
 
-from offset_signals import _LLM_KEY, _LLM_ENDPOINT, _LLM_MODEL
-
 # Lazy imports — avoid circular dependency
 _fail_open = None; _extract_md_section = None
 _current_stage = None; stage_list = None; scene_current = None; _log_scene_timeline = None; scene_guess = None

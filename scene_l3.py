@@ -42,9 +42,6 @@ def scene_mode(mode: str = None) -> str:
         logger.debug("emotion检测失败")
         return 'normal'
 
-# ── LLM 配置 ──
-from offset_signals import _LLM_KEY, _LLM_ENDPOINT, _LLM_MODEL
-
 def scene_add(tag: str) -> list:
     """添加一个场景标签。返回当前全部标签。"""
     tags = _load_scenes()
