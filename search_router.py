@@ -133,22 +133,32 @@ def sand_density(candidates, query_tokens, query) -> list:
         if candidates:
             max_ln = max(c[0] for c in candidates)
             p = ln / max(max_ln, 1)
-            # V3.1密度自适应高斯 — 搜索结果密度分布反推信息中心(100%覆盖)
-            # 密度加权平均位置 + 补偿偏移 → 中段自然对准
-            if candidates:
+            # V3.1密度自适应 — ≥10候选时用密度分布,不足用固定0.50
+            if len(candidates) >= 10:
                 weighted_sum = sum(
                     c[0] * max(1, len(c[2]) / 50) for c in candidates if len(c) > 2
                 )
                 total_weight = sum(
                     max(1, len(c[2]) / 50) for c in candidates if len(c) > 2
                 )
-                if total_weight > 0:
-                    center = (weighted_sum / total_weight / max_ln) + 0.08
-                    center = max(0.35, min(center, 0.60))
+                center = (weighted_sum / max(total_weight, 1) / max_ln) + 0.08
+                center = max(0.35, min(center, 0.60))
+            else:
+                # V3.2 L1/L2锚点: trust+fact_tags找信息中心
+                info_lns, info_ws = [], []
+                for c in candidates:
+                    cln = c[0]
+                    t = trust_scores.get(cln, 0.5)
+                    tagged_flag = cln in tagged
+                    if t > 0.5 or tagged_flag:
+                        info_lns.append(cln)
+                        info_ws.append(t * (2.0 if tagged_flag else 1.0))
+                if info_lns and max_ln > 0:
+                    wsum = sum(ln * w for ln, w in zip(info_lns, info_ws))
+                    center = (wsum / max(sum(info_ws), 1) / max_ln) + 0.08
+                    center = max(0.30, min(center, 0.65))
                 else:
                     center = 0.50
-            else:
-                center = 0.50
             pos_bonus = math.exp(-((p - center) ** 2) / (2 * 0.22 ** 2)) * 0.1
         else:
             pos_bonus = 0
