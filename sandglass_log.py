@@ -54,6 +54,9 @@ def log_message(text: str, sender: str = "agent") -> bool:
     返回 True 表示写入成功。
     V2.4.0: 去掉DPAPI，落沙提速~2ms，FTS5可直接索引中文。"""
     try:
+        # 工具调用过滤：<invoke> XML / {"function": JSON 不入沙漏
+        if sender != "user" and ("<invoke" in text or '"function":' in text):
+            return False
         # AI低价值回复过滤（V2.1）
         if sender == "agent" and _estimate_info_value(text) < 0.3:
             return False
