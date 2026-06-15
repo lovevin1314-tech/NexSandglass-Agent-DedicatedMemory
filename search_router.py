@@ -86,8 +86,21 @@ def sand_density(candidates, query_tokens, query) -> list:
             ).fetchall()}
             _tagged_mtime = mtime
         tagged = _tagged_cache
+        # 英文降级: entities表实体密度=语义信号
+        global _entity_lines
+        if len(tagged) < 20 and _entity_lines is None:
+            try:
+                _entity_lines = {}
+                for ln_str in db.execute("SELECT line_nums FROM entities").fetchall():
+                    for n in ln_str[0].split(','):
+                        n = int(n)
+                        _entity_lines[n] = _entity_lines.get(n, 0) + 1
+            except Exception:
+                _entity_lines = {}
+        entity_density = _entity_lines if _entity_lines else {}
     except Exception:
         tagged = set()
+        entity_density = {}
     if _offset_vocab is None:
         try:
             from offset_signals import _OFFSET_SIGNALS
@@ -134,6 +147,9 @@ def sand_density(candidates, query_tokens, query) -> list:
                 idf_sum = sum(_tag_idf.get(t, 0) for t in tags)
                 tag_bonus = min(0.12, idf_sum * 0.04) * (0.2 + 0.8 * density)
                 final += tag_bonus
+        # 英文降级: 实体密度补偿(≥3个实体的行=信息密集)
+        if len(tagged) < 20 and entity_density.get(ln, 0) >= 3:
+            final += 0.03 * (0.2 + 0.8 * density)
         if offset_vocab and any(w in text.lower() for w in offset_vocab):
             final += 0.04
         scored.append((final, item))
