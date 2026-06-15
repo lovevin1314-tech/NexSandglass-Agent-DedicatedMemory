@@ -387,7 +387,7 @@ class NexSandglassProvider(MemoryProvider):
             except Exception:
                 pass
 
-            # 纪律
+            # 铁律
             rules = []
             try:
                 from discipline import iron_rules_with_counts, iron_rule_inject_bump
@@ -412,7 +412,7 @@ class NexSandglassProvider(MemoryProvider):
                 if rules:
                     if not tasks:
                         layer4.append(header)
-                    layer4.append("纪律：")
+                    layer4.append("铁律：")
                     layer4.extend(f"  {i+1}. {r}" for i, r in enumerate(rules))
                 blocks.append("\n".join(layer4))
 

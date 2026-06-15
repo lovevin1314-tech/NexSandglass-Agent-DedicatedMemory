@@ -1,5 +1,5 @@
 """
-NexSandglass L3 — 纪律因子 (V2.9.6: 权重计数)
+NexSandglass L3 — 铁律因子 (V2.9.6: 权重计数)
 从 sandglass_think.py 拆分。
 """
 import os, json
@@ -26,7 +26,7 @@ def _save_counts(counts: dict):
 
 
 def iron_rules(limit: int = 3) -> list:
-    """读取纪律——按提醒次数排序，最多 limit 条。"""
+    """读取铁律——按提醒次数排序，最多 limit 条。"""
     if not os.path.exists(_IRON_RULES):
         return []
     raw = [l.strip() for l in open(_IRON_RULES, "r", encoding="utf-8").readlines() if l.strip()]
@@ -37,7 +37,7 @@ def iron_rules(limit: int = 3) -> list:
 
 
 def iron_rules_with_counts(limit: int = 3) -> list:
-    """读取纪律——带计数，用于注入。返回 [(rule, count), ...]"""
+    """读取铁律——带计数，用于注入。返回 [(rule, count), ...]"""
     rules = iron_rules(limit)
     counts = _load_counts()
     return [(r, counts.get(r, 0)) for r in rules]
@@ -69,7 +69,7 @@ def iron_rule_inject_bump(rule_text: str):
 
 
 def iron_rules_set(rules: list) -> bool:
-    """设定纪律。覆盖写入，最多5条。"""
+    """设定铁律。覆盖写入，最多5条。"""
     os.makedirs(os.path.dirname(_IRON_RULES), exist_ok=True)
     with open(_IRON_RULES, "w", encoding="utf-8") as f:
         for r in rules[:5]:
