@@ -42,7 +42,7 @@ lm("性价比优先，免费方案能跑就行", "user")
 lm("最近对 AI Agent 记忆系统特别感兴趣", "user")
 lm("想在 GitHub 上做个开源项目", "user")
 
-print("=== 第1天 — 初始画像（零LLM） ===")
+print("=== 第1天 — 初始画像 ===")
 from sandglass_vault import count
 print(f"沙子: {count()} 条")
 lp = s3._local_persona_extract()
@@ -104,4 +104,5 @@ if os.path.exists(REAL_IDX + ".demo_backup"):
 
 print(f"沙漏已恢复: {sv.count()} 条")
 print()
+
 print("🎉 Demo 完成！没有触碰任何真实数据。")

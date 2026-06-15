@@ -165,7 +165,7 @@ python test_smoke.py
 ## 设计原则
 
 1. **层追加不替换** — 新层叠加，永不修改已定稿的下层
-2. **本地优先，LLM 增强** — 没 API Key 一样能跑
+2. **本地优先，API 增强** — 没 API Key 一样能跑
 3. **决策是链条不是单点** — A→B→C→回到A
 4. **改了A必须同步B** — 改名/改签名后全项目 grep
 5. **极简注入** — 每轮~60token，LLM按需sandglass_search
