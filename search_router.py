@@ -105,7 +105,12 @@ def sand_density(candidates, query_tokens, query) -> list:
         text = item[2] if len(item) > 2 else ""
         text_tokens = _query_tokens(text)
         matched = len(query_tokens & text_tokens)
-        density = matched / max(len(query_tokens), 1)
+        # V2.9.9.8: 查询词IDF加权 — 稀有词匹配>常见词匹配
+        if query_tokens:
+            weighted = sum(1.0 / max(1, text_tokens.count(t)) for t in query_tokens if t in text_tokens)
+            density = weighted / max(len(query_tokens), 1)
+        else:
+            density = 0
         trust = trust_scores.get(ln, 0.5)
         fp = _l3_simhash(text[:500])
         if fp == -1:
