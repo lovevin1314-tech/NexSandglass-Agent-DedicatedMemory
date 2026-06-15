@@ -14,9 +14,9 @@ try: from offset_l3 import _read_decision_log
 except ImportError:
     _read_decision_log = lambda n: []
 
-try: from sandglass_think import _fail_open, _llm, _emotional_entropy, comprehensive_offset
+try: from sandglass_think import _fail_open, _emotional_entropy, comprehensive_offset
 except ImportError:
-    _fail_open = lambda d: lambda f: f; _llm = None; _emotional_entropy = lambda n=10: 0.0; comprehensive_offset = lambda: {"offset":0,"direction":"neutral","sample":0}
+    _fail_open = lambda d: lambda f: f; _emotional_entropy = lambda n=10: 0.0; comprehensive_offset = lambda: {"offset":0,"direction":"neutral","sample":0}
 
 try: from persona_l3 import _STAGE_THRESHOLD
 except ImportError:

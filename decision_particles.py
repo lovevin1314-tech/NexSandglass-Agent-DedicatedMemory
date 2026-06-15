@@ -244,46 +244,7 @@ def _read_context() -> str:
 # ═══════════════════════════════════════════════
 
 def _tag_llm(question: str, choice: str) -> str:
-    """
-    让 LLM 吃进画像+阶段+粒子+织布机，自己推断深层动机。
-    不抄用户表面理由——用第三层所有数据交叉判断。
-    """
-    try:
-        from sandglass_think import _llm
-
-        context = _read_context()
-        options = _extract_options(question)
-
-        system = (
-            "你是深层决策分析师。用户做了一个选择，你拥有用户的完整画像、近期决策历史、"
-            "搜索权重和矛盾告警。你的任务不是复述用户的表面理由——而是用所有这些数据，"
-            "推断他做这个选择的**真实深层动机**。\n\n"
-            "推断维度：\n"
-            "- 情绪状态（压力？开心？焦虑？生理期？）\n"
-            "- 阶段特征（疯狂建设期？调整期？）\n"
-            "- 偏移趋势（省钱→愿意投入→红牌？）\n"
-            "- 认知惯性（完美主义？囤积癖？社恐式独立？）\n\n"
-            "输出格式：只返回3-5个深层标签，逗号分隔。标签要有洞察力、有人味。\n"
-            "例如：补偿心理(压力期),囤积式省钱,经期偏好,表演型效率,深夜决策疲劳\n"
-            "不要解释，不要复述用户说的理由。"
-        )
-
-        user_prompt = (
-            f"可选选项：{options}\n"
-            f"用户选择了：{choice}\n\n"
-            f"== 用户全量上下文 ==\n{context[:4000]}"
-        )
-
-        result = _llm(system, user_prompt, max_tokens=80)
-        if result:
-            tags = [t.strip() for t in result.split(",") if t.strip()]
-            # 托尼P1: 任何标签>50字=LLM返回分析段落→不存
-            if any(len(t) > 50 for t in tags):
-                return ""
-            tags = [t for t in tags if len(t) <= 30]
-            return ",".join(tags[:5])
-    except Exception:
-        pass
+    """V2.9.9.9+: 纯本地引擎 — LLM标签已退役，由本地词库+自进化覆盖"""
     return ""
 
 
@@ -319,31 +280,7 @@ def _learn(tags: str, choice: str = "") -> None:
 # ═══════════════════════════════════════════════
 
 def _enrich_choice_with_llm(question: str, choice: str) -> str:
-    """LLM 用第三层上下文解释为什么选这个——不抄表面理由。"""
-    try:
-        from sandglass_think import _llm
-
-        context = _read_context()
-        options = _extract_options(question)
-
-        system = (
-            "你是决策动机分析师。用户面临选择，他用上下文中的所有数据来推断"
-            "用户选择某个选项的**真实深层原因**。不要复述用户说的理由——"
-            "用画像+决策历史+偏移趋势+阶段特征自己推。\n"
-            "输出：一句话，20字以内。例如：'压力期补偿心理'、'经期偏好甜食'、"
-            "'疯狂建设期的完美主义'。不要解释，直接给结论。"
-        )
-
-        user_prompt = (
-            f"可选：{options}\n用户选了：{choice}\n\n"
-            f"上下文参考：{context[:3000]}"
-        )
-
-        result = _llm(system, user_prompt, max_tokens=40)
-        if result and result.strip():
-            return f"{choice}({result.strip()[:30]})"
-    except Exception:
-        pass
+    """V2.9.9.9+: 纯本地引擎 — LLM丰富已退役，返回原选择"""
     return choice
 
 
@@ -438,39 +375,12 @@ def _infer_local(chain: list[str]) -> str:
 
 def _infer_resolution(chain: list[str]) -> str:
     """
-    决策链条推断——LLM 优先，本地兜底。
+    决策链条推断——纯本地。
     
-    LLM：吃进画像+阶段+历史粒子，深层推断倾向
     本地：关键词+链条模式+历史比对，模糊画像
     """
     if not chain or len(chain) < 2:
         return ""
-    
-    # LLM 优先
-    try:
-        from sandglass_think import _llm
-        
-        context = _read_context()
-        summary = _chain_summary(chain)
-        
-        system = (
-            "你是行为模式分析师。用户做了一串决策：犹豫、试探、回退。"
-            "结合他的画像、决策历史、偏移趋势，推断这条链条背后揭示的深层偏好。"
-            "不要复述链条内容。推断维度：为什么回退？试探暴露了什么？下次怎么服务他？"
-            "输出：一句话，30字以内。格式：'倾向于XX，下次直接给XX'"
-        )
-        
-        user_prompt = (
-            f"决策链条：{summary}\n"
-            f"全链条：{' → '.join(chain)}\n\n"
-            f"== 用户上下文 ==\n{context[:3000]}"
-        )
-        
-        result = _llm(system, user_prompt, max_tokens=80)
-        if result and result.strip():
-            return result.strip()[:60]
-    except Exception:
-        pass
     
     # 本地兜底——三层结构已有数据
     return _infer_local(chain)
