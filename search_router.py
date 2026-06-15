@@ -288,9 +288,14 @@ class SearchRouter:
                         seen.add(ln)
                         all_candidates.append((ln, ts, text))
         if all_candidates:
-            # V2.9.9.4: 英文查询去掉时间停用词（when/first/last等挤掉正确结果）
-            if _detect_lang(query) == "en":
-                query = re.sub(r'\b(first|last|when|time)\b', '', query, flags=re.IGNORECASE).strip()
+            # V2.9.19: 中英文停用词过滤 — 防虚词稀释ratio
+            lang = _detect_lang(query)
+            if lang == "en" or lang == "mixed":
+                EN_STOP = r'\b(first|last|when|time|the|a|an|is|are|was|were|been|being|have|has|had|do|does|did|will|would|can|could|should|may|might|if|then|else|that|this|these|those|it|its|not|but|or|and|for|nor|so|yet|to|of|in|on|at|by|from|with)\b'
+                query = re.sub(EN_STOP, '', query, flags=re.IGNORECASE).strip()
+            if lang == "zh" or lang == "mixed":
+                ZH_STOP = r'(上次|那个|这个|一下|我想|帮我|多少钱|怎么样|怎么办|有没有|是不是|能不能|可不可以|什么是|什么叫|怎么|什么|哪|吗|呢|啊|吧|的|了|是|在|有|我|你|他|她|它|们|这|那|很|都|也|就|还|要|会|能|可以|应该|把|被|让|给|对|从|到|和|与|或|但|而|所以|因为|如果|虽然|但是|然而|不过|只是|而且|并且)'
+                query = re.sub(ZH_STOP, '', query).strip()
             tokens = _query_tokens(query)
             ranked = sand_density(all_candidates, tokens, query)
             # V2.9.9.8: sim_bonus已在sand_density处理
