@@ -96,9 +96,9 @@ def sand_density(candidates, query_tokens, query) -> list:
         final += pos_bonus
         # 语义微调: fact_tags标签 + offset关键词
         if ln in tagged:
-            final += 0.03
+            final += 0.05
         if offset_vocab and any(w in text.lower() for w in offset_vocab):
-            final += 0.02
+            final += 0.04
         scored.append((final, item))
     scored.sort(key=lambda x: x[0], reverse=True)
     return [item for _, item in scored]
