@@ -22,12 +22,12 @@ from offset_signals import _OFFSET_SIGNALS
 from offset_signals import _LLM_KEY, _LLM_ENDPOINT, _LLM_MODEL
 
 # Lazy imports — avoid circular dependency
-_fail_open = None; _llm = None; _extract_md_section = None
+_fail_open = None; _extract_md_section = None
 def _lazy_import():
-    global _fail_open, _llm, _extract_md_section
+    global _fail_open, _extract_md_section
     if _fail_open is None:
-        from sandglass_think import _fail_open as _fo, _llm as _l, _extract_md_section as _em
-        _fail_open = _fo; _llm = _l; _extract_md_section = _em
+        from sandglass_think import _fail_open as _fo, _extract_md_section as _em
+        _fail_open = _fo; _extract_md_section = _em
 
 @__import__("offset_signals")._fail_open("")
 def persona_build() -> str:
@@ -69,31 +69,7 @@ def persona_build() -> str:
 
     user_prompt += f"=== 主人对话沙子 ===\n{sand_text[:30000]}\n=== 结束 ===\n\n请执行四层深度扫描，生成 persona.md。首次生成，全量写入。"
 
-    result = _llm(_PERSONA_SYSTEM.format(time=datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                          first_line=first_line, last_line=last_line,
-                                          total=limit),
-                  user_prompt, max_tokens=4096)
-
-    if result:
-        os.makedirs(os.path.dirname(_PERSONA), exist_ok=True)
-        m = re.search(r"```(?:markdown)?\s*\n(.*?)```", result, re.DOTALL)
-        content = m.group(1).strip() if m else result.strip()
-        # 保存旧版本用于diff
-        import shutil
-        prev = os.path.join(_PERSONA_DIR, "persona.prev.md")
-        if os.path.exists(_PERSONA):
-            shutil.copy2(_PERSONA, prev)
-        with open(_PERSONA, "w", encoding="utf-8") as f:
-            f.write(content)
-        # 自动画像diff
-        try:
-            diff = persona_diff()
-            logger.info(f"persona_diff: {diff['insight']}")
-        except Exception:
-            pass
-        return _PERSONA
-
-    # V2.9.12: LLM 不可用 → 管道聚合构建（fact_tags + offset + particles + scenes）
+    # V2.9.12: 纯本地 → 管道聚合构建（fact_tags + offset + particles + scenes）
     content = _pipe_build(first_line, last_line, total)
     if content:
         os.makedirs(os.path.dirname(_PERSONA), exist_ok=True)
@@ -141,22 +117,11 @@ def persona_update() -> str:
 
     user_prompt = f"当前时间：{datetime.now():%Y-%m-%d %H:%M}\n\n### 现有画像\n{existing[:4000]}\n\n### 新对话沙子（总{total_sands}条，本条第{first_line}-{last_line}行）\n{sand_text[:15000]}\n\n请增量更新画像。只改有变化的部分，不变的部分原样保留。注意维护项链溯源。"
 
-    result = _llm(_PERSONA_SYSTEM.format(time=datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                          first_line=first_line, last_line=last_line, total=sand_count),
-                  user_prompt, max_tokens=4096)
-
-    if result:
-        m = re.search(r"```(?:markdown)?\s*\n(.*?)```", result, re.DOTALL)
-        content = m.group(1).strip() if m else result.strip()
-        if len(content) > 500:  # 防止空覆盖
-            with open(_PERSONA, "w", encoding="utf-8") as f:
-                f.write(content)
-    else:
-        # V2.9.9.11: _llm 纯本地返回空 → 数据点驱动更新
-        refreshed = _data_driven_refresh(existing, first_line, last_line, total_sands)
-        if refreshed:
-            with open(_PERSONA, "w", encoding="utf-8") as f:
-                f.write(refreshed)
+    # V2.9.9.11: 纯本地 → 数据点驱动更新
+    refreshed = _data_driven_refresh(existing, first_line, last_line, total_sands)
+    if refreshed:
+        with open(_PERSONA, "w", encoding="utf-8") as f:
+            f.write(refreshed)
     return _PERSONA
 
 
@@ -379,25 +344,8 @@ def persona_canvas(persona_path: str = "", stage: str = "") -> str:
     else:
         return ""
 
-    user_prompt = f"=== 人格画像 ===\n{persona_text[:5000]}\n=== 结束 ===\n请生成认知地图。"
-
-    result = _llm(_CANVAS_SYSTEM.format(stage=stage, time=datetime.now().strftime("%Y-%m-%d %H:%M")),
-                  user_prompt, max_tokens=1024)
-
-    if not result:
-        return ""
-
-    m = re.search(r"```(?:markdown)?\s*\n(.*?)```", result, re.DOTALL)
-    content = m.group(1).strip() if m else result.strip()
-
-    os.makedirs(_PERSONA_DIR, exist_ok=True)
-    canvas_path = os.path.join(_PERSONA_DIR, f"canvas.{stage}.md")
-    with open(canvas_path, "w", encoding="utf-8") as f:
-        f.write(content)
-
-    # 同时更新当前画布（首页快照）
-    shutil.copy2(canvas_path, _CANVAS)
-    return canvas_path
+    # V2.9.9.9+: 纯本地 — canvas 由 persona_diff + persona_verify 驱动
+    return ""
 
 
 def persona_freshness() -> dict:

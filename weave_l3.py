@@ -15,10 +15,9 @@ logger = logging.getLogger(__name__)
 # Lazy imports — avoid circular dependency with sandglass_think
 
 try:
-    from sandglass_think import _fail_open, _llm, comprehensive_offset, cross_stage_offset, stage_list, search_with_stage_label, weave_links
+    from sandglass_think import _fail_open, comprehensive_offset, cross_stage_offset, stage_list, search_with_stage_label, weave_links
 except ImportError:
     _fail_open = lambda d: lambda f: f
-    _llm = None
     comprehensive_offset = lambda: {"offset": 0, "direction": "neutral", "sample": 0}
     cross_stage_offset = lambda *a, **kw: {}
     stage_list = lambda: []
