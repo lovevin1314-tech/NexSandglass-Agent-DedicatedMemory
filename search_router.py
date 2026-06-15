@@ -59,121 +59,46 @@ def simhash_rerank(candidates, query) -> list:
 
 
 def sand_density(candidates, query_tokens, query) -> list:
+    """V2.9.9.8优化: 余弦相似度×信任+SimHash — 简洁通用"""
+    import math
     q_fp = _l3_simhash(query)
-    if q_fp == -1:
-        q_fp = 0
+    if q_fp == -1: q_fp = 0
     trust_scores = {}
     try:
         from shadow_sand import shadow_boost
         line_nums = {c[0] for c in candidates if len(c) > 0}
         boosted = shadow_boost(line_nums, limit=len(candidates))
         trust_scores = {ln: score for score, ln in boosted}
-    except Exception:
-        pass
-    import math
-    global _tag_idf
-    if _tag_idf is None: _load_tag_idf()
-    scored = []
-    # V2.9.9.8: 语义信号缓存(mtime失效)+offset记忆词库
-    global _tagged_cache, _tagged_mtime, _offset_vocab
-    try:
-        db_path = os.path.join(_NB, "shadow_sand.db")
-        mtime = os.path.getmtime(db_path) if os.path.exists(db_path) else 0
-        if _tagged_cache is None or mtime > _tagged_mtime:
-            from shadow_sand import _get_conn
-            db = _get_conn()
-            _tagged_cache = {r[0] for r in db.execute(
-                "SELECT line_num FROM fact_tags WHERE tags != '' AND tags != '未分类'"
-            ).fetchall()}
-            _tagged_mtime = mtime
-        tagged = _tagged_cache
-        _db = _get_conn()
-    except Exception:
-        tagged = set()
-        _db = None
-    if _offset_vocab is None:
-        try:
-            from offset_signals import _OFFSET_SIGNALS
-            words = set()
-            for v in _OFFSET_SIGNALS.values():
-                words.update(w.lower() for w in v if len(w) > 1)
-            _offset_vocab = words
-        except Exception:
-            _offset_vocab = set()
-    offset_vocab = _offset_vocab
-    for item in candidates:
-        ln = item[0]
-        text = item[2] if len(item) > 2 else ""
-        text_tokens = _query_tokens(text)
-        # V2.9.9.8: 同义词管道 → 密度排序
-        try:
-            from l3_search_core import _synonym_expand
-            expanded = set()
+    except Exception: pass
+
+    # 候选集近似IDF(零额外IO)
+    N = max(len(candidates), 1)
+    df = {}
+    for c in candidates:
+        if len(c) > 2:
             for t in query_tokens:
-                expanded.update(_synonym_expand(t)[:3])  # 每词最多3同义词
-            expanded_tokens = query_tokens | expanded
-        except Exception:
-            expanded_tokens = query_tokens
-        matched = len(expanded_tokens & text_tokens)
-        # V2.9.9.8: 查询词IDF加权 — 稀有词匹配>常见词匹配
-        if query_tokens:
-            weighted = sum(1.0 / max(1, text_tokens.count(t)) for t in query_tokens if t in text_tokens)
-            density = weighted / max(len(query_tokens), 1)
-        else:
-            density = 0
+                if t in c[2].lower(): df[t] = df.get(t, 0) + 1
+
+    scored = []
+    for item in candidates:
+        ln = item[0]; text = item[2] if len(item) > 2 else ""
+        text_tokens = _query_tokens(text)
+        # 余弦相似度
+        dot = q_norm = d_norm = 0
+        for t in query_tokens:
+            idf = math.log((N + 1) / (df.get(t, 0) + 1))
+            q_w = 1.0 / len(query_tokens) * idf
+            d_w = (1.0 if t in text_tokens else 0) / max(len(text_tokens), 1) * idf
+            dot += q_w * d_w; q_norm += q_w ** 2; d_norm += d_w ** 2
+        density = dot / (math.sqrt(q_norm) * math.sqrt(d_norm) + 0.001)
         trust = trust_scores.get(ln, 0.5)
+        # SimHash bonus
         fp = _l3_simhash(text[:500])
-        if fp == -1:
-            sim_bonus = 0
+        if fp == -1: sim_bonus = 0
         else:
             dist = bin(q_fp ^ fp).count('1')
             sim_bonus = min(1.0 / (1 + dist / 128), 0.5)
         final = density * trust + sim_bonus
-        # V2.9.9.8: 高斯位置偏置 — 中期行权重最高(信息密度峰值)
-        if candidates:
-            max_ln = max(c[0] for c in candidates)
-            p = ln / max(max_ln, 1)
-            # V3.1密度自适应 — ≥10候选时用密度分布,不足用固定0.50
-            if len(candidates) >= 10:
-                weighted_sum = sum(
-                    c[0] * max(1, len(c[2]) / 50) for c in candidates if len(c) > 2
-                )
-                total_weight = sum(
-                    max(1, len(c[2]) / 50) for c in candidates if len(c) > 2
-                )
-                center = (weighted_sum / max(total_weight, 1) / max_ln) + 0.08
-                center = max(0.35, min(center, 0.60))
-            else:
-                # V3.2 L1/L2锚点: trust+fact_tags找信息中心
-                info_lns, info_ws = [], []
-                for c in candidates:
-                    cln = c[0]
-                    t = trust_scores.get(cln, 0.5)
-                    tagged_flag = cln in tagged
-                    if t > 0.5 or tagged_flag:
-                        info_lns.append(cln)
-                        info_ws.append(t * (2.0 if tagged_flag else 1.0))
-                if info_lns and max_ln > 0:
-                    wsum = sum(ln * w for ln, w in zip(info_lns, info_ws))
-                    center = (wsum / max(sum(info_ws), 1) / max_ln) + 0.08
-                    center = max(0.30, min(center, 0.65))
-                else:
-                    center = 0.50
-            pos_bonus = math.exp(-((p - center) ** 2) / (2 * 0.22 ** 2)) * 0.1
-        else:
-            pos_bonus = 0
-        final += pos_bonus
-        # 语义微调: IDF标签(≥10个标签时) / offset关键词 / 密度调制
-        if _tag_idf and ln in tagged:
-            row = _db.execute("SELECT tags FROM fact_tags WHERE line_num=?", (ln,)).fetchone()
-            if row and row[0]:
-                tags = [t.strip() for t in row[0].split(',') if t.strip()]
-                idf_sum = sum(_tag_idf.get(t, 0) for t in tags)
-                tag_bonus = min(0.12, idf_sum * 0.04) * (0.2 + 0.8 * density)
-                final += tag_bonus
-
-        if offset_vocab and any(w in text.lower() for w in offset_vocab):
-            final += 0.04
         scored.append((final, item))
     scored.sort(key=lambda x: x[0], reverse=True)
     return [item for _, item in scored]
