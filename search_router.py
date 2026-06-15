@@ -116,18 +116,18 @@ def sand_density(candidates, query_tokens, query) -> list:
         if candidates:
             max_ln = max(c[0] for c in candidates)
             p = ln / max(max_ln, 1)
-            # V2.9.9.8: 自适应中心 - 标签密集处=信息峰值
-            if tagged:
+            # V2.9.9.8: 自适应中心(≥20标签时) / 降级线性(英文等无标签场景)
+            if tagged and len([tln for tln in tagged if tln <= max_ln]) >= 20:
                 tagged_lns = [tln for tln in tagged if tln <= max_ln]
-                center = sum(tagged_lns) / max(len(tagged_lns), 1) / max_ln if tagged_lns else 0.45
+                center = sum(tagged_lns) / len(tagged_lns) / max_ln
+                pos_bonus = math.exp(-((p - center) ** 2) / (2 * 0.22 ** 2)) * 0.1
             else:
-                center = 0.45
-            pos_bonus = math.exp(-((p - center) ** 2) / (2 * 0.22 ** 2)) * 0.1
+                pos_bonus = min(0.1, ln / max(max_ln, 1) * 0.0002)  # 线性降级
         else:
             pos_bonus = 0
         final += pos_bonus
-        # 语义微调: IDF标签稀有度 + offset关键词 + 密度调制
-        if ln in tagged and _tag_idf:
+        # 语义微调: IDF标签(≥10个标签时) / offset关键词 / 密度调制
+        if _tag_idf and ln in tagged:
             row = db.execute("SELECT tags FROM fact_tags WHERE line_num=?", (ln,)).fetchone()
             if row and row[0]:
                 tags = [t.strip() for t in row[0].split(',') if t.strip()]
