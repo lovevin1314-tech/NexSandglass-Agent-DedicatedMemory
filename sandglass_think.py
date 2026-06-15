@@ -1246,17 +1246,57 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
         if off_dir != "neutral":
             pipe_insights.append(f"偏移: {dir_cn.get(off_dir, off_dir)}{off_pct:+d}%({off_sample})")
         
-        # decision_particles 最近模式
+        # decision_particles 最近模式 + 纠结度（链条犹豫信号）
         try:
             dp_path = os.path.join(_NB, "decision_particles.txt")
             if os.path.exists(dp_path):
                 with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
                     dps = [l.strip() for l in f if l.strip() and not l.startswith("#")]
                 if dps:
-                    last = dps[-1]
-                    if "→" in last:
-                        chain = last.split("→")[-1].strip()[:40]
-                        pipe_insights.append(f"决策: {chain}")
+                    # ── 纠结信号：读取最近链条的模式 ──
+                    import re as _re_dp
+                    total_arrows = 0
+                    hesitation_count = 0
+                    recent_chains = []
+                    for line in dps[-10:]:  # 最近10条
+                        parts = line.split(" | ")
+                        if len(parts) >= 3:
+                            chain_field = parts[2]  # chain_or_choice
+                            arrows = _re_dp.findall(r"→\s*(\S+)", chain_field)
+                            if len(arrows) >= 2:
+                                total_arrows += len(arrows)
+                                # 回退检测：①箭头回退 ②"回到"标记 ③"选择困难"推断
+                                if (arrows[-1] in arrows[:-1] or 
+                                    "回到" in chain_field or 
+                                    "选择困难" in chain_field):
+                                    hesitation_count += 1
+                                recent_chains.append(chain_field[:60])
+                    
+                    # 纠结度 = 回退次数 / 决策总数
+                    if total_arrows > 0:
+                        tangle_score = round(hesitation_count / max(total_arrows, 1) * 100)
+                        if tangle_score >= 30:
+                            pipe_insights.append(f"纠结: {tangle_score}%犹豫({hesitation_count}/{total_arrows})")
+                        elif tangle_score > 0:
+                            pipe_insights.append(f"纠结: 轻微({tangle_score}%)")
+                    
+                    # 最近决策链条（保留完整模式，不止最后一步）
+                    if recent_chains:
+                        last_chain = recent_chains[-1]
+                        pipe_insights.append(f"决策: {last_chain}")
+                    else:
+                        last = dps[-1]
+                        if "→" in last:
+                            chain = last.split("→")[-1].strip()[:40]
+                            pipe_insights.append(f"决策: {chain}")
+        except Exception: pass
+        
+        # scene 场景感知（个人困惑=纠结场景）
+        try:
+            from scene_l3 import scene_current
+            sc = scene_current()
+            if sc and any(s in str(sc) for s in ["个人困惑", "困惑"]):
+                pipe_insights.append(f"场景: 纠结期")
         except Exception: pass
         
         # weave 告警
