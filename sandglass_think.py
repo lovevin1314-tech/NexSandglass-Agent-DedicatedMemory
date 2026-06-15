@@ -1320,70 +1320,28 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
     - 需要生成 → LLM 吃全量数据 → 保存为永久注解
     - 不接 LLM 返回空 dict → 上游走 2D 玻璃
     """
-    if not _LLM_KEY:
-        return {}
-
-    # 检查是否该生成（除非强制或情绪波动触发）
-    if not force and trigger not in ("emotion_spike",):
-        should, reason = _should_synthesize()
-        if not should:
-            return _latest_annotation()
-
+    # V2.9.9.10: 本地3D合成 — 纯数据聚合,零LLM
     try:
-        # 1. 画像
         persona_text = ""
         if os.path.exists(_PERSONA):
             with open(_PERSONA, "r", encoding="utf-8", errors="replace") as f:
                 persona_text = f.read()[:3000]
-
-        # 2. 偏移率 + 粒子
         comp = comprehensive_offset()
-        particles = _read_decision_log(20)
-        particle_text = "\n".join(
-            f"{e['ts'][:10]} | {e['direction']:6s} | {e.get('tags','')}"
-            for e in particles[-20:]
-        ) if particles else "无决策粒子"
-
-        # 3. 织布机矛盾
-        weave_text = ""
-        weave_path = os.path.join(_NB, "weave_alerts.txt")
-        if os.path.exists(weave_path):
-            with open(weave_path, "r", encoding="utf-8") as f:
-                weave_text = f.read()[-500:]
-
-        # 4. 搜索权重
-        weight_text = ""
-        wf = os.path.join(_NB, "search_weights.txt")
-        if os.path.exists(wf):
-            with open(wf, "r", encoding="utf-8", errors="replace") as f:
-                weight_text = f.read()[:500]
-
-        system = (
-            "你是深层人格分析师。你拥有用户的完整画像、决策历史、偏移趋势、"
-            "织布机矛盾检测和搜索权重。基于这些数据，回答四个问题：\n\n"
-            "1. 这是什么类型的人？（一句话，20字以内）\n"
-            "2. 他最近的情绪状态？（一句话）\n"
-            "3. 他的决策模式特征？（平时怎样，什么情况下会变）\n"
-            "4. 对这种人，什么样的提醒语气最有效？"
-            "（小二式热情/好奇式提问/分享式观察/数据式汇报/安静不打扰）\n"
-            "5. 给一个具体的提醒例句（30字以内，体现你最推荐的那个语气）\n\n"
-            "输出 JSON 格式：\n"
-            '{"persona_type":"","emotional_state":"","decision_pattern":"","reminder_tone":"","reminder_example":""}\n\n'
-            "不要用「你」称呼用户，用「他」。只输出 JSON。"
-        )
-
-        user_prompt = (
-            f"## 画像\n{persona_text}\n\n"
-            f"## 偏移率\n方向：{comp['direction']}  幅度：{comp['offset']}%  "
-            f"样本：{comp['sample']}条  趋势：{comp.get('trend','?')}\n\n"
-            f"## 决策粒子（最近20条）\n{particle_text}\n\n"
-            f"## 织布机矛盾\n{weave_text or '无矛盾'}\n\n"
-            f"## 搜索权重（热门话题）\n{weight_text or '无数据'}"
-        )
-
-        result = _llm(system, user_prompt, max_tokens=300)
-        if not result:
-            return {}
+        ent = _emotional_entropy()
+        mood = "平稳" if ent < 0.5 else ("波动" if ent < 1.0 else "高熵")
+        data = {
+            "persona_type": persona_text.split(chr(10))[0].replace("#","").strip()[:30] if persona_text else "未知",
+            "emotional_state": f"情绪熵{ent:.2f}({mood})",
+            "decision_pattern": f'{comp["direction"]}倾向({comp["offset"]:+d}%), 样本{comp["sample"]}条',
+            "reminder_tone": "数据汇报" if mood == "平稳" else "安静陪伴",
+            "source": "3D 本地合成",
+            "timestamp": datetime.now().isoformat(),
+            "offset": comp,
+        }
+        _save_annotation(data, trigger or "local")
+        return data
+    except Exception:
+        return {}
 
         m = re.search(r"\{.*\}", result, re.DOTALL)
         if m:
