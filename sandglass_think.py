@@ -58,9 +58,7 @@ from offset_l3 import (
     _STAGE_THRESHOLD,
 )
 
-# ── LLM 配置（单一来源：offset_signals）──
-from offset_signals import _LLM_KEY, _LLM_ENDPOINT, _LLM_MODEL
-
+# ── 配置 ──
 logger = logging.getLogger(__name__)
 
 # ═══════════════════ 场景感知 ═══════════════════
@@ -219,7 +217,7 @@ _PERSONA_SYSTEM = """# 🧬 人格架构师 -- 渐进演化协议
 
 ## ⛔ 铁律
 1. **只能从提供的对话沙子中提炼，禁止编造。**
-2. **每条声明必须注明 `[src:L行号]`----这叫"项链"，可追溯到 sandglass.txt。系统会自动加 SHA256 hash 防 LLM 幻觉。**
+2. **每条声明必须注明 `[src:L行号]`----这叫"项链"，可追溯到 sandglass.txt。系统会自动加 SHA256 hash 防幻觉。**
 3. **首次生成用 write 模式全量写，增量更新只改变化部分。**
 4. **保持克制：信息不足的维度留空，不要臆测。**
 5. **中文输出。**
@@ -559,8 +557,8 @@ def search_semantic(query: str, limit: int = 10) -> list:
 
     return sentiment_rerank(enriched, _sentiment_wind())
 
-def _llm_expand(query: str) -> list:
-    """LLM 语义扩展----把用户查询扩展为多个相关关键词。
+def _infer_expand(query: str) -> list:
+    """语义扩展----把用户查询扩展为多个相关关键词。
     返回 [原词, 扩展词1, 扩展词2, ...]"""
     system = """你是搜索关键词扩展器。用户给你一个查询，你返回一组相关的中文关键词。
 规则：
@@ -730,7 +728,7 @@ def search_filter(query: str) -> dict:
         pass
 
     # ── 四维扩展（有 API Key 时）──
-    expanded = _llm_expand_with_context(query, 
+    expanded = _infer_expand_with_context(query, 
         result.get("persona_context", ""),
         result.get("scene_context", ""), 
         result.get("stage_context", ""),
@@ -760,7 +758,7 @@ def search_filter(query: str) -> dict:
                     w *= 1.2
             weights[kw] = round(w, 2)
         result["weights"] = weights
-        result["source"] = "LLM场景+阶段+决策粒子(4D权重)"
+        result["source"] = "场景+阶段+决策粒子(4D权重)"
     else:
         # 2D 离线也吃决策粒子权重----本地 80 分
         alt_keywords = _synonym_expand(query)
@@ -790,46 +788,8 @@ def search_filter(query: str) -> dict:
 
     return result
 
-def _llm_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage_ctx: str, dp_ctx: str = "", decision_bias: str = "") -> list:
-    """LLM 结合画像+场景+阶段+决策粒子四维上下文扩展关键词。"""
-    if not _LLM_KEY:
-        return []
-
-    system = """你是搜索关键词扩展器。根据用户的画像、当前场景、历史阶段和近期决策，扩展相关关键词。
-规则：
-1. 第一个词必须是用户原词
-2. 结合画像，返回符合用户偏好的词
-3. 结合场景上下文，返回该场景下最可能相关的词
-4. 结合阶段轨迹，返回历史上该话题相关的词
-5. 结合近期决策倾向，推测用户真正在找什么----决策粒子揭示行为模式，搜索词只是表面意图
-6. 返回 3-8 个关键词，一行一个
-
-示例：
-画像：性价比优先，偏好开源工具，关注本地安全
-场景：NeuroBase开发
-阶段轨迹：2024年偏向省钱自研，2025年开始接受付费工具
-近期决策：成本观,动手派,独立性
-查询：加密
-输出：
-加密
-本地安全
-权限保护
-沙漏隐私
-零依赖
-明文"""
-
-    ctx = ""
-    if persona_ctx:
-        ctx += f"画像：{persona_ctx[:200]}\n"
-    if scene_ctx:
-        ctx += f"{scene_ctx}\n"
-    if stage_ctx:
-        ctx += f"阶段轨迹：{stage_ctx}\n"
-    if decision_bias:
-        ctx += f"{decision_bias}\n"
-    if dp_ctx:
-        ctx += f"{dp_ctx}\n"
-
+def _infer_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage_ctx: str, dp_ctx: str = "", decision_bias: str = "") -> list:
+    """结合画像+场景+阶段+决策粒子四维上下文扩展关键词。纯本地引擎——返回空列表。"""
     return []
 
 def _parse_time_range(query: str) -> list:
@@ -1087,14 +1047,8 @@ _3D_ANNOTATIONS = os.path.join(_NB, "3d_annotations.jsonl")
 _THREE_D_UNLOCK = 2000
 
 def _three_d_ready() -> bool:
-    """3D 是否已解锁。本地累积够 + API Key 可用。"""
-    if not _LLM_KEY:
-        return False
-    try:
-        from sandglass_vault import count
-        return count() >= _THREE_D_UNLOCK
-    except Exception:
-        return False
+    """3D 是否已解锁。纯本地引擎 — 未解锁。"""
+    return False
 
 def _should_synthesize() -> tuple[bool, str]:
     """
