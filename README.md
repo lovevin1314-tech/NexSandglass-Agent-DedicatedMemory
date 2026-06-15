@@ -193,8 +193,8 @@ God Module 拆分 + 信号链路全通 + L1/L2封框冻结
 ### V2.9.9.12 — 搜索密度回归ratio
 `sand_density` 余弦+IDF → 简单 ratio + trust + SimHash。15项对比测试 0 退化，LLM 理解精准度显著提升（分数 0.4-1.0 vs 0.1-0.3）。代码 -9 行。
 
-### V2.9.10 — 管道式3D合成
-`_synthesize_3d` 扩展：fact_tags趋势 + offset拐点 + decision_particles模式 + weave告警 四管道聚合。零新提取器，纯管道聚合（反思技能原则）。LLM 每轮获得跨会话洞察。
+### V2.9.11 — 管道洞察接入LLM
+`memory_provider` 接入 `_synthesize_3d` 的 `pipe_insights`，LLM 每轮收到跨会话管道洞察（标签趋势+偏移拐点+决策模式+画像告警）。零新提取器。
 
 ---
 
