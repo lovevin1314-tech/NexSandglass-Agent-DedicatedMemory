@@ -116,7 +116,13 @@ def sand_density(candidates, query_tokens, query) -> list:
         if candidates:
             max_ln = max(c[0] for c in candidates)
             p = ln / max(max_ln, 1)
-            pos_bonus = math.exp(-((p - 0.45) ** 2) / (2 * 0.22 ** 2)) * 0.1
+            # V2.9.9.8: 自适应中心 - 标签密集处=信息峰值
+            if tagged:
+                tagged_lns = [tln for tln in tagged if tln <= max_ln]
+                center = sum(tagged_lns) / max(len(tagged_lns), 1) / max_ln if tagged_lns else 0.45
+            else:
+                center = 0.45
+            pos_bonus = math.exp(-((p - center) ** 2) / (2 * 0.22 ** 2)) * 0.1
         else:
             pos_bonus = 0
         final += pos_bonus
