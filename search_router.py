@@ -59,8 +59,7 @@ def simhash_rerank(candidates, query) -> list:
 
 
 def sand_density(candidates, query_tokens, query) -> list:
-    """V2.9.9.8优化: 余弦相似度×信任+SimHash — 简洁通用"""
-    import math
+    """V2.9.9.11r: 回归ratio + trust + SimHash — 对LLM理解更精准"""
     q_fp = _l3_simhash(query)
     if q_fp == -1: q_fp = 0
     trust_scores = {}
@@ -71,26 +70,14 @@ def sand_density(candidates, query_tokens, query) -> list:
         trust_scores = {ln: score for score, ln in boosted}
     except Exception: pass
 
-    # 候选集近似IDF(零额外IO)
-    N = max(len(candidates), 1)
-    df = {}
-    for c in candidates:
-        if len(c) > 2:
-            for t in query_tokens:
-                if t in c[2].lower(): df[t] = df.get(t, 0) + 1
-
+    q_len = max(len(query_tokens), 1)
     scored = []
     for item in candidates:
         ln = item[0]; text = item[2] if len(item) > 2 else ""
         text_tokens = _query_tokens(text)
-        # 余弦相似度
-        dot = q_norm = d_norm = 0
-        for t in query_tokens:
-            idf = math.log((N + 1) / (df.get(t, 0) + 1))
-            q_w = 1.0 / len(query_tokens) * idf
-            d_w = (1.0 if t in text_tokens else 0) / max(len(text_tokens), 1) * idf
-            dot += q_w * d_w; q_norm += q_w ** 2; d_norm += d_w ** 2
-        density = dot / (math.sqrt(q_norm) * math.sqrt(d_norm) + 0.001)
+        # ratio: matched/query — LLM一眼看懂,0=无关,1=完全匹配
+        matched = len(query_tokens & text_tokens)
+        ratio = matched / q_len
         trust = trust_scores.get(ln, 0.5)
         # SimHash bonus
         fp = _l3_simhash(text[:500])
@@ -98,7 +85,7 @@ def sand_density(candidates, query_tokens, query) -> list:
         else:
             dist = bin(q_fp ^ fp).count('1')
             sim_bonus = min(1.0 / (1 + dist / 128), 0.5)
-        final = density * trust + sim_bonus
+        final = ratio * trust + sim_bonus
         scored.append((final, item))
     scored.sort(key=lambda x: x[0], reverse=True)
     return [item for _, item in scored]
