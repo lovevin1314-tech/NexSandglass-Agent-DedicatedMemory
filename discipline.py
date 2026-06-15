@@ -44,7 +44,7 @@ def iron_rules_with_counts(limit: int = 3) -> list:
 
 
 def iron_rule_bump(rule_text: str):
-    """提醒计数 +1——每次 LLM 引用/提醒某条规则时调用"""
+    """提醒计数 +1——每次引用/提醒某条规则时调用"""
     if not os.path.exists(_IRON_RULES):
         return
     raw = [l.strip() for l in open(_IRON_RULES, "r", encoding="utf-8").readlines() if l.strip()]

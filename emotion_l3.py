@@ -27,7 +27,7 @@ try:
     _3D_ANNOTATIONS = __import__('sandglass_think')._3D_ANNOTATIONS
 except ImportError:
     _read_decision_log = lambda n: []
-    _llm = None  # V2.9.9.9+ 已退役
+    _llm = None
     _three_d_ready = lambda: False
     _latest_annotation = lambda: {}
     _should_synthesize = lambda: (False, "")
@@ -116,8 +116,8 @@ def entropy_ghost(question: str) -> dict:
       ② 查同标签决策的后续偏移模式
       ③ 基于历史数据推断
     
-    LLM 增强（+120分）:
-      喂上下文 → LLM 推演虚拟分支
+    3D 增强（+120分）:
+      喂上下文 → 推演虚拟分支
     
     不论 2D 还是 3D，都标注'幽灵决策——纯虚拟推演，未修改任何数据'
     """
@@ -191,7 +191,7 @@ def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str
 
     - 先读最新 3D 阶段注解 → 直接用（永久保存的）
     - 触发条件满足 → 重新合成 3D
-    - 无 LLM → 2D 描述方向
+    - 无 API Key → 2D 描述方向
 
     不判对错，不说"该怎样"。
     """
@@ -199,7 +199,7 @@ def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str
     if emotion_trigger:
         trigger = "emotion_spike"
 
-    # ── 3D 路径：沙漏 ≥ 2000 条 + 有 LLM → 启用立体合成 ──
+    # ── 3D 路径：沙漏 ≥ 2000 条 + API Key → 启用立体合成 ──
     syn = {}
     if _three_d_ready():
         # 读最新注解或触发 3D 合成
@@ -279,7 +279,7 @@ def memo_mode() -> str:
       - 阶段简报（stage_brief）
       - 最近决策（decision_particles）
     
-    3D LLM（200分）:
+    3D 增强（200分）:
       - 加一段自然语言总结
     """
     lines = [f"🧬 沙漏画像记忆 — {datetime.now():%Y-%m-%d %H:%M}", ""]
