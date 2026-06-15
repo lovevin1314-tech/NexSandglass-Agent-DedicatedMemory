@@ -188,7 +188,10 @@ God Module 拆分 + 信号链路全通 + L1/L2封框冻结
 19工具 inputSchema + 情绪熵重构 + 纪律因子自动触发
 
 ### V2.9.9.11 — 数据点自生长
-`persona_update()` 加 `_data_driven_refresh()` 本地兜底。_llm 返回空不再冻住画像，自动从 fact_tags + offset + decision_particles 聚合更新。清理 memory_provider.py 重复代码块。画像溯源标记标准化（`<!-- L: -->`）。
+`persona_update()` 加 `_data_driven_refresh()` 本地兜底。_llm 返回空不再冻住画像，自动从 fact_tags + offset + decision_particles 聚合更新。清理 memory_provider.py 重复代码块。
+
+### V2.9.9.12 — 搜索密度回归ratio
+`sand_density` 余弦+IDF → 简单 ratio + trust + SimHash。15项对比测试 0 退化，LLM 理解精准度显著提升（分数 0.4-1.0 vs 0.1-0.3）。代码 -9 行。
 
 ---
 
