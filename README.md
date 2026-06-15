@@ -147,6 +147,13 @@ python -c "from sandglass_vault import sandglass_export; print(sandglass_export(
 
 ---
 
+## 从 Hermes 迁移
+
+```bash
+python hermes_to_sandglass.py
+```
+一行命令，自动找到 Hermes 记忆并导入沙漏。
+
 ## 冒烟测试
 
 ```bash
