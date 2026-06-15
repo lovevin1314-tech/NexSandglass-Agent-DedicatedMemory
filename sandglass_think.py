@@ -537,7 +537,7 @@ def search_semantic(query: str, limit: int = 10) -> list:
 
     if not results:
         try:
-            # V2.9.9.9: 本地TF-IDF语义搜索 — 无LLM降级
+            # V2.9.9.9: 本地TF-IDF语义搜索
             from l3_search_core import _tfidf_search
             results = _tfidf_search(query, limit)
         except Exception:
@@ -697,7 +697,7 @@ def search_filter(query: str) -> dict:
     except Exception:
         pass
 
-    # ── 决策粒子全量喂入 LLM 扩展（让 LLM 吃决策历史推断搜索意图）──
+    # ── 决策粒子全量数据扩展（吃决策历史推断搜索意图）──
     dp_path = os.path.join(_VAULT, "decision_particles.txt")
     dp_context = ""
     if os.path.exists(dp_path):
@@ -729,7 +729,7 @@ def search_filter(query: str) -> dict:
     except Exception:
         pass
 
-    # ── LLM 四维扩展（有 API Key 时）──
+    # ── 四维扩展（有 API Key 时）──
     expanded = _llm_expand_with_context(query, 
         result.get("persona_context", ""),
         result.get("scene_context", ""), 
@@ -783,7 +783,7 @@ def search_filter(query: str) -> dict:
         result["weights"] = weights
         result["source"] = "2D本地权重(决策粒子+偏移方向)"
 
-    # ── 同时保留非LLM路径的关键词作为备选 ──
+    # ── 同时保留本地路径的关键词作为备选 ──
     result["alt_keywords"] = _synonym_expand(query) if not expanded or len(expanded) <= 1 else []
     if result["alt_keywords"]:
         result["hint"] = f"或者你也可能在找：{'、'.join(result['alt_keywords'][:3])}"
@@ -833,10 +833,10 @@ def _llm_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage
     return []
 
 def _parse_time_range(query: str) -> list:
-    """解析模糊时间表达式，返回年份列表。有LLM更准，无LLM关键词匹配。"""
+    """解析模糊时间表达式，返回年份列表。有关键词匹配兜底。"""
     now_year = datetime.now().year
 
-    # 无LLM：关键词
+    # 关键词兜底
     patterns = [
         (r"(两三|[一二三]?四?)年前", lambda m: [now_year-4, now_year-1]),
         (r"大概(.+?)年前", lambda m: [now_year-int(m.group(1))-1, now_year-int(m.group(1))+1]),
@@ -1078,16 +1078,16 @@ def session_context(n: int = 5) -> str:
     return "\n".join(lines)
 
 # 2D 离线 = 玻璃曲面，沙自然累积 → 轮廓渐清（小标签）
-# 3D 在线 = LLM 吃进所有 2D 影子 → 合成立体像（大标签，永久保存）
+# 3D 在线 = 吃进所有 2D 影子 → 合成立体像（大标签，永久保存）
 # 每个阶段可以有多个注解----阶段切了、偏移变了、沙子够了、情绪波动了 → 重新生成
 
 _3D_ANNOTATIONS = os.path.join(_NB, "3d_annotations.jsonl")
 
-# ── 3D 解锁门槛：本地优先，2000 条沙子 + LLM → 才启用立体合成 ──
+# ── 3D 解锁门槛：本地优先，2000 条沙子 + API Key → 启用立体合成 ──
 _THREE_D_UNLOCK = 2000
 
 def _three_d_ready() -> bool:
-    """3D 是否已解锁。本地累积够 + LLM 可用。"""
+    """3D 是否已解锁。本地累积够 + API Key 可用。"""
     if not _LLM_KEY:
         return False
     try:
@@ -1208,8 +1208,8 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
     3D 立体画像合成----永久注解模式。
     
     - 先检查 _should_synthesize() → 不需要生成则返回最新注解
-    - 需要生成 → LLM 吃全量数据 → 保存为永久注解
-    - 不接 LLM 返回空 dict → 上游走 2D 玻璃
+    - 需要生成 → 全量数据 → 保存为永久注解
+    - 不接 API Key 返回空 dict → 上游走 2D 玻璃
     """
     # V2.9.9.14: 管道式3D合成 — fact_tags趋势 + offset拐点 + particles模式 + weave告警
     try:

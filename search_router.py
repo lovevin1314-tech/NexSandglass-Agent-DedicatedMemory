@@ -59,7 +59,7 @@ def simhash_rerank(candidates, query) -> list:
 
 
 def sand_density(candidates, query_tokens, query) -> list:
-    """V2.9.9.11r: 回归ratio + trust + SimHash — 对LLM理解更精准"""
+    """V2.9.9.11r: 回归ratio + trust + SimHash — 对语义理解更精准"""
     q_fp = _l3_simhash(query)
     if q_fp == -1: q_fp = 0
     trust_scores = {}
@@ -75,7 +75,7 @@ def sand_density(candidates, query_tokens, query) -> list:
     for item in candidates:
         ln = item[0]; text = item[2] if len(item) > 2 else ""
         text_tokens = _query_tokens(text)
-        # ratio: matched/query — LLM一眼看懂,0=无关,1=完全匹配
+        # ratio: matched/query — 一眼看懂,0=无关,1=完全匹配
         matched = len(query_tokens & text_tokens)
         ratio = matched / q_len
         trust = trust_scores.get(ln, 0.5)

@@ -42,7 +42,7 @@ def persona_build() -> str:
     if not sands:
         return ""
 
-    # 组装沙子给 LLM
+    # 组装沙子供分析
     lines = []
     for ln, ts, text in sands:
         lines.append(f"[L{ln}:{hashlib.sha256(text[:300].encode()).hexdigest()[:8]} | {ts}] {text[:300]}")
@@ -126,7 +126,7 @@ def persona_update() -> str:
 
 
 def _data_driven_refresh(existing: str, first_line: int, last_line: int, total: int) -> str:
-    """V2.9.9.11: 数据点驱动画像刷新 — 不调LLM，纯本地聚合。
+    """V2.9.9.11: 数据点驱动画像刷新 — 纯本地聚合。
     
     从 fact_tags + offset + decision_particles 提取最新数据点，
     更新画像中的溯源标记、偏移率、标签云等动态字段。
@@ -176,7 +176,7 @@ def _data_driven_refresh(existing: str, first_line: int, last_line: int, total: 
             new_lines.append(f"> 沙子来源：L{first_line} ~ L{last_line}（共 {total} 条）")
             continue
         if not header_end and "更新方式" in line:
-            new_lines.append(f"> 更新方式：fact_tags + decision_particles + offset → 自然累积（纯本地，零外部LLM）")
+            new_lines.append(f"> 更新方式：fact_tags + decision_particles + offset → 自然累积（纯本地）")
             continue
         
         # 偏移率行（在决策模式区域，用精确匹配）
@@ -200,7 +200,7 @@ def _data_driven_refresh(existing: str, first_line: int, last_line: int, total: 
 
 
 def _pipe_build(first_line: int, last_line: int, total: int) -> str:
-    """V2.9.12: 管道聚合首次构建画像 — 纯本地，零LLM。
+    """V2.9.12: 管道聚合首次构建画像 — 纯本地。
     
     从 fact_tags + offset + decision_particles + scenes 生成四层 persona.md。
     新用户空管道 → 输出"待积累"骨架；老用户管道丰富 → 输出完整画像。
@@ -441,7 +441,7 @@ def _load_persona() -> str:
 
 
 def _local_persona_extract() -> str:
-    """本地提取基本画像——零 LLM，纯模式匹配。V1.3。"""
+    """本地提取基本画像——纯模式匹配。V1.3。"""
     from sandglass_vault import recent
     from collections import Counter
 
@@ -469,7 +469,7 @@ def _local_persona_extract() -> str:
         if hits:
             results[cat] = [w for w, c in Counter(hits).most_common(5) if c >= 2]
 
-    lines = ["# 主人画像 — 本地提取", "", "> 设置API Key后升级为LLM四层深度扫描。", ""]
+    lines = ["# 主人画像 — 本地提取", "", "> 设置API Key后可启用深度扫描。", ""]
     for cat, items in results.items():
         if items:
             lines.append(f"## {cat}")
