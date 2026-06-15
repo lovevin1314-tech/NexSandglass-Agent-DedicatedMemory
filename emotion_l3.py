@@ -18,7 +18,7 @@ import os as _os
 from offset_signals import _LLM_KEY, _LLM_ENDPOINT, _LLM_MODEL
 try:
     from sandglass_think import (
-        _fail_open, _llm, _three_d_ready, _latest_annotation,
+        _fail_open, _three_d_ready, _latest_annotation,
         _should_synthesize, _synthesize_3d, comprehensive_offset,
         _emotional_entropy, shadow_chart, stage_brief,
         weave_graph,
@@ -27,7 +27,7 @@ try:
     _3D_ANNOTATIONS = __import__('sandglass_think')._3D_ANNOTATIONS
 except ImportError:
     _read_decision_log = lambda n: []
-    _llm = None
+    _llm = None  # V2.9.9.9+ 已退役
     _three_d_ready = lambda: False
     _latest_annotation = lambda: {}
     _should_synthesize = lambda: (False, "")
@@ -104,35 +104,7 @@ def entropy_mirror(question: str) -> dict:
     except Exception as e:
         logger.warning(f"entropy_mirror: 偏移趋势获取失败: {e}")
 
-    # ④ 画像提示（有 LLM 时总结）
-    if _LLM_KEY and result["past_decisions"]:
-        try:
-            persona_text = ""
-            if os.path.exists(_PERSONA):
-                with open(_PERSONA, "r", encoding="utf-8") as f:
-                    persona_text = f.read()[:1500]
-
-            past_summary = "\n".join(
-                f"- {d['ts']}: {d['options']} → {d['choice']} ({d['direction']})"
-                for d in result["past_decisions"]
-            )
-
-            system = (
-                "你是决策镜子。你有用户画像 + 他过去面对类似选择时的历史。"
-                "不要说'应该选什么'——只总结他过去的模式和行为倾向。"
-                "一句话，15字以内。"
-            )
-
-            llm_result = _llm(
-                system,
-                f"问题：{question}\n画像：{persona_text}\n趋势：{result['current_trend']}\n\n过去类似决策：\n{past_summary}",
-                max_tokens=60,
-            )
-            if llm_result:
-                result["persona_hint"] = llm_result.strip()[:50]
-        except Exception as e:
-            logger.warning(f"entropy_mirror: LLM增强失败: {e}")
-
+    # V2.9.9.9+: 纯本地 — 画像提示由本地数据聚合
     return result
 
 def entropy_ghost(question: str) -> dict:
@@ -210,38 +182,7 @@ def entropy_ghost(question: str) -> dict:
                 f"数据不够做因果追溯，但方向可参考。"
             )
 
-    # ④ LLM 增强（200分）
-    if _LLM_KEY and result["similar_patterns"]:
-        try:
-            persona_text = ""
-            if os.path.exists(_PERSONA):
-                with open(_PERSONA, "r", encoding="utf-8") as f:
-                    persona_text = f.read()[:2000]
-
-            past = "\n".join(
-                f"- {p['ts']}: {p['options']} → {p['choice']} ({p['direction']})"
-                for p in result["similar_patterns"]
-            )
-
-            system = (
-                "你是幽灵决策推演师——模拟'如果当时选了另一个选项会怎样'。"
-                "你有用户的完整画像和真实决策历史。"
-                "基于他的行为模式推演虚拟分支。不要说'应该选什么'。"
-                "标注这是纯虚拟推演。一句话，30字以内。"
-            )
-
-            llm_result = _llm(
-                system,
-                f"问题：{question}\n画像：{persona_text}\n历史类似决策：\n{past}\n本地推断：{result['inference']}",
-                max_tokens=80,
-            )
-            if llm_result:
-                result["inference"] = f"{llm_result.strip()}（幽灵决策——纯虚拟推演）"
-                result["llm_enhanced"] = True
-                result["mode"] = "3D LLM 增强"
-        except Exception as e:
-            logger.warning(f"entropy_ghost: LLM增强失败: {e}")
-
+    # V2.9.9.9+: 纯本地 — 幽灵推演由因果链+历史模式驱动
     return result
 
 def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str:
@@ -387,18 +328,6 @@ def memo_mode() -> str:
         lines.append("  （决策粒子尚未生成）")
     lines.append("")
     
-    # LLM 增强
-    if _LLM_KEY:
-        try:
-            ctx = "\n".join(lines)
-            result = _llm(
-                "你是记忆展示助手。用户想看沙漏记住了什么。总结一下画像+影子+阶段的关联。一句话，20字以内。",
-                ctx[:3000], max_tokens=60)
-            if result:
-                lines.append(f"💬 {result.strip()}")
-        except Exception as e:
-            logger.warning(f"memo_mode LLM总结失败: {e}")
-    
-
+    # V2.9.9.9+: 纯本地 — 记忆展示由画像+影子+阶段+粒子直接拼接
 
     return "\n".join(lines)

@@ -78,10 +78,6 @@ def _extract_md_section(content, section_name):
 # ── fail-open 装饰器（单一来源：offset_signals）──
 from offset_signals import _fail_open
 
-def _llm(system: str, user: str, max_tokens: int = 2048) -> str:
-    """V2.9.9.9: 纯本地引擎 — 不调外部LLM, 所有功能已本地降级"""
-    return ""
-
 _FULL_SANITY = {
     "L1_plugin": ["plugin.py"],
     "L1_nightwatch": ["nightwatch.py"],
@@ -582,17 +578,7 @@ def _llm_expand(query: str) -> list:
 数据隐私
 零依赖"""
 
-    result = _llm(system, query, max_tokens=200)
-    if not result:
-        return [query]
-
-    # 解析：取非空行，去重，保留原词
-    keywords = []
-    for line in result.strip().split("\n"):
-        word = line.strip()
-        if word and word not in keywords:
-            keywords.append(word)
-    return keywords if keywords else [query]
+    return [query]
 
 def decision_snapshot(decision_text: str, offset_result: dict = None) -> dict:
     """决策全维度快照----点、线、面。传入offset_result可断递归。"""
@@ -844,38 +830,11 @@ def _llm_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage
     if dp_ctx:
         ctx += f"{dp_ctx}\n"
 
-    user = f"{ctx}查询：{query}"
-    result = _llm(system, user, max_tokens=200)
-
-    if not result:
-        return []
-
-    keywords = []
-    for line in result.strip().split("\n"):
-        word = line.strip()
-        if word and word not in keywords:
-            keywords.append(word)
-    return keywords if keywords else []
+    return []
 
 def _parse_time_range(query: str) -> list:
     """解析模糊时间表达式，返回年份列表。有LLM更准，无LLM关键词匹配。"""
     now_year = datetime.now().year
-
-    # LLM模式
-    if _LLM_KEY:
-        result = _llm(
-            "你是时间解析器。返回JSON数组年份。'两三年前'→[2024,2023]，'去年'→[2025]，无时间→[]。只返回JSON。",
-            query, max_tokens=100
-        )
-        if result:
-            try:
-                m = re.search(r'\[[\d,\s]+\]', result)
-                if m:
-                    years = json.loads(m.group())
-                    if years:
-                        return [str(y) for y in range(min(years)-1, max(years)+2)]
-            except Exception:
-                pass
 
     # 无LLM：关键词
     patterns = [

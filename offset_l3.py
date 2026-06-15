@@ -21,14 +21,14 @@ from offset_signals import _OFFSET_SIGNALS
 from offset_signals import _LLM_KEY, _LLM_ENDPOINT, _LLM_MODEL
 
 # Lazy imports — avoid circular dependency
-_fail_open = None; _llm = None; _extract_md_section = None
+_fail_open = None; _extract_md_section = None
 _current_stage = None; stage_list = None; scene_current = None; _log_scene_timeline = None; scene_guess = None
 _WAVE_THRESHOLDS = None; _weave_guard = None; weave_contradiction = None
 def _lazy_import():
-    global _fail_open, _llm, _extract_md_section, _current_stage, stage_list, scene_current, _log_scene_timeline, scene_guess, _WAVE_THRESHOLDS, _weave_guard, weave_contradiction
+    global _fail_open, _extract_md_section, _current_stage, stage_list, scene_current, _log_scene_timeline, scene_guess, _WAVE_THRESHOLDS, _weave_guard, weave_contradiction
     if _fail_open is None:
-        from sandglass_think import _fail_open as _fo, _llm as _l, _extract_md_section as _em
-        _fail_open = _fo; _llm = _l; _extract_md_section = _em
+        from sandglass_think import _fail_open as _fo, _extract_md_section as _em
+        _fail_open = _fo; _extract_md_section = _em
     if _current_stage is None:
         from scene_l3 import _log_scene_timeline as _lst, scene_current as _sc, scene_guess as _sg
         from sandglass_think import _current_stage as _cs, stage_list as _sl
