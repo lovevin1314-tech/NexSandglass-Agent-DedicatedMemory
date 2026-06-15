@@ -232,6 +232,24 @@ class NexSandglassProvider(MemoryProvider):
                             identity_parts.append(line.strip()[:60])
             except Exception: pass
             
+            # 铁律：从 five-facets.json 注入结构化事实（importance×confidence 排序）
+            try:
+                import json
+                facets_path = os.path.join(_NB, "profile", "five-facets.json")
+                if os.path.exists(facets_path):
+                    with open(facets_path, "r", encoding="utf-8") as f:
+                        facets = json.load(f)
+                    all_entries = []
+                    for facet_name in ["fact","preference","restriction","task_pattern","style"]:
+                        for entry in facets.get(facet_name, []):
+                            imp = entry.get("importance", 0)
+                            conf = entry.get("confidence", 0)
+                            all_entries.append((imp * conf, entry["content"]))
+                    all_entries.sort(reverse=True)
+                    for _, content in all_entries[:8]:
+                        identity_parts.append(content[:60])
+            except Exception: pass
+            
             # 决策：从偏移率
             if off_label != "平稳":
                 identity_parts.append(f"决策: {off_label}倾向({off_pct:+d}%)")

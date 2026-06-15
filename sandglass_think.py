@@ -1233,17 +1233,18 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
                     t = t.strip()
                     if t and len(t) > 1: tags[t] += 1
             db.close()
-            top_tags = [t for t, c in tags.most_common(3) if c >= 2]
+            top_tags = [(t, c) for t, c in tags.most_common(3) if c >= 2]
             if top_tags:
-                pipe_insights.append(f"标签: {'·'.join(top_tags)}")
+                pipe_insights.append(f"标签: {'·'.join(f'{t}({c})' for t,c in top_tags)}")
         except Exception: pass
         
         # offset 拐点
         off_dir = comp.get("direction", "neutral")
         off_pct = comp.get("offset", 0)
+        off_sample = comp.get("sample", 0)
         dir_cn = {"frugal": "省钱", "spend": "愿投", "drift": "放弃", "neutral": "平稳"}
         if off_dir != "neutral":
-            pipe_insights.append(f"偏移: {dir_cn.get(off_dir, off_dir)}{off_pct:+d}%")
+            pipe_insights.append(f"偏移: {dir_cn.get(off_dir, off_dir)}{off_pct:+d}%({off_sample})")
         
         # decision_particles 最近模式
         try:
