@@ -147,7 +147,87 @@ def persona_update() -> str:
         if len(content) > 500:  # 防止空覆盖
             with open(_PERSONA, "w", encoding="utf-8") as f:
                 f.write(content)
+    else:
+        # V2.9.9.11: _llm 纯本地返回空 → 数据点驱动更新
+        refreshed = _data_driven_refresh(existing, first_line, last_line, total_sands)
+        if refreshed:
+            with open(_PERSONA, "w", encoding="utf-8") as f:
+                f.write(refreshed)
     return _PERSONA
+
+
+def _data_driven_refresh(existing: str, first_line: int, last_line: int, total: int) -> str:
+    """V2.9.9.11: 数据点驱动画像刷新 — 不调LLM，纯本地聚合。
+    
+    从 fact_tags + offset + decision_particles 提取最新数据点，
+    更新画像中的溯源标记、偏移率、标签云等动态字段。
+    保留现有画像的结构和定性内容。
+    """
+    import sqlite3
+    from collections import Counter
+    from sandglass_think import comprehensive_offset
+    
+    # 1. fact_tags 高频标签
+    tops = []
+    try:
+        db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"))
+        tags = Counter()
+        for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
+            for t in r[0].split(","):
+                t = t.strip()
+                if t and len(t) > 1: tags[t] += 1
+        db.close()
+        tops = [(t, c) for t, c in tags.most_common(5) if c >= 2]
+    except Exception:
+        pass
+    
+    # 2. 偏移率
+    off = comprehensive_offset()
+    off_dir = off.get("direction", "neutral")
+    off_pct = off.get("offset", 0)
+    dir_labels = {"frugal": "省钱", "spend": "愿投", "drift": "放弃", "neutral": "平稳"}
+    off_label = dir_labels.get(off_dir, "平稳")
+    
+    # 3. 更新溯源标记
+    now_ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+    lines = existing.split("\n")
+    new_lines = []
+    header_end = False  # 遇到第一个 ## 标题后为 True
+    
+    for line in lines:
+        # 替换 L 溯源标记
+        if line.startswith("<!-- L:"):
+            new_lines.append(f"<!-- L: first_line={first_line} last_line={last_line} total={total} -->")
+            continue
+        # 头部元数据行（image header block）
+        if not header_end and line.startswith("> 最后更新"):
+            new_lines.append(f"> 最后更新：{now_ts}（数据点驱动 · V2.9.9.11）")
+            continue
+        if not header_end and "沙子来源" in line:
+            new_lines.append(f"> 沙子来源：L{first_line} ~ L{last_line}（共 {total} 条）")
+            continue
+        if not header_end and "更新方式" in line:
+            new_lines.append(f"> 更新方式：fact_tags + decision_particles + offset → 自然累积（纯本地，零外部LLM）")
+            continue
+        
+        # 偏移率行（在决策模式区域，用精确匹配）
+        if "偏移率" in line and ("省钱" in line or "愿投" in line or "放弃" in line or "平稳" in line):
+            new_lines.append(f"  - 偏移率：**{off_label}倾向 {off_pct:+d}%**（{off_dir}，数据点实时）")
+            continue
+        
+        # 标签云行
+        if "标签云" in line and "fact_tags" in line:
+            tag_str = " · ".join([f"**{t}**" for t, _ in tops]) if tops else "待积累"
+            new_lines.append(f"- **标签云**（来自 fact_tags 自动生长）：{tag_str}")
+            continue
+        
+        # 遇到 ## 标题 → 头部结束
+        if line.startswith("## "):
+            header_end = True
+        
+        new_lines.append(line)
+    
+    return "\n".join(new_lines)
 
 
 @__import__("offset_signals")._fail_open("")
