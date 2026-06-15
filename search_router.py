@@ -11,6 +11,8 @@ V2.8.6: 统一搜索入口 — search_semantic 委托 SearchRouter
 """
 import os, mmap, re, concurrent.futures, math
 from sandglass_vault import _SANDGLASS, _parse_line
+from sandglass_paths import _NB
+import statistics
 from l3_search_core import simhash as _l3_simhash
 from sandglass_vault import _query_tokens
 
@@ -21,7 +23,6 @@ _tag_idf = None  # V2.9.9.8: IDF标签稀有度缓存
 def _load_tag_idf():
     global _tag_idf
     import math, sqlite3, os
-    from sandglass_paths import _NB
     db_path = os.path.join(_NB, "shadow_sand.db")
     if not os.path.exists(db_path): return {}
     db = sqlite3.connect(db_path)
@@ -86,10 +87,10 @@ def sand_density(candidates, query_tokens, query) -> list:
             ).fetchall()}
             _tagged_mtime = mtime
         tagged = _tagged_cache
-
+        _db = _get_conn()
     except Exception:
         tagged = set()
-        entity_density = {}
+        _db = None
     if _offset_vocab is None:
         try:
             from offset_signals import _OFFSET_SIGNALS
@@ -138,12 +139,15 @@ def sand_density(candidates, query_tokens, query) -> list:
                 info_lns += [c[0] for c in candidates if any(w in c[2].lower() for w in offset_vocab) and c[0] <= max_ln]
             if len(info_lns) >= 10:
                 center = sorted(info_lns)[len(info_lns)//2] / max_ln
-                # 三峰: 中心±0.2 — 覆盖不同表达习惯
-                pos_bonus = 0
-                for shift in (-0.2, 0, 0.2):
-                    c = center + shift
-                    if 0 <= c <= 1:
-                        pos_bonus += math.exp(-((p - c) ** 2) / (2 * 0.15 ** 2)) * 0.033
+                # 一大两小: 主高斯+两侧小峰(跟随信息分布)
+                if len(info_lns) >= 3:
+                    import statistics
+                    spread = statistics.stdev([x/max_ln for x in info_lns]) if len(info_lns)>=3 else 0.1
+                else:
+                    spread = 0.1
+                pos_bonus = math.exp(-((p - center) ** 2) / (2 * spread ** 2)) * 0.07
+                for shift in (-spread, spread):
+                    pos_bonus += math.exp(-((p - (center+shift)) ** 2) / (2 * spread ** 2)) * 0.015
             else:
                 pos_bonus = min(0.1, ln / max(max_ln, 1) * 0.0002)
         else:
@@ -151,7 +155,7 @@ def sand_density(candidates, query_tokens, query) -> list:
         final += pos_bonus
         # 语义微调: IDF标签(≥10个标签时) / offset关键词 / 密度调制
         if _tag_idf and ln in tagged:
-            row = db.execute("SELECT tags FROM fact_tags WHERE line_num=?", (ln,)).fetchone()
+            row = _db.execute("SELECT tags FROM fact_tags WHERE line_num=?", (ln,)).fetchone()
             if row and row[0]:
                 tags = [t.strip() for t in row[0].split(',') if t.strip()]
                 idf_sum = sum(_tag_idf.get(t, 0) for t in tags)
