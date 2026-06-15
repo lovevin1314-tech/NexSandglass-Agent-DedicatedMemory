@@ -44,10 +44,11 @@ CREATE TABLE IF NOT EXISTS fact_tags (
 """
 
 _ENTITY_RE = re.compile(
-    r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b|'   # 英文大写多词
-    r'"([^"]+)"|'                                   # 双引号
-    r"'([^']+)'|"                                   # 单引号
-    r'([\u4e00-\u9fff]{2,4})'                     # 中文2-4字（人名/术语）
+    r'\b([A-Z][a-z]{1,}(?:\s+[A-Z][a-z]+)*)\b|'     # 英文单/多词(Caroline, New York)
+    r'\b([A-Z]{2,})\b|'                                # 全大写(LGBTQ, API)
+    r'"([^"]+)"|'                                       # 双引号
+    r"'([^']+)'|"                                       # 单引号
+    r'([\u4e00-\u9fff]{2,4})'                         # 中文2-4字
 )
 
 _conn = None
@@ -143,7 +144,7 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
     # 提取实体（同时收集为兜底 tags——接已有管线，不建新提取器）
     entities_found = []
     for m in _ENTITY_RE.finditer(text):
-        name = m.group(1) or m.group(2) or m.group(3) or m.group(4) or ""
+        name = m.group(1) or m.group(2) or m.group(3) or m.group(4) or m.group(5) or ""
         name = name.strip()
         if name and len(name) > 1:
             entities_found.append(name)
