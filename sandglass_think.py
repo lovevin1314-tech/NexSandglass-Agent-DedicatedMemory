@@ -314,7 +314,7 @@ def _metrics_feedback() -> dict:
     ml = os.path.join(_VAULT, "metrics.log")
     if not os.path.exists(ml): return {}
     try:
-        with open(ml, "r", encoding="utf-8") as f:
+        with open(ml, "r", encoding="utf-8", errors="replace") as f:
             lines = f.readlines()[-100:]
         if len(lines) < 10: return {}
         offsets = []
@@ -644,7 +644,7 @@ def search_filter(query: str) -> dict:
 
     # ── 画像感知（始终生效）──
     if os.path.exists(_PERSONA):
-        with open(_PERSONA, "r", encoding="utf-8") as f:
+        with open(_PERSONA, "r", encoding="utf-8", errors="replace") as f:
             persona = f.read()
         for dim, keywords in [("认知内核", ["决策", "核心价值", "驱动力"]),
                                ("偏好", ["喜欢", "偏好", "开源", "免费", "本地"]),
@@ -664,7 +664,7 @@ def search_filter(query: str) -> dict:
         wf = os.path.join(_VAULT, "search_weights.txt")
         if os.path.exists(wf):
             weights = {}
-            with open(wf, "r", encoding="utf-8") as f:
+            with open(wf, "r", encoding="utf-8", errors="replace") as f:
                 for line in f:
                     if ":" in line:
                         k, v = line.strip().split(":", 1)
@@ -734,7 +734,7 @@ def search_filter(query: str) -> dict:
     dp_context = ""
     if os.path.exists(dp_path):
         try:
-            with open(dp_path, "r", encoding="utf-8") as f:
+            with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
                 lines = f.readlines()[-15:]
             if lines:
                 dp_context = "## 近期决策\n" + "".join(lines)
@@ -949,7 +949,7 @@ def weave_links() -> dict:
 
         # 追加到当前画像
         if os.path.exists(_PERSONA):
-            with open(_PERSONA, "r", encoding="utf-8") as f:
+            with open(_PERSONA, "r", encoding="utf-8", errors="replace") as f:
                 persona = f.read()
 
             # 统计互链层已有笔记数（匹配日期格式的笔记行）
@@ -1015,7 +1015,7 @@ def stage_brief() -> str:
     try:
         wf = os.path.join(_NB, "search_weights.txt")
         if os.path.exists(wf):
-            with open(wf, "r", encoding="utf-8") as f:
+            with open(wf, "r", encoding="utf-8", errors="replace") as f:
                 top = [line.strip() for line in f.readlines()[:5] if line.strip()]
             if top:
                 lines.append(f"\n🔑 高权重标签: {', '.join(top)}")
@@ -1026,7 +1026,7 @@ def stage_brief() -> str:
     try:
         dp_path = os.path.join(_NB, "decision_particles.txt")
         if os.path.exists(dp_path):
-            with open(dp_path, "r", encoding="utf-8") as f:
+            with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
                 recent = f.readlines()[-3:]
             if recent:
                 lines.append(f"\n📝 最近决策:")
@@ -1351,7 +1351,7 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
         # 1. 画像
         persona_text = ""
         if os.path.exists(_PERSONA):
-            with open(_PERSONA, "r", encoding="utf-8") as f:
+            with open(_PERSONA, "r", encoding="utf-8", errors="replace") as f:
                 persona_text = f.read()[:3000]
 
         # 2. 偏移率 + 粒子
@@ -1373,7 +1373,7 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
         weight_text = ""
         wf = os.path.join(_NB, "search_weights.txt")
         if os.path.exists(wf):
-            with open(wf, "r", encoding="utf-8") as f:
+            with open(wf, "r", encoding="utf-8", errors="replace") as f:
                 weight_text = f.read()[:500]
 
         system = (
