@@ -138,9 +138,7 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
     except: pass
     """落沙后同步——调用方传入实际行号，避免COUNT(*)偏移。"""
     db = _get_conn()
-    # 行号由调用方传入（sandglass_log 写入后传实际行号）
-    if line_num <= 0:
-        line_num = db.execute("SELECT COUNT(*) FROM trust").fetchone()[0] + 1
+    # V2.9.9.8: 行号由调用方传入，不自计数（防止与sandglass物理行号偏移）
 
     # 提取实体
     for m in _ENTITY_RE.finditer(text):
