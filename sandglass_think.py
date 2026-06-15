@@ -558,28 +558,33 @@ def search_semantic(query: str, limit: int = 10) -> list:
     return sentiment_rerank(enriched, _sentiment_wind())
 
 def _infer_expand(query: str) -> list:
-    """语义扩展----把用户查询扩展为多个相关关键词。
-    返回 [原词, 扩展词1, 扩展词2, ...]"""
-    system = """你是搜索关键词扩展器。用户给你一个查询，你返回一组相关的中文关键词。
-规则：
-1. 第一个词必须是用户原词
-2. 之后返回 3-5 个语义相关的词/短语
-3. 只返回关键词，一行一个，不要编号，不要解释
-4. 在同义替换之外，也返回上位词和下位词
-示例：
-输入：怎么保护数据
-输出：
-怎么保护数据
-加密
-权限保护
-本地安全
-数据隐私
-零依赖"""
+    """语义扩展——同义词词典 + TF-IDF 动态扩展。纯本地。"""
+    from l3_search_core import _synonym_expand
+    expanded = _synonym_expand(query)
+    return [query] + expanded[:5] if expanded else [query]
 
-    return [query]
+
+def _infer_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage_ctx: str, dp_ctx: str = "", decision_bias: str = "") -> list:
+    """结合画像+场景+阶段+决策粒子四维上下文扩展关键词。纯本地——同义词+上下文分词。"""
+    from l3_search_core import _synonym_expand
+    import re
+    keywords = [query]
+    # 1. 同义词扩展
+    expanded = _synonym_expand(query)
+    keywords.extend(expanded[:5])
+    # 2. 从上下文提取有意义的词（≥2字的实词）
+    for ctx in [persona_ctx, scene_ctx, dp_ctx]:
+        if ctx:
+            words = re.findall(r'[\u4e00-\u9fff]{2,4}', ctx[:200])
+            for w in words:
+                if w not in keywords and len(w) >= 2:
+                    keywords.append(w)
+                    if len(keywords) >= 8:
+                        break
+    return keywords[:8]
 
 def decision_snapshot(decision_text: str, offset_result: dict = None) -> dict:
-    """决策全维度快照----点、线、面。传入offset_result可断递归。"""
+    """决策全维度快照——点、线、面。传入offset_result可断递归。"""
     if offset_result:
         point = offset_result
     else:
@@ -787,10 +792,6 @@ def search_filter(query: str) -> dict:
         result["hint"] = f"或者你也可能在找：{'、'.join(result['alt_keywords'][:3])}"
 
     return result
-
-def _infer_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage_ctx: str, dp_ctx: str = "", decision_bias: str = "") -> list:
-    """结合画像+场景+阶段+决策粒子四维上下文扩展关键词。纯本地引擎——返回空列表。"""
-    return []
 
 def _parse_time_range(query: str) -> list:
     """解析模糊时间表达式，返回年份列表。有关键词匹配兜底。"""
