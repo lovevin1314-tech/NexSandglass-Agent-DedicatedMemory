@@ -565,16 +565,25 @@ def _infer_expand(query: str) -> list:
 
 
 def _infer_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage_ctx: str, dp_ctx: str = "", decision_bias: str = "") -> list:
-    """结合画像+场景+阶段+决策粒子四维上下文扩展关键词。纯本地——同义词+上下文分词。"""
+    """结合画像+场景+阶段+决策粒子四维上下文扩展关键词。纯本地——同义词+决策粒子标签。"""
     from l3_search_core import _synonym_expand
     import re
     keywords = [query]
     # 1. 同义词扩展
     expanded = _synonym_expand(query)
-    keywords.extend(expanded[:5])
-    # 2. 从上下文提取有意义的词（≥2字的实词）
-    for ctx in [persona_ctx, scene_ctx, dp_ctx]:
-        if ctx:
+    keywords.extend([w for w in expanded[:5] if w not in keywords])
+    # 2. 决策粒子标签注入（dp_ctx是逗号分隔的标签列表）
+    if dp_ctx:
+        dp_tags = re.split(r'[,，]', dp_ctx)
+        for tag in dp_tags:
+            tag = tag.strip()
+            if tag and len(tag) >= 2 and tag not in keywords:
+                keywords.append(tag)
+                if len(keywords) >= 8:
+                    break
+    # 3. 上下文分词补充
+    for ctx in [persona_ctx, scene_ctx]:
+        if ctx and len(keywords) < 8:
             words = re.findall(r'[\u4e00-\u9fff]{2,4}', ctx[:200])
             for w in words:
                 if w not in keywords and len(w) >= 2:
