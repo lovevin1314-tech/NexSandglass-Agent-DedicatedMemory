@@ -219,55 +219,61 @@ class NexSandglassProvider(MemoryProvider):
 
             blocks = []
 
-            # ═══════ 第一层：你是谁 ═══════
-            persona_text = ""
+            # ═══════ 第一层：你是谁 V2.9.9.10 数据点 ═══════
+            identity_parts = []
+            
+            # 身份：从画像快照提取
+            try:
+                from persona_l3 import _local_persona_extract
+                local = _local_persona_extract()
+                if local and local != "数据不足":
+                    for line in local.split("\n"):
+                        if "：" in line or ":" in line:
+                            identity_parts.append(line.strip()[:60])
+            except Exception: pass
+            
+            # 决策：从偏移率
+            if off_label != "平稳":
+                identity_parts.append(f"决策: {off_label}倾向({off_pct:+d}%)")
+            
+            # 关注：从fact_tags高频标签
+            try:
+                import sqlite3, os
+                from collections import Counter
+                db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"))
+                tags = Counter()
+                for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
+                    for t in r[0].split(","):
+                        t = t.strip()
+                        if t and len(t) > 1: tags[t] += 1
+                db.close()
+                top = [t for t,_ in tags.most_common(3) if _ >= 2]
+                if top: identity_parts.append(f"关注: {', '.join(top)}")
+            except Exception: pass
+            
+            # 场景
             scene_text = ""
             try:
-                sf = search_filter("")
-                if sf.get("persona_context"):
-                    raw = sf["persona_context"][:250]
-                    # 保留完整结构（含日期/沙子来源→精准定位），截到段落边界
-                    cut = raw.rfind("\n\n")
-                    if cut > 80:
-                        raw = raw[:cut]
-                    persona_text = raw.strip()
-                if sf.get("scene_context"):
-                    raw_scene = sf["scene_context"]
-                    if "：" in raw_scene:
-                        raw_scene = raw_scene.split("：", 1)[1]
-                    scene_text = raw_scene
+                from scene_l3 import scene_current
+                scenes = scene_current()
+                if scenes: scene_text = ", ".join(scenes[:3])
+            except Exception: pass
+            
+            if not identity_parts:
+                identity_parts.append("身份: 待积累（使用中自动发现）")
+            
+            blocks.append(f"【你是谁】\n{' | '.join(identity_parts)}")
+            if scene_text:
+                blocks.append(f"📍 {scene_text}")
+
+            # V2.9.9.7: 溯源异常告警
+            try:
+                from l3_persona_verify import persona_verify
+                pv = persona_verify()
+                if pv.get("failed", 0) > 0:
+                    blocks.append(f"⚠️ 画像溯源异常：{pv['failed']}条声明源行已变更")
             except Exception:
-                logger.debug("search_filter 失败", exc_info=True)
-
-            # 场景如果在画像中已出现，不重复
-            if scene_text and persona_text and any(s in persona_text for s in scene_text.split("、")):
-                scene_text = ""
-
-            # fallback: scene_current
-            if not scene_text:
-                try:
-                    from scene_l3 import scene_current
-                    scenes = scene_current()
-                    if scenes:
-                        scene_text = f"当前场景：{'、'.join(scenes[:3])}"
-                except Exception:
-                    pass
-
-            if persona_text or scene_text:
-                layer1 = ["【你是谁】"]
-                if persona_text:
-                    layer1.append(persona_text)
-                if scene_text:
-                    layer1.append(f"📍 {scene_text}")
-                # V2.9.9.7: 溯源异常告警 — 仅hash不匹配时出现
-                try:
-                    from l3_persona_verify import persona_verify
-                    pv = persona_verify()
-                    if pv.get("failed", 0) > 0:
-                        layer1.append(f"⚠️ 画像溯源异常：{pv['failed']}条声明源行已变更，可能过时")
-                except Exception:
-                    pass
-                blocks.append("\n".join(layer1))
+                pass
 
             # ═══════ 第二层：你在往哪走 ═══════
             layer2 = ["【你在往哪走】"]
