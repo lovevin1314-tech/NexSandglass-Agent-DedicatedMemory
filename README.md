@@ -13,7 +13,7 @@
 > Plaintext storage, zero-dependency. Four-way concurrent search — FTS5 · IDX · TF-IDF · Shadow Sand.
 > Knows not just who you are, but how you became this way. Remembers what you said three days ago.
 
-> **V2.9.9.7 Minimal Injection:** 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完。~60token。LLM 按需 sandglass_search 主动查。
+> **V2.9.9.8 Minimal Injection:** 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完。~60token。LLM 按需 sandglass_search 主动查。
 
 > **Soul Distillation:** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories — we forge a unique, evolving soul that resonates with the user.
 
@@ -175,12 +175,12 @@ God Module 拆分 + 信号链路全通 + L1/L2封框冻结
 ### V2.9 — 极简注入
 四路并发搜索 + 织线知识图谱 + 四层问答式注入(~60token)
 
-### V2.9.9.7 — MCP 合规
+### V2.9.9.8 — MCP 合规
 19工具 inputSchema + 情绪熵重构 + 纪律因子自动触发
 
 ---
 
-## 性能基准 (V2.9.9.7 实测)
+## 性能基准 (V2.9.9.8 实测)
 
 | 层 | 操作 | median | p99 |
 |----|------|--------|------|
