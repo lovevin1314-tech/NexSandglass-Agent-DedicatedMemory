@@ -398,6 +398,14 @@ class NexSandglassProvider(MemoryProvider):
                     layer4.extend(f"  {i+1}. {r}" for i, r in enumerate(rules))
                 blocks.append("\n".join(layer4))
 
+            # ═══════ 管道洞察（V2.9.11） ═══════
+            try:
+                from sandglass_think import _synthesize_3d
+                syn = _synthesize_3d(trigger="inject")
+                if syn and syn.get("pipe_insights"):
+                    blocks.append(f"🔍 {syn['pipe_insights']}")
+            except Exception: pass
+
             # ═══════ 尾部 ═══════
             blocks.append(f"沙漏: {total}条 | 阶段: {stage}")
 
