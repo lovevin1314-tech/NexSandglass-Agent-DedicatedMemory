@@ -103,7 +103,9 @@ curl -sSL https://raw.githubusercontent.com/lovevin1314-tech/NexSandglass-Agent-
 **MCP 用户（独立服务）：**
 ```bash
 git clone https://github.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory
-cd NexSandglass-Agent-DedicatedMemory && python sandglass_mcp.py
+cd NexSandglass-Agent-DedicatedMemory
+pythonw sandglass_mcp.py    # Windows无弹窗
+# 或 python sandglass_mcp.py  # Mac/Linux
 ```
 
 **Docker：**
