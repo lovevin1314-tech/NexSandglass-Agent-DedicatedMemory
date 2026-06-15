@@ -525,8 +525,12 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
         chain = _detect_chain(question + " " + choice)
     if chain:
         summary = _chain_summary(chain)
-        inference = _infer_resolution(chain) if _has_llm() else ""
+        inference = _infer_local(chain)  # V2.9.9.9: 纯本地链条推断
         resolved = f"{summary}  ({inference})" if inference else summary
+        # 链条标签合并到决策标签
+        if inference:
+            chain_tags = inference.replace("习惯回退", "习惯偏好").replace("选择困难", "决策犹豫")
+            tags = f"{tags},{chain_tags}" if tags and tags != "未分类" else chain_tags
     else:
         resolved = choice
 
