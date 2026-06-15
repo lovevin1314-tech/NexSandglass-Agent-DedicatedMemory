@@ -16,6 +16,24 @@ from sandglass_vault import _query_tokens
 
 # V2.9.9.8: 语义信号缓存
 _tagged_cache = None
+_tag_idf = None  # V2.9.9.8: IDF标签稀有度缓存
+
+def _load_tag_idf():
+    global _tag_idf
+    import math, sqlite3, os
+    from sandglass_paths import _NB
+    db_path = os.path.join(_NB, "shadow_sand.db")
+    if not os.path.exists(db_path): return {}
+    db = sqlite3.connect(db_path)
+    freq = {}
+    for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'"):
+        for t in r[0].split(','):
+            t = t.strip()
+            if t: freq[t] = freq.get(t, 0) + 1
+    db.close()
+    total = sum(freq.values())
+    _tag_idf = {t: math.log(total / max(v, 1)) for t, v in freq.items()}
+    return _tag_idf
 _tagged_mtime = 0
 _offset_vocab = None
 
@@ -51,6 +69,9 @@ def sand_density(candidates, query_tokens, query) -> list:
         trust_scores = {ln: score for score, ln in boosted}
     except Exception:
         pass
+    import math
+    global _tag_idf
+    if _tag_idf is None: _load_tag_idf()
     scored = []
     # V2.9.9.8: 语义信号缓存(mtime失效)+offset记忆词库
     global _tagged_cache, _tagged_mtime, _offset_vocab
@@ -91,12 +112,22 @@ def sand_density(candidates, query_tokens, query) -> list:
             dist = bin(q_fp ^ fp).count('1')
             sim_bonus = min(1.0 / (1 + dist / 128), 0.5)
         final = density * trust + sim_bonus
-        # V2.9.9.8: 位置偏置 — 后期行小幅加权(对话越往后越常被问到)
-        pos_bonus = min(0.1, ln / 500 * 0.1)
+        # V2.9.9.8: 高斯位置偏置 — 中期行权重最高(信息密度峰值)
+        if candidates:
+            max_ln = max(c[0] for c in candidates)
+            p = ln / max(max_ln, 1)
+            pos_bonus = math.exp(-((p - 0.45) ** 2) / (2 * 0.22 ** 2)) * 0.1
+        else:
+            pos_bonus = 0
         final += pos_bonus
-        # 语义微调: fact_tags标签 + offset关键词
-        if ln in tagged:
-            final += 0.05
+        # 语义微调: IDF标签稀有度 + offset关键词 + 密度调制
+        if ln in tagged and _tag_idf:
+            row = db.execute("SELECT tags FROM fact_tags WHERE line_num=?", (ln,)).fetchone()
+            if row and row[0]:
+                tags = [t.strip() for t in row[0].split(',') if t.strip()]
+                idf_sum = sum(_tag_idf.get(t, 0) for t in tags)
+                tag_bonus = min(0.12, idf_sum * 0.04) * (0.2 + 0.8 * density)
+                final += tag_bonus
         if offset_vocab and any(w in text.lower() for w in offset_vocab):
             final += 0.04
         scored.append((final, item))
