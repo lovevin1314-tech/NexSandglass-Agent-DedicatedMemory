@@ -137,10 +137,15 @@ def sand_density(candidates, query_tokens, query) -> list:
             if offset_vocab:
                 info_lns += [c[0] for c in candidates if any(w in c[2].lower() for w in offset_vocab) and c[0] <= max_ln]
             if len(info_lns) >= 10:
-                center = sorted(info_lns)[len(info_lns)//2] / max_ln  # 中位数
-                pos_bonus = math.exp(-((p - center) ** 2) / (2 * 0.22 ** 2)) * 0.1
+                center = sorted(info_lns)[len(info_lns)//2] / max_ln
+                # 三峰: 中心±0.2 — 覆盖不同表达习惯
+                pos_bonus = 0
+                for shift in (-0.2, 0, 0.2):
+                    c = center + shift
+                    if 0 <= c <= 1:
+                        pos_bonus += math.exp(-((p - c) ** 2) / (2 * 0.15 ** 2)) * 0.033
             else:
-                pos_bonus = min(0.1, ln / max(max_ln, 1) * 0.0002)  # 线性降级
+                pos_bonus = min(0.1, ln / max(max_ln, 1) * 0.0002)
         else:
             pos_bonus = 0
         final += pos_bonus
