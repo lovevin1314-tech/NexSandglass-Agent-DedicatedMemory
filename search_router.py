@@ -132,8 +132,14 @@ def sand_density(candidates, query_tokens, query) -> list:
         if candidates:
             max_ln = max(c[0] for c in candidates)
             p = ln / max(max_ln, 1)
-            # V2.9.9.8: 固定高斯位置(中英文统一,中心=0.5,中间段信息密度最高)
-            pos_bonus = math.exp(-((p - 0.5) ** 2) / (2 * 0.22 ** 2)) * 0.1
+            # V2.9.9.8: 反密度中心 — 密度往哪偏,高斯往反方向推
+            if candidates:
+                weighted_sum = sum(c[0] * (1.0 - min(1.0, len(c[2])/200)) for c in candidates if len(c)>2)
+                total_w = sum(1.0 - min(1.0, len(c[2])/200) for c in candidates if len(c)>2)
+                center = 1.0 - (weighted_sum / max(total_w, 1) / max_ln) if total_w > 0 else 0.5
+            else:
+                center = 0.5
+            pos_bonus = math.exp(-((p - center) ** 2) / (2 * 0.22 ** 2)) * 0.1
         else:
             pos_bonus = 0
         final += pos_bonus
