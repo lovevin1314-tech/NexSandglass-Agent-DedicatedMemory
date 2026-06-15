@@ -118,13 +118,8 @@ def sand_density(candidates, query_tokens, query) -> list:
         if candidates:
             max_ln = max(c[0] for c in candidates)
             p = ln / max(max_ln, 1)
-            # V2.9.9.8: 自适应中心(≥20标签时) / 降级线性(英文等无标签场景)
-            if tagged and len([tln for tln in tagged if tln <= max_ln]) >= 20:
-                tagged_lns = [tln for tln in tagged if tln <= max_ln]
-                center = sum(tagged_lns) / len(tagged_lns) / max_ln
-                pos_bonus = math.exp(-((p - center) ** 2) / (2 * 0.22 ** 2)) * 0.1
-            else:
-                pos_bonus = min(0.1, ln / max(max_ln, 1) * 0.0002)  # 线性降级
+            # V2.9.9.8: 固定高斯位置(中英文统一,中心=0.5,中间段信息密度最高)
+            pos_bonus = math.exp(-((p - 0.5) ** 2) / (2 * 0.22 ** 2)) * 0.1
         else:
             pos_bonus = 0
         final += pos_bonus
@@ -346,9 +341,7 @@ class SearchRouter:
                 query = re.sub(r'\b(first|last|when|time)\b', '', query, flags=re.IGNORECASE).strip()
             tokens = _query_tokens(query)
             ranked = sand_density(all_candidates, tokens, query)
-            # V2.9.9.3: 英文查询跳过simhash（短问题vs长文本汉明距离不公平）
-            if _detect_lang(query) != "en":
-                ranked = simhash_rerank(ranked, query)
+            # V2.9.9.8: sim_bonus已在sand_density处理
             ranked = dynamic_expand(ranked, tokens, limit)
             return ranked[:limit]
         return self.mmapfallback.search(query, limit)
