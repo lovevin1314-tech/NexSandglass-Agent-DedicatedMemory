@@ -47,6 +47,15 @@ def sand_density(candidates, query_tokens, query) -> list:
     except Exception:
         pass
     scored = []
+    # V2.9.9.8: fact_tags语义信号 — 被标签过的行更可能含关键信息
+    try:
+        import sqlite3, os
+        from sandglass_paths import _NB
+        db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"))
+        tagged = {r[0] for r in db.execute("SELECT line_num FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall()}
+        db.close()
+    except Exception:
+        tagged = set()
     for item in candidates:
         ln = item[0]
         text = item[2] if len(item) > 2 else ""
@@ -64,6 +73,9 @@ def sand_density(candidates, query_tokens, query) -> list:
         # V2.9.9.8: 位置偏置 — 后期行小幅加权(对话越往后越常被问到)
         pos_bonus = min(0.1, ln / 500 * 0.1)
         final += pos_bonus
+        # fact_tags语义 — 有标签的行微幅加权
+        if ln in tagged:
+            final += 0.03
         scored.append((final, item))
     scored.sort(key=lambda x: x[0], reverse=True)
     return [item for _, item in scored]
