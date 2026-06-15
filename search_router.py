@@ -104,7 +104,16 @@ def sand_density(candidates, query_tokens, query) -> list:
         ln = item[0]
         text = item[2] if len(item) > 2 else ""
         text_tokens = _query_tokens(text)
-        matched = len(query_tokens & text_tokens)
+        # V2.9.9.8: 同义词管道 → 密度排序
+        try:
+            from l3_search_core import _synonym_expand
+            expanded = set()
+            for t in query_tokens:
+                expanded.update(_synonym_expand(t)[:3])  # 每词最多3同义词
+            expanded_tokens = query_tokens | expanded
+        except Exception:
+            expanded_tokens = query_tokens
+        matched = len(expanded_tokens & text_tokens)
         # V2.9.9.8: 查询词IDF加权 — 稀有词匹配>常见词匹配
         if query_tokens:
             weighted = sum(1.0 / max(1, text_tokens.count(t)) for t in query_tokens if t in text_tokens)
