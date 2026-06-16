@@ -229,8 +229,10 @@ _TOOL_SCHEMAS = [
 
 
 def _pipe_warn(name, e):
-    """管道降级日志——无闭包,零作用域问题"""
+    """管道降级——PipelineHealth追踪+LLM可见"""
     logger.warning(f"管道 [{name}] 降级: {e}")
+    # 记录到PipelineHealth——用于自动复活和LLM降级报告
+    _pipeline_health.execute(name, lambda: (_ for _ in ()).throw(e))
 
 class NexSandglassProvider(MemoryProvider):
     """NexSandglass 记忆提供器——替代 Holographic，纯本地零依赖。"""
