@@ -559,6 +559,29 @@ class NexSandglassProvider(MemoryProvider):
 
             blocks.append("\n".join(layer2))
 
+            # ═══════ V2.10.51: 最近对话——10轮用户消息注入 ═══════
+            try:
+                import sqlite3 as _sq
+                state_db = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~/.local/share")), "hermes", "state.db")
+                if os.path.exists(state_db):
+                    _db = _sq.connect(state_db)
+                    _rows = _db.execute("""
+                        SELECT content FROM messages 
+                        WHERE role='user' AND content NOT LIKE '{%' AND content NOT LIKE '[{%' AND length(content) > 2
+                        ORDER BY id DESC LIMIT 10
+                    """).fetchall()
+                    _db.close()
+                    if _rows:
+                        _lines = [r[0][:80].replace('\n',' ').strip() for r in reversed(_rows)]
+                        # 去重相邻重复
+                        _dedup = []
+                        for l in _lines:
+                            if not _dedup or l != _dedup[-1]:
+                                _dedup.append(l)
+                        blocks.append("【最近对话】\n" + "\n".join(f"  {l}" for l in _dedup))
+            except Exception:
+                pass
+
             # ═══════ 第三层：你怎么变成这样 ═══════
             try:
                 from weavethread import wthread_stats, wthread_weave
