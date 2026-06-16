@@ -454,22 +454,51 @@ class NexSandglassProvider(MemoryProvider):
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
 
     def prefetch(self, query: str) -> str:
-        """V2.9.34: 两段式轮次注入 — 搜索上下文+状态快照。~60t。激励LLM主动搜索。"""
+        """V2.10.7: 三块式轮次注入 — 搜索引导+记忆预览(带精搜引导)+状态决策。~150t。"""
         try:
-            parts = []
-            
-            # ═══ 块A: 搜索上下文 (~25t) ═══
+            blocks = []
             hints = getattr(self, '_prefetch_hints', [])
-            if hints:
-                ctx = f"🔍 {' / '.join(hints[:3])}"
-                try:
-                    from scene_l3 import scene_current
-                    sc = scene_current()
-                    if sc: ctx += f" | 📍 {sc[0]}"
-                except: pass
-                parts.append(ctx)
             
-            # ═══ 块B: 状态快照 (~35t) ═══
+            # ═══ 块1: 搜索引导 (~40t) ═══
+            guide = []
+            if hints:
+                guide.append(f"搜索: {' / '.join(hints[:3])}")
+            try:
+                import sqlite3, os
+                from sandglass_paths import _NB
+                db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"))
+                tags_set = set()
+                for r in db.execute("SELECT category, tags FROM fact_tags WHERE tags!='' ORDER BY rowid DESC LIMIT 10").fetchall():
+                    if r[1]:
+                        for t in r[1].split(",")[:2]:
+                            t = t.strip()
+                            if len(t) > 1: tags_set.add(t[:12])
+                db.close()
+                if tags_set: guide.append(f"标签: {', '.join(list(tags_set)[:4])}")
+            except: pass
+            try:
+                from scene_l3 import scene_current
+                sc = scene_current()
+                if sc: guide.append(f"📍 {'·'.join(sc[:2])}")
+            except: pass
+            if guide: blocks.append(" | ".join(guide))
+            
+            # ═══ 块2: 记忆预览 (~70t) — 带精搜引导 ═══
+            try:
+                from search_router import SearchRouter
+                sr = SearchRouter()
+                search_q = " ".join(hints[:3]) if hints and len(hints) > 1 else query
+                results = sr.search(search_q, limit=3)
+                if results:
+                    mem_lines = []
+                    for i, (ln, ts, text) in enumerate(results[:3]):
+                        prefix = "✓" if i == 0 else "·"
+                        t = text[:70].replace("\n", " ")
+                        mem_lines.append(f"  {prefix} [{ts[:10]}] {t}")
+                    blocks.append("📋 记忆预览:\n" + "\n".join(mem_lines))
+            except: pass
+            
+            # ═══ 块3: 状态+决策 (~40t) ═══
             from sandglass_think import comprehensive_offset, _emotional_entropy, _synthesize_3d
             off = comprehensive_offset()
             ent = _emotional_entropy()
@@ -480,22 +509,35 @@ class NexSandglassProvider(MemoryProvider):
             pi = syn.get("pipe_insights", "")
             tangle = ""
             if "纠结:" in pi: tangle = " 纠结:" + pi.split("纠结:")[1].split("|")[0].strip()
-            lines = [f"状态: {off_d}({off.get('offset',0):+d}%) | {mood}{tangle}"]
+            lines = [f"状态: {off_d}({off.get('offset',0):+d}%) | 🎭{mood}{tangle}"]
             # 铁律
             try:
                 from discipline import iron_rules_with_counts
                 rules = iron_rules_with_counts(2)
-                if rules: lines.append("⚠" + " ⚠".join(r[:25] for r,_ in rules[:2]))
+                if rules: lines.append("⚠" + " ⚠".join(r[:30] for r,_ in rules[:2]))
             except: pass
-            # 洞察精简（只取标签+告警）
+            # 决策粒子
+            try:
+                import os
+                dp_path = os.path.join(os.environ.get("NEXSANDBASE_HOME", os.path.expanduser("~/.neurobase")), "decision_particles.txt")
+                if os.path.exists(dp_path):
+                    with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
+                        dps = [l for l in f if l.strip() and not l.startswith("#")]
+                    if dps:
+                        last = dps[-1]
+                        if "→" in last:
+                            parts = last.split(" | ")
+                            if len(parts) >= 4: lines.append(f"决策: {parts[2][:35]} ({parts[3].strip()[:10]})")
+            except: pass
+            # 洞察精简
             if pi:
                 snippets = [s.strip() for s in pi.split("|") if s.strip()]
-                key = [s[:50] for s in snippets if any(k in s for k in ["标签:", "告警:"])]
+                key = [s[:40] for s in snippets if any(k in s for k in ["标签:", "告警:", "链:"])]
                 if key: lines.append(" | ".join(key[:2]))
-            parts.append("\n".join(lines))
+            blocks.append("\n".join(lines))
             
-            result = "\n".join(parts)
-            return result[:500]  # ~60t 硬截断
+            result = "\n\n".join(blocks)
+            return result[:700]  # 硬截断
         except Exception:
             return ""
 
