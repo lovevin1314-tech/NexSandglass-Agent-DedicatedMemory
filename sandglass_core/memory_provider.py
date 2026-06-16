@@ -457,7 +457,7 @@ class NexSandglassProvider(MemoryProvider):
             
             # 关注：从fact_tags高频标签
             try:
-                import sqlite3, os
+                import sqlite3
                 from collections import Counter
                 db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
                 tags = Counter()
@@ -504,7 +504,7 @@ class NexSandglassProvider(MemoryProvider):
             # 最近决策（管道洞察已含，此处只补情绪）
             decisions = []
             try:
-                import json, os
+                import json
                 dlog = os.path.join(_NB, "persona", "decision-log.jsonl")
                 if os.path.exists(dlog):
                     with open(dlog, "r", encoding="utf-8") as f:
@@ -652,7 +652,7 @@ class NexSandglassProvider(MemoryProvider):
             if hints:
                 guide.append(f"搜索: {' / '.join(hints[:3])}")
             try:
-                import sqlite3, os
+                import sqlite3
                 db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
                 tags_set = set()
                 for r in db.execute("SELECT category, tags FROM fact_tags WHERE tags!='' ORDER BY rowid DESC LIMIT 10").fetchall():
@@ -705,7 +705,6 @@ class NexSandglassProvider(MemoryProvider):
             except: pass
             # 决策粒子
             try:
-                import os
                 dp_path = os.path.join(os.environ.get("NEXSANDBASE_HOME", os.path.expanduser("~/.neurobase")), "decision_particles.txt")
                 if os.path.exists(dp_path):
                     with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
@@ -863,7 +862,7 @@ class NexSandglassProvider(MemoryProvider):
             # V2.9.9.1: 情绪会话摘要
             try:
                 from emotion_vocab import detect as emotion_detect
-                import os, json
+                import json
                 mood_counts = {}
                 for msg in messages:
                     if msg.get("role") == "user":
