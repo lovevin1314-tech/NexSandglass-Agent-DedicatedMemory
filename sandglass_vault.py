@@ -730,5 +730,6 @@ def repair_sandglass(dry_run: bool = False) -> dict:
             "backup": backup, "dry_run": False}
 
 
-# V2.10.14: _startup_autoheal 由 memory_provider.initialize() 显式调用
-# 不在此处模块级触发——避免导入锁+重型I/O造成死锁
+# V2.10.15: Timer延迟自愈——5秒后导入锁释放,安全执行+全覆盖
+import threading
+threading.Timer(5.0, _startup_autoheal).start()
