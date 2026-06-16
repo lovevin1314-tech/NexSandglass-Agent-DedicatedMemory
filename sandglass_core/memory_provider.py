@@ -676,10 +676,7 @@ class NexSandglassProvider(MemoryProvider):
         nb = os.environ.get("NEXSANDBASE_HOME") or ""
         # 自动搜索已有沙漏数据
         search_paths = [nb] if nb else []
-        search_paths.extend([
-            os.path.join(os.path.expanduser("~"), ".neurobase"),
-            os.path.join(hermes_home, "sandglass_data") if hermes_home else "",
-        ])
+        search_paths.append(os.path.join(os.path.expanduser("~"), ".neurobase"))
         found = None
         for p in search_paths:
             if p and os.path.exists(os.path.join(p, "sandglass.txt")):
