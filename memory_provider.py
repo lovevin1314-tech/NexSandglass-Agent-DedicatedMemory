@@ -452,25 +452,22 @@ class NexSandglassProvider(MemoryProvider):
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
 
     def prefetch(self, query: str) -> str:
-        """V2.9.33: 三块式轮次注入 — 搜索引导+记忆候选+状态决策。10管道全接。"""
+        """V2.9.34: 两段式轮次注入 — 搜索上下文+状态快照。~60t。激励LLM主动搜索。"""
         try:
             parts = []
             
-            # ── 块1: 搜索引导（40-60t）──
-            search_hints = getattr(self, '_prefetch_hints', [])
-            if search_hints:
-                parts.append(f"🔍 {', '.join(search_hints[:4])}")
+            # ═══ 块A: 搜索上下文 (~25t) ═══
+            hints = getattr(self, '_prefetch_hints', [])
+            if hints:
+                ctx = f"🔍 {' / '.join(hints[:3])}"
+                try:
+                    from scene_l3 import scene_current
+                    sc = scene_current()
+                    if sc: ctx += f" | 📍 {sc[0]}"
+                except: pass
+                parts.append(ctx)
             
-            # ── 块2: 记忆候选（60-100t）──
-            memories = getattr(self, '_prefetch_memories', [])
-            if memories:
-                mem_lines = []
-                for i, (score, ts, text) in enumerate(memories[:3]):
-                    prefix = "✓" if i == 0 else "·"
-                    mem_lines.append(f"  {prefix} [{ts[:10]}] {text[:80]}")
-                parts.append("📋 相关:\n" + "\n".join(mem_lines))
-            
-            # ── 块3: 状态+决策（50-90t）──
+            # ═══ 块B: 状态快照 (~35t) ═══
             from sandglass_think import comprehensive_offset, _emotional_entropy, _synthesize_3d
             off = comprehensive_offset()
             ent = _emotional_entropy()
@@ -479,35 +476,29 @@ class NexSandglassProvider(MemoryProvider):
             off_d = dirs.get(off.get('direction',''), '平稳')
             syn = _synthesize_3d(trigger="prefetch")
             pi = syn.get("pipe_insights", "")
-            # 纠结度
             tangle = ""
-            if "纠结:" in pi: tangle = pi.split("纠结:")[1].split("|")[0].strip()
-            state = f"状态: {off_d}({off.get('offset',0):+d}%) | {'🎭'+mood if mood!='平稳' else '平稳'}"
-            if tangle: state += f" | 纠结:{tangle}"
-            # 场景
-            try:
-                from scene_l3 import scene_current
-                sc = scene_current()
-                if sc: state += f" | {sc[0]}"
-            except: pass
-            parts.append(state)
-            # 铁律（按相关性，最多2条）
+            if "纠结:" in pi: tangle = " 纠结:" + pi.split("纠结:")[1].split("|")[0].strip()
+            lines = [f"状态: {off_d}({off.get('offset',0):+d}%) | {mood}{tangle}"]
+            # 铁律
             try:
                 from discipline import iron_rules_with_counts
                 rules = iron_rules_with_counts(2)
-                if rules:
-                    parts.append("⚠" + " ⚠".join(r[:25] for r,_ in rules[:2]))
+                if rules: lines.append("⚠" + " ⚠".join(r[:25] for r,_ in rules[:2]))
             except: pass
-            # 管道洞察
-            if pi: parts.append(pi[:120])
+            # 洞察精简（只取标签+告警）
+            if pi:
+                snippets = [s.strip() for s in pi.split("|") if s.strip()]
+                key = [s[:50] for s in snippets if any(k in s for k in ["标签:", "告警:"])]
+                if key: lines.append(" | ".join(key[:2]))
+            parts.append("\n".join(lines))
             
             result = "\n".join(parts)
-            return result[:600]  # 硬截断 ~250 tokens
+            return result[:500]  # ~60t 硬截断
         except Exception:
             return ""
 
     def queue_prefetch(self, query: str) -> None:
-        """后台预热——语义扩展+预搜记忆候选。接_infer_expand+SearchRouter管道。"""
+        """后台预热——语义扩展+标签提取。激励LLM主动调sandglass_search。"""
         try:
             from sandglass_think import _infer_expand_with_context, search_filter
             sf = search_filter(query)
@@ -521,14 +512,8 @@ class NexSandglassProvider(MemoryProvider):
                 ctx.get("decision_bias", "")
             )
             self._prefetch_hints = expanded[1:5] if expanded and len(expanded) > 1 else []
-            # 块2: 预搜记忆候选
-            from search_router import SearchRouter
-            sr = SearchRouter()
-            results = sr.search(query, 3)
-            self._prefetch_memories = [(1.0 - i*0.1, r[1], r[2][:80]) for i, r in enumerate(results[:3])]
         except Exception:
             self._prefetch_hints = []
-            self._prefetch_memories = []
 
     def sync_turn(self, user_msg: str, assistant_msg: str, **kwargs) -> None:
         """每轮对话后落沙。"""
