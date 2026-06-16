@@ -12,6 +12,7 @@ import json, logging, os, re, threading, time
 from typing import Any, Dict, List, Optional
 
 # 纯本地MemoryProvider——不导入Hermes核心模块避免死锁
+# Hermes通过register()函数发现插件,不检查继承关系
 class MemoryProvider:
     name = "nexsandglass"
     def is_available(self): return True
@@ -23,10 +24,7 @@ class MemoryProvider:
     def prefetch(self, query): return None
     def sync_turn(self, user_msg, assistant_msg): pass
 
-try:
-    from tools.registry import tool_error
-except ImportError:
-    def tool_error(msg): return json.dumps({"error": msg})
+def tool_error(msg): return json.dumps({"error": msg})
 
 logger = logging.getLogger(__name__)
 
