@@ -298,7 +298,7 @@ def _metrics_feedback() -> dict:
         avg_offset = sum(offsets[-10:]) / len(offsets[-10:])
         return {"avg_offset": avg_offset, "sample": len(offsets),
                 "drift_accelerating": len(offsets) > 20 and abs(sum(offsets[-5:])/5) > abs(sum(offsets[-20:-5])/15)}
-    except: return {}
+    except Exception: return {}
 
 def _current_stage() -> str:
     """读当前阶段标签。O(1) -- 只读最后一行。"""
@@ -504,7 +504,7 @@ def simhash_rerank(query: str, candidates: list) -> dict:
             if dist <= 55:
                 scores[ln] = max(0, (55 - dist) / 55 * 0.5)
         return scores
-    except: return {}
+    except Exception: return {}
 
 def dynamic_expand(hit_line: int, query_tokens: set, all_lines: list, max_ctx: int = 15, threshold: float = 0.2):
     """沙子密度衰减扩窗：遇到密度断崖就停"""
@@ -1034,7 +1034,7 @@ def stage_brief() -> str:
         if since >= 200:
             lines.append(f"\n🔄 管道洞察（+{since}条新对话）")
             try: lines.append(local_distill("daily"))
-            except: pass
+            except Exception: pass
             with open(last_distill, "w") as f:
                 f.write(str(total))
     except Exception:
