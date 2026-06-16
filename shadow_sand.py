@@ -66,11 +66,7 @@ def _get_conn():
     return _conn
 
 def _maybe_commit():
-    global _commit_pending
-    _commit_pending += 1
-    if _commit_pending >= 3:
-        _get_conn().commit()
-        _commit_pending = 0
+    _get_conn().commit()  # V2.10.17: 每次写入立即commit,防崩溃丢数据
 
 
 # ═══════════════════ 查询（脱口而出层） ═══════════════════

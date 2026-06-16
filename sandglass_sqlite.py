@@ -1,3 +1,4 @@
+import threading
 """
 NexSandglass SQLite FTS5 加速层
 ================================
