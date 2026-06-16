@@ -622,6 +622,7 @@ def _is_valid_sandglass_line(line: str) -> bool:
 
 
 def repair_sandglass(dry_run: bool = False) -> dict:
+    _SHADOW_DB = os.path.join(_NB, "shadow_sand.db")
     """扫描 sandglass.txt，将多行消息的孤儿行合并回父消息。
     
     原理：多行消息中的 \\n 导致后续行缺少时间戳成为"坏行"。
@@ -710,9 +711,13 @@ def repair_sandglass(dry_run: bool = False) -> dict:
             sync_incremental()
         except Exception:
             pass
+    # V2.10.16: 先备份再清空——防止rebuild失败后数据丢失
     try:
         from shadow_sand import _get_conn
         db = _get_conn()
+        import shutil
+        shadow_bak = _SHADOW_DB + ".pre_repair_bak"
+        shutil.copy2(_SHADOW_DB, shadow_bak)
         db.execute("DELETE FROM trust")
         db.execute("DELETE FROM entities")
         db.execute("DELETE FROM fact_tags")
