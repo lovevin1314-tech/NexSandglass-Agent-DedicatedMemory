@@ -469,13 +469,29 @@ class NexSandglassProvider(MemoryProvider):
             return (
                 f"偏移: {off_d}({off.get('offset',0):+d}%) | 情绪: {mood}"
                 + (f" | 纠结: {tangle}" if tangle else "")
+                + (f" | 搜: {', '.join(getattr(self, '_prefetch_hints', [])[:3])}" if getattr(self, '_prefetch_hints', []) else "")
             )
         except Exception:
             return ""
 
     def queue_prefetch(self, query: str) -> None:
-        """后台预热——搜索足够快，不需要预热。保持接口兼容。"""
-        pass
+        """后台预热——用查询语义扩展预热搜索词。接_infer_expand_with_context管道。"""
+        try:
+            from sandglass_think import _infer_expand_with_context, search_filter
+            sf = search_filter(query)
+            ctx = sf or {}
+            expanded = _infer_expand_with_context(
+                query,
+                ctx.get("persona_context", ""),
+                ctx.get("scene_context", ""),
+                ctx.get("stage_context", ""),
+                ctx.get("dp_context", ""),
+                ctx.get("decision_bias", "")
+            )
+            if expanded and len(expanded) > 1:
+                self._prefetch_hints = expanded[1:5]  # 扩展词给LLM搜索提示
+        except Exception:
+            self._prefetch_hints = []
 
     def sync_turn(self, user_msg: str, assistant_msg: str, **kwargs) -> None:
         """每轮对话后落沙。"""
