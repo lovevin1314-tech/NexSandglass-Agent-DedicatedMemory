@@ -32,11 +32,14 @@ def _on_message(event, **_kw) -> None:
             pass
 
 def register(ctx) -> None:
-    """Hermes插件入口。延迟导入避免模块加载死锁。"""
+    """Hermes插件入口。发现阶段安全退避——memory_provider延迟至激活时加载。"""
     import sys, os
     sys.path.insert(0, os.path.dirname(__file__))
-    # Gateway: 消息落沙
+    # Gateway: 消息落沙（轻量，永远安全）
     ctx.register_hook("pre_gateway_dispatch", _on_message)
-    # Memory: 记忆提供者
-    from memory_provider import NexSandglassProvider
-    ctx.register_memory_provider(NexSandglassProvider())
+    # Memory: 发现阶段不加载——等用户激活时由Hermes调__init__.py的register()
+    try:
+        from memory_provider import NexSandglassProvider
+        ctx.register_memory_provider(NexSandglassProvider())
+    except Exception:
+        pass  # 发现阶段死锁→静默跳过；激活时会重试
