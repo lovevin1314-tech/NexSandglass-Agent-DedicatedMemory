@@ -880,6 +880,52 @@ def weave_links() -> dict:
 
     return {"linked": False, "insight": "无跨阶段变化"}
 
+
+def local_distill(period: str = "daily") -> str:
+    """V2.9.35: 管道聚合蒸馏——纯本地统计替代LLM蒸馏。零依赖。"""
+    try:
+        from sandglass_vault import count
+        from sandglass_think import comprehensive_offset, _emotional_entropy
+        import sqlite3, os
+        from collections import Counter
+        
+        total = count()
+        off = comprehensive_offset()
+        ent = _emotional_entropy()
+        
+        lines = []
+        lines.append("## 管道洞察")
+        
+        # 统计概览
+        dirs = {"frugal": "省钱", "spend": "愿投", "drift": "放弃"}
+        d = off.get("direction", "neutral")
+        lines.append(f"偏移: {dirs.get(d,d)}{off.get('offset',0):+d}%({off.get('sample',0)}次) | 情绪熵:{ent:.2f} | 沙量:{total}")
+        
+        # 关键标签
+        db = sqlite3.connect(os.path.join(os.environ.get("NEXSANDBASE_HOME", os.path.join(os.path.expanduser("~"), ".neurobase")), "shadow_sand.db"))
+        tags = Counter()
+        for r in db.execute("SELECT tags FROM fact_tags WHERE tags!='' AND tags!='未分类'").fetchall():
+            for t in r[0].split(","):
+                t = t.strip()
+                if t and len(t)>1: tags[t] += 1
+        db.close()
+        top = tags.most_common(5)
+        if top: lines.append(f"标签: {', '.join(f'{t}({c})' for t,c in top)}")
+        
+        # 决策粒子
+        dp_path = os.path.join(os.environ.get("NEXSANDBASE_HOME", os.path.join(os.path.expanduser("~"), ".neurobase")), "decision_particles.txt")
+        if os.path.exists(dp_path):
+            with open(dp_path, encoding="utf-8", errors="replace") as f:
+                dps = [l.strip() for l in f if l.strip() and not l.startswith("#")]
+            if dps:
+                recent = dps[-5:]
+                lines.append(f"决策({len(dps)}): {'; '.join(r[:40] for r in recent[-3:])}")
+        
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
 def stage_brief() -> str:
     """
     织布机----阶段简报。阶段切换时生成更新日志。
@@ -982,8 +1028,9 @@ def stage_brief() -> str:
             with open(last_distill) as f:
                 since = total - int(f.read().strip() or 0)
         if since >= 200:
-            lines.append(f"\n🔄 自动蒸馏触发（+{since}条新对话）")
-            distill("自动蒸馏", save=True)
+            lines.append(f"\n🔄 管道洞察（+{since}条新对话）")
+            try: lines.append(local_distill("daily"))
+            except: pass
             with open(last_distill, "w") as f:
                 f.write(str(total))
     except Exception:
