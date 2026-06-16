@@ -902,7 +902,7 @@ def local_distill(period: str = "daily") -> str:
         lines.append(f"偏移: {dirs.get(d,d)}{off.get('offset',0):+d}%({off.get('sample',0)}次) | 情绪熵:{ent:.2f} | 沙量:{total}")
         
         # 关键标签
-        db = sqlite3.connect(os.path.join(os.environ.get("NEXSANDBASE_HOME", os.path.join(os.path.expanduser("~"), ".neurobase")), "shadow_sand.db"))
+        db = sqlite3.connect(os.path.join(os.environ.get("NEXSANDBASE_HOME", os.path.join(os.path.expanduser("~"), ".neurobase")), "shadow_sand.db"), check_same_thread=False)
         tags = Counter()
         for r in db.execute("SELECT tags FROM fact_tags WHERE tags!='' AND tags!='未分类'").fetchall():
             for t in r[0].split(","):
@@ -1237,7 +1237,7 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
         try:
             import sqlite3
             from collections import Counter
-            db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"))
+            db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
             tags = Counter()
             for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
                 for t in r[0].split(","):

@@ -137,7 +137,7 @@ def _data_driven_refresh(existing: str, first_line: int, last_line: int, total: 
     # 1. fact_tags 高频标签
     tops = []
     try:
-        db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"))
+        db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
         tags = Counter()
         for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
             for t in r[0].split(","):
@@ -216,7 +216,7 @@ def _pipe_build(first_line: int, last_line: int, total: int) -> str:
     tops = []
     tool_hints = []
     try:
-        db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"))
+        db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
         tags = Counter()
         for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
             for t in r[0].split(","):

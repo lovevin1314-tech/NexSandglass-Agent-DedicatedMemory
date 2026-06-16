@@ -283,7 +283,7 @@ class NexSandglassProvider(MemoryProvider):
                 sand_path = os.path.join(nb, "sandglass.txt")
                 if os.path.exists(sand_path):
                     current_lines = sum(1 for _ in open(sand_path, encoding="utf-8", errors="replace"))
-                    db = sqlite3.connect(os.path.join(nb, "shadow_sand.db"))
+                    db = sqlite3.connect(os.path.join(nb, "shadow_sand.db"), check_same_thread=False)
                     max_trust = db.execute("SELECT COALESCE(MAX(line_num), 0) FROM trust").fetchone()[0]
                     db.close()
                     if current_lines > max_trust:
@@ -375,7 +375,7 @@ class NexSandglassProvider(MemoryProvider):
             try:
                 import sqlite3, os
                 from collections import Counter
-                db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"))
+                db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
                 tags = Counter()
                 for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
                     for t in r[0].split(","):
@@ -568,7 +568,7 @@ class NexSandglassProvider(MemoryProvider):
             try:
                 import sqlite3, os
                 from sandglass_paths import _NB
-                db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"))
+                db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
                 tags_set = set()
                 for r in db.execute("SELECT category, tags FROM fact_tags WHERE tags!='' ORDER BY rowid DESC LIMIT 10").fetchall():
                     if r[1]:

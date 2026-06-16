@@ -30,7 +30,7 @@ def _tokenize(text: str) -> str:
 
 def _get_db():
     os.makedirs(os.path.dirname(_DB), exist_ok=True)
-    conn = sqlite3.connect(_DB)
+    conn = sqlite3.connect(_DB, check_same_thread=False)
     conn.execute("PRAGMA journal_mode=WAL")  # 支持多进程并发
     conn.execute("PRAGMA synchronous=NORMAL")  # 性能优化，安全够用
     conn.execute("CREATE TABLE IF NOT EXISTS sandglass (id INTEGER PRIMARY KEY, ts TEXT, sender TEXT, text TEXT)")

@@ -25,7 +25,7 @@ def _load_tag_idf():
     import math, sqlite3, os
     db_path = os.path.join(_NB, "shadow_sand.db")
     if not os.path.exists(db_path): return {}
-    db = sqlite3.connect(db_path)
+    db = sqlite3.connect(db_path, check_same_thread=False)
     freq = {}
     for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'"):
         for t in r[0].split(','):

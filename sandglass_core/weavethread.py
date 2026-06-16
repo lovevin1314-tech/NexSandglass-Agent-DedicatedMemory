@@ -43,7 +43,7 @@ _EXTRACT_PATTERNS = [
 
 def _ensure_table():
     """确保 wthread_triples 表存在"""
-    conn = sqlite3.connect(_DB, timeout=10)
+    conn = sqlite3.connect(_DB, timeout=10, check_same_thread=False)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS wthread_triples (
@@ -99,7 +99,7 @@ def wthread_store(text: str, line_num: int = 0, subject: str = "user") -> int:
     if not triples:
         return 0
     
-    conn = sqlite3.connect(_DB, timeout=10)
+    conn = sqlite3.connect(_DB, timeout=10, check_same_thread=False)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     count = 0
     for subj, rel, obj in triples:
@@ -127,7 +127,7 @@ def wthread_query(entity: str = None, relation: str = None, limit: int = 20) -> 
     返回 [{subject, relation, object, source_line, confidence}, ...]
     """
     _ensure_table()
-    conn = sqlite3.connect(_DB, timeout=10)
+    conn = sqlite3.connect(_DB, timeout=10, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     
     if entity and relation:
@@ -193,7 +193,7 @@ def wthread_graph(entity: str, depth: int = 1) -> dict:
 def wthread_stats() -> dict:
     """图谱统计"""
     _ensure_table()
-    conn = sqlite3.connect(_DB, timeout=10)
+    conn = sqlite3.connect(_DB, timeout=10, check_same_thread=False)
     total = conn.execute("SELECT COUNT(*) FROM wthread_triples").fetchone()[0]
     entities = conn.execute("SELECT COUNT(DISTINCT subject) + COUNT(DISTINCT object) FROM wthread_triples").fetchone()
     relations = conn.execute("SELECT relation, COUNT(*) as c FROM wthread_triples GROUP BY relation ORDER BY c DESC").fetchall()
@@ -249,7 +249,7 @@ def wthread_add(subject: str, relation: str, object: str, source_line: int = 0) 
     返回 True 表示写入成功或已存在。
     """
     _ensure_table()
-    conn = sqlite3.connect(_DB, timeout=10)
+    conn = sqlite3.connect(_DB, timeout=10, check_same_thread=False)
     exists = conn.execute(
         "SELECT id FROM wthread_triples WHERE subject=? AND relation=? AND object=?",
         (subject, relation, object)
