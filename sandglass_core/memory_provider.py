@@ -432,7 +432,6 @@ class NexSandglassProvider(MemoryProvider):
             decisions = []
             try:
                 import json, os
-                from sandglass_paths import _NB
                 dlog = os.path.join(_NB, "persona", "decision-log.jsonl")
                 if os.path.exists(dlog):
                     with open(dlog, "r", encoding="utf-8") as f:
@@ -581,7 +580,6 @@ class NexSandglassProvider(MemoryProvider):
                 guide.append(f"搜索: {' / '.join(hints[:3])}")
             try:
                 import sqlite3, os
-                from sandglass_paths import _NB
                 db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
                 tags_set = set()
                 for r in db.execute("SELECT category, tags FROM fact_tags WHERE tags!='' ORDER BY rowid DESC LIMIT 10").fetchall():
@@ -792,7 +790,6 @@ class NexSandglassProvider(MemoryProvider):
             # V2.9.9.1: 情绪会话摘要
             try:
                 from emotion_vocab import detect as emotion_detect
-                from sandglass_paths import _NB
                 import os, json
                 mood_counts = {}
                 for msg in messages:
