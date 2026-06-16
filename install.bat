@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ╔══════════════════════════════════╗
-echo ║  NexSandglass V2.10.39 安装程序    ║
+echo ║  NexSandglass 2.11.1 安装程序    ║
 echo ║  极简注入 · 零依赖 · 纯本地        ║
 echo ╚══════════════════════════════════╝
 echo.
@@ -19,7 +19,7 @@ copy /Y "%%~dp0*.py" "%LOCALAPPDATA%\hermes\hermes-agent\plugins\memory\nexsandg
 copy /Y "%%~dp0plugin.yaml" "%LOCALAPPDATA%\hermes\hermes-agent\plugins\memory\nexsandglass\" >nul 2>&1
 
 echo.
-echo ✅ NexSandglass V2.10.39 安装完成！
+echo ✅ NexSandglass 2.11.1 安装完成！
 echo.
 echo 📂 39模块 + 插件已部署
 echo 🔐 全本地运行，数据不出设备
