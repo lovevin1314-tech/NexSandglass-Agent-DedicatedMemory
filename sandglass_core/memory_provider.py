@@ -547,7 +547,10 @@ class NexSandglassProvider(MemoryProvider):
             
             blocks.append(f"沙漏: {total}条 | 阶段: {stage}")
 
-            return "\n\n".join(blocks).strip()
+            result = "\n\n".join(blocks).strip()
+            if not result:
+                logger.debug("system_prompt_block: 无可注入数据")
+            return result
         except Exception:
             logger.warning("system_prompt_block 整体失败", exc_info=True)
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
@@ -690,8 +693,13 @@ class NexSandglassProvider(MemoryProvider):
         os.environ["NEXSANDBASE_HOME"] = found
         config.setdefault("memory", {})["nexsandglass"] = {"home": found}
         config["memory"]["provider"] = "nexsandglass"
-        print(f"\n  ✓ NexSandglass V2.10.26 已激活")
+        print(f"\n  ✓ NexSandglass V2.10.27 已激活")
         print(f"  沙漏目录：{found}")
+        try:
+            from sandglass_vault import count
+            total = count()
+            print(f"  沙漏记录：{total}条")
+        except: pass
         print(f"  重启后开始记录。\n")
 
     def shutdown(self) -> None:
