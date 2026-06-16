@@ -226,23 +226,56 @@ def comprehensive_offset(scene: str = "") -> dict:
 
 # V2.9.9: 情绪x偏移预判 — 零依赖,纯本地
 def psychology_hint() -> str:
-    """偏移方向 + 情绪熵 -> 预判心理状态。"""
+    """V2.9.36: 多维判据预判心理状态——方向×熵层级×幅度×趋势。15种模式。"""
     try:
         from sandglass_think import _emotional_entropy
         off = comprehensive_offset()
         ent = _emotional_entropy()
         d = off.get("direction", "")
-        if d == "frugal" and ent > 1.0:
-            return "高熵省钱 -> 可能补偿心理"
-        if d == "spend" and ent > 1.0:
-            return "高熵花钱 -> 可能冲动消费"
-        if d == "drift" and ent < 0.5:
-            return "低熵放弃 -> 可能冷静决策"
-        if d == "frugal" and ent < 0.3:
-            return "低熵省钱 -> 理性节制"
+        pct = off.get("offset", 0)
+        trend = off.get("trend", "")
+        chain = off.get("chain", {})
+        hesitations = chain.get("hesitations", 0) if isinstance(chain, dict) else 0
+        
+        # 熵层级（5档）
+        if ent < 0.3: el = "极低"
+        elif ent < 0.5: el = "低"
+        elif ent < 1.0: el = "中"
+        elif ent < 1.5: el = "高"
+        else: el = "极高"
+        
+        # 幅度
+        hi = abs(pct) > 30
+        
+        modes = {
+            ("frugal","极低",""): "理性节制·极度冷静",
+            ("frugal","低",""): "理性节制·预算纪律奏效",
+            ("frugal","中",""): "节省但有情绪波动",
+            ("frugal","高",""): "补偿心理·省钱中带焦虑",
+            ("frugal","极高",""): "节省焦虑·需确认方向",
+            ("spend","极低",""): "理性投资·信心充足",
+            ("spend","低",""): "愿意投入·状态稳",
+            ("spend","中",""): "消费试探·边花边看",
+            ("spend","高",""): "冲动消费·情绪驱动",
+            ("spend","极高",""): "报复消费·情绪宣泄",
+            ("drift","极低",""): "冷静放弃·理性止损",
+            ("drift","低",""): "佛系·无所谓",
+            ("drift","中",""): "决策疲劳初现",
+            ("drift","高",""): "决策疲劳·需要休息",
+            ("drift","极高",""): f"决策疲劳临界{'(回退'+str(hesitations)+'次)' if hesitations>2 else ''}",
+        }
+        
+        key = (d, el, "")
+        hint = modes.get(key, "")
+        
+        # 动态修饰
+        if hint and hi: hint += "·大幅度"
+        if hint and trend == "shifting_spend": hint = hint.replace("省钱","转向投入")
+        if hint and trend == "shifting_frugal": hint = hint.replace("花钱","回归节省")
+        
+        return hint
     except Exception:
-        pass
-    return ""
+        return ""
 
 
 @__import__("offset_signals")._fail_open({})
