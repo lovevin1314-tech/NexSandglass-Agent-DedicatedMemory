@@ -671,13 +671,27 @@ class NexSandglassProvider(MemoryProvider):
             pass
 
     def post_setup(self, hermes_home: str, config: dict) -> None:
-        """Hermes memory setup钩子——自动激活NexSandglass。V2.10.24"""
+        """V2.10.26: 自动检测沙漏目录——零配置一键激活。"""
         import os
-        nb = os.environ.get("NEXSANDBASE_HOME") or os.path.expanduser("~/.neurobase")
-        print(f"\n  ✓ NexSandglass V2.10.24")
-        print(f"  沙漏目录：{nb}")
-        config.setdefault("memory", {})["provider"] = "nexsandglass"
-        print(f"  重启 Hermes 后生效。\n")
+        nb = os.environ.get("NEXSANDBASE_HOME") or ""
+        # 自动搜索已有沙漏数据
+        search_paths = [nb] if nb else []
+        search_paths.extend([
+            os.path.join(os.path.expanduser("~"), ".neurobase"),
+            os.path.join(hermes_home, "sandglass_data") if hermes_home else "",
+        ])
+        found = None
+        for p in search_paths:
+            if p and os.path.exists(os.path.join(p, "sandglass.txt")):
+                found = p; break
+        if not found:
+            found = os.path.join(os.path.expanduser("~"), ".neurobase")
+        os.environ["NEXSANDBASE_HOME"] = found
+        config.setdefault("memory", {})["nexsandglass"] = {"home": found}
+        config["memory"]["provider"] = "nexsandglass"
+        print(f"\n  ✓ NexSandglass V2.10.26 已激活")
+        print(f"  沙漏目录：{found}")
+        print(f"  重启后开始记录。\n")
 
     def shutdown(self) -> None:
         """清理。"""
