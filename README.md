@@ -36,6 +36,13 @@ hermes plugins update NexSandglass                       # 升级到最新
 ```
 重启 Desktop → 设置 → 记忆体 → 选择 NexSandglass → 开始对话
 
+**⚡ 关闭内置记忆（推荐）**
+内置记忆与沙漏共存会产生冗余。一行命令降到最低：
+```bash
+hermes config set memory.memory_char_limit 1
+```
+之后所有记忆由沙漏接管——影子沙索引 + 三块式注入。
+
 **⚠️ Desktop GUI 下拉菜单看不到 NexSandglass？**
 这是 Hermes Desktop 硬编码限制，非沙漏问题。一行命令激活：
 ```bash
