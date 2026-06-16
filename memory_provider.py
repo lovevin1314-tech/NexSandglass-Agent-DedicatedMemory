@@ -27,6 +27,78 @@ class MemoryProvider:
 def tool_error(msg): return json.dumps({"error": msg})
 
 logger = logging.getLogger(__name__)
+# ══════════════════════════════════════════════════════════
+# 管道健康追踪器 — 失败重试+降级报告+自动复活
+# ══════════════════════════════════════════════════════════
+import time as _time, traceback as _traceback
+from collections import defaultdict as _defaultdict
+
+class PipelineHealth:
+    """管道健康状态机：OK → 瞬态重试 → 降级 → 定期复活"""
+    
+    def __init__(self):
+        self._state = {}  # name → {failures, last_error, suppressed_until}
+        self._lock = threading.Lock()
+        self.TRANSIENT_PATTERNS = [
+            "database is locked", "database locked",
+            "threading", "Lock", "timeout",
+            "disk I/O error", "Permission denied"
+        ]
+        self.MAX_RETRIES = 3
+        self.SUPPRESS_AFTER = 5
+        self.RESURRECT_INTERVAL = 300  # 降级后5分钟尝试复活
+    
+    def _is_transient(self, error: Exception) -> bool:
+        msg = str(error).lower()
+        return any(p.lower() in msg for p in self.TRANSIENT_PATTERNS)
+    
+    def execute(self, name: str, fn):
+        """执行管道，瞬态错误自动重试，持久错误降级+定期复活。
+        返回 (result, degraded_note)"""
+        with self._lock:
+            s = self._state.get(name, {})
+            if s.get("suppressed_until", 0) > _time.time():
+                return None, f"[{name} 降级中]"
+        
+        last_error = None
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                result = fn()
+                with self._lock:
+                    self._state[name] = {"failures": 0, "last_ok": _time.time()}
+                return result, None
+            except Exception as e:
+                last_error = e
+                if not self._is_transient(e): break
+                if attempt < self.MAX_RETRIES - 1: _time.sleep(0.3 * (attempt + 1))
+        
+        with self._lock:
+            s = self._state.get(name, {"failures": 0})
+            s["failures"] = s.get("failures", 0) + 1
+            s["last_error"] = str(last_error)[:120]
+            if s["failures"] >= self.SUPPRESS_AFTER:
+                s["suppressed_until"] = _time.time() + self.RESURRECT_INTERVAL
+                logger.warning(f"管道 [{name}] 连续失败{s['failures']}次，降级{self.RESURRECT_INTERVAL}s: {s['last_error']}")
+            else:
+                logger.warning(f"管道 [{name}] 第{s['failures']}次失败: {s['last_error']}")
+            self._state[name] = s
+        
+        return None, f"[{name} 不可用: {str(last_error)[:60]}]"
+    
+    def degraded_summary(self) -> str:
+        """LLM可见的降级报告"""
+        with self._lock:
+            degraded = []
+            for name, s in self._state.items():
+                if s.get("failures", 0) > 0:
+                    status = "降级" if s.get("suppressed_until", 0) > _time.time() else "异常"
+                    degraded.append(f"  {status} [{name}]: {s.get('last_error', '?')[:50]}")
+            if degraded:
+                return "⚠️ 部分记忆管道异常:\n" + "\n".join(degraded)
+            return ""
+
+_pipeline_health = PipelineHealth()
+
 
 # ══════════════════════════════════════════════════════════
 # 工具方法——把 sandglass 函数暴露给 Hermes 模型调用
@@ -221,6 +293,23 @@ class NexSandglassProvider(MemoryProvider):
             self._initialized = True
             logger.info("NexSandglass V2.9.37 就绪")
 
+    def _safe_pipe(self, name, fn):
+        """管道健康包装——失败时LLM可见降级"""
+        result, note = _pipeline_health.execute(name, fn)
+        if note:
+            if not hasattr(self, '_degraded_notes'):
+                self._degraded_notes = []
+            self._degraded_notes.append(note)
+        return result
+    
+    def _degraded_report(self):
+        """收集本轮所有降级，注入LLM可见"""
+        report = _pipeline_health.degraded_summary()
+        if hasattr(self, '_degraded_notes') and self._degraded_notes:
+            report += "\n" + "\n".join(self._degraded_notes)
+            self._degraded_notes = []
+        return report
+    
     def system_prompt_block(self) -> str:
         """V2.9.8: 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完"""
         try:
@@ -446,6 +535,11 @@ class NexSandglassProvider(MemoryProvider):
             except Exception: pass
 
             # ═══════ 尾部 ═══════
+            # V2.10.19: 管道降级报告——LLM可见
+            degraded = self._degraded_report()
+            if degraded:
+                blocks.insert(0, degraded)
+            
             blocks.append(f"沙漏: {total}条 | 阶段: {stage}")
 
             return "\n\n".join(blocks).strip()
