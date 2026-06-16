@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  nexsandglass:
+    build: .
+    container_name: nexsandglass
+    volumes:
+      - sandglass_data:/data
+    ports:
+      - "8765:8765"
+    restart: unless-stopped
+    environment:
+      - NEXSANDBASE_HOME=/data
+
+volumes:
+  sandglass_data:
