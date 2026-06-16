@@ -52,7 +52,8 @@ _SANDGLASS = os.path.join(_NB, "sandglass.txt")
 def log_message(text: str, sender: str = "agent") -> bool:
     """写入一条消息到沙漏。明文存储——OS层全盘加密保护。
     返回 True 表示写入成功。
-    V2.4.0: 去掉DPAPI，落沙提速~2ms，FTS5可直接索引中文。"""
+    V2.4.0: 去掉DPAPI，落沙提速~2ms，FTS5可直接索引中文。
+    V2.9.9.9: 换行符→空格，保证1消息=1行=永不出坏行。"""
     try:
         # 工具调用过滤：<invoke> XML / {"function": JSON 不入沙漏
         if sender != "user" and ("<invoke" in text or '"function":' in text):
@@ -62,7 +63,9 @@ def log_message(text: str, sender: str = "agent") -> bool:
             return False
 
         os.makedirs(os.path.dirname(_SANDGLASS), exist_ok=True)
-        line = f"{datetime.now():%Y-%m-%d %H:%M:%S} | {sender} | {text}\n"
+        # V2.9.9.9: 防多行消息炸裂——\n \r \r\n 全部替换为空格，保证1消息=1行=永不出坏行
+        sanitized = text.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
+        line = f"{datetime.now():%Y-%m-%d %H:%M:%S} | {sender} | {sanitized}\n"
 
         # 文件锁——指数退避：3次×5s=15s（V2.4.0修复：超时不裸写，重试+告警）
         lock = _SANDGLASS + ".lock"
