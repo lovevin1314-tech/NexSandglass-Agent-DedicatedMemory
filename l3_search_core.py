@@ -92,25 +92,25 @@ def sand_density(text: str, query_tokens: set) -> float:
 _SIMHASH_BITS = 128
 _simhash_cache = {}  # V2.0.5: 预计算缓存，key=text[:500], val=fingerprint
 _SIMHASH_CACHE_MAX = 10000  # V2.1.11: LRU上限，超过清空重建
-_SIMHASH_CACHE_FILE = os.path.join(os.path.expanduser("~"), ".neurobase", "simhash_cache.pkl")
+_SIMHASH_CACHE_FILE = os.path.join(os.path.expanduser("~"), ".neurobase", "simhash_cache.json")
 
 def _load_simhash_cache():
     """启动时从磁盘加载缓存。"""
     global _simhash_cache
     try:
-        import pickle
+        import json as _json
         if os.path.exists(_SIMHASH_CACHE_FILE):
             with open(_SIMHASH_CACHE_FILE, "rb") as f:
-                _simhash_cache = pickle.load(f)
+                _simhash_cache = dict(_json.load(f))
     except Exception:
         pass
 
 def _save_simhash_cache():
     """定时/结束时持久化缓存。"""
     try:
-        import pickle
+        import json as _json
         with open(_SIMHASH_CACHE_FILE, "wb") as f:
-            pickle.dump(_simhash_cache, f)
+            _json.dump(_simhash_cache, f)
     except Exception:
         pass
 
