@@ -200,30 +200,31 @@ class NexSandglassProvider(MemoryProvider):
             if not os.path.exists(idx_done):
                 rebuild_index()
                 with open(idx_done, "w") as f: f.write("1")
-            # V2.9.37: 一次性回填——完成后写标记，后续重启跳过
-            backfill_done = os.path.join(nb, "backfill_done")
-            if not os.path.exists(backfill_done):
+            # V2.9.38: 增量检查——仅处理新增沙子
+            checkpoint = os.path.join(nb, "sandglass_checkpoint")
+            last_ln = 0
+            if os.path.exists(checkpoint):
+                with open(checkpoint) as cf: last_ln = int(cf.read().strip() or 0)
+            
+            sand_path = os.path.join(nb, "sandglass.txt")
+            current_lines = 0
+            if os.path.exists(sand_path):
+                current_lines = sum(1 for _ in open(sand_path, encoding="utf-8", errors="replace"))
+            
+            if current_lines > last_ln:
+                # 增量处理：只扫新增行
                 try:
-                    import sqlite3, re
+                    import sqlite3
                     db = sqlite3.connect(os.path.join(nb, "shadow_sand.db"))
-                    rows = db.execute("SELECT rowid, line_num FROM fact_tags WHERE tags='' OR tags IS NULL").fetchall()
-                    if rows:
-                        sand_path = os.path.join(nb, "sandglass.txt")
-                        if os.path.exists(sand_path):
-                            with open(sand_path, "r", encoding="utf-8", errors="replace") as sf:
-                                sand_lines = sf.readlines()
-                            ENTITY_RE = re.compile(r'(?:[A-Z][a-z]{2,}(?:[A-Z][a-z]{2,})+|[A-Z]{2,}|[A-Z][a-z]+(?:[ -][A-Z][a-z]+)*|[\u4e00-\u9fff]{2,6})')
-                            for rid, ln in rows:
-                                if 0 < ln <= len(sand_lines):
-                                    text = sand_lines[ln - 1]
-                                    entities = [m.group().strip() for m in ENTITY_RE.finditer(text) if len(m.group().strip()) > 1]
-                                    if entities:
-                                        db.execute("UPDATE fact_tags SET tags=?, category=? WHERE rowid=?", (",".join(entities[:10]), entities[0][:30], rid))
-                            db.commit()
+                    # 新增行的 trust + fact_tags
+                    for ln in range(last_ln + 1, current_lines + 1):
+                        try: db.execute("INSERT OR IGNORE INTO trust (line_num, score) VALUES (?, 0.5)", (ln,))
+                        except: pass
+                    db.commit()
                     db.close()
-                    # 标记完成
-                    with open(backfill_done, "w") as bf: bf.write("1")
                 except Exception: pass
+                # 更新 checkpoint
+                with open(checkpoint, "w") as cf: cf.write(str(current_lines))
             self._initialized = True
             logger.info("NexSandglass V2.9.37 就绪")
 
