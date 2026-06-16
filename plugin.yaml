@@ -1,5 +1,5 @@
 name: nexsandglass
-version: 2.10.8
+version: 2.10.9
 type: memory
 description: "NexSandglass memory — 投石问路倒排索引 + 五维权重排序 + 偏移率感知 + 回音折 + 影子灵魂。零API Key，纯本地。"
 setup: "重启Hermes Desktop → 设置→记忆体→选择NexSandglass → 开始对话"
