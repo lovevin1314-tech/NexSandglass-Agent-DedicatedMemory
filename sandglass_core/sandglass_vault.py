@@ -739,5 +739,4 @@ def repair_sandglass(dry_run: bool = False) -> dict:
 
 # V2.10.22: 延迟自愈函数——由 memory_provider.initialize() 调用
 def init_autoheal():
-    import threading
     threading.Timer(5.0, _startup_autoheal).start()

@@ -573,7 +573,7 @@ def _feed_emotion_to_synonyms():
     _EMOTION_SYN_FED = True
     try:
         from sandglass_paths import _NB
-        import os, json
+        import json
         ev = os.path.join(_NB, "emotion_vocab.json")
         if not os.path.exists(ev):
             return
@@ -605,7 +605,6 @@ def _feed_emotion_to_synonyms():
                     if r not in _SYNONYMS[w]:
                         _SYNONYMS[w].append(r)
         if top:
-            import logging
             logging.getLogger(__name__).info(f"情绪→同义词桥注入{len(top)}词")
     except Exception:
         pass
