@@ -36,6 +36,13 @@ hermes plugins update NexSandglass                       # 升级到最新
 ```
 重启 Desktop → 设置 → 记忆体 → 选择 NexSandglass → 开始对话
 
+**⚠️ Desktop GUI 下拉菜单看不到 NexSandglass？**
+这是 Hermes Desktop 硬编码限制，非沙漏问题。一行命令激活：
+```bash
+hermes config set memory.provider nexsandglass
+```
+重启 Desktop 后生效。
+
 **已安装过？直接更新：**
 ```bash
 hermes plugins update NexSandglass
