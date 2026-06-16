@@ -56,14 +56,16 @@ def persona_build() -> str:
         glass = glass_reminder("", emotion_trigger=False)
         if glass and "无需提醒" not in glass:
             user_prompt += f"=== 玻璃画像（2D轮廓+3D注解） ===\n{glass}\n\n"
-    except Exception: pass
+    except Exception as e:
+        _pipe_warn("persona_l3_L59", e)
     try:
         off = comprehensive_offset()
         if off.get("direction") and off["direction"] != "neutral":
             proj = persona_project(off["direction"], off.get("offset", 0))
             if proj.get("shadow_persona"):
                 user_prompt += f"=== 影子灵魂（如果选相反方向） ===\n{proj['shadow_persona'][:500]}\n\n"
-    except Exception: pass
+    except Exception as e:
+        _pipe_warn("persona_l3_L66", e)
 
     user_prompt += f"=== 主人对话沙子 ===\n{sand_text[:30000]}\n=== 结束 ===\n\n请执行四层深度扫描，生成 persona.md。首次生成，全量写入。"
 
@@ -652,10 +654,12 @@ def persona_project(direction: str, offset: int) -> dict:
                             wind_direction += rec.get("spread_weight", 1.3)
                         elif rec.get("sentiment") == "负面":
                             wind_direction -= rec.get("spread_weight", 0.8)
-                    except Exception: pass
+                    except Exception as e:
+                        _pipe_warn("persona_l3_L655", e)
         from sandglass_think import _sentiment_wind
         wind_direction += _sentiment_wind()
-    except Exception: pass
+    except Exception as e:
+        _pipe_warn("persona_l3_L658", e)
 
     # 读决策粒子——用回音折缩小反向选择范围
     shadow_lines = []
@@ -719,7 +723,8 @@ def persona_project(direction: str, offset: int) -> dict:
         os.makedirs(os.path.dirname(echo_path), exist_ok=True)
         with open(echo_path, "a", encoding="utf-8") as ef:
             ef.write(json.dumps(echo_entry, ensure_ascii=False) + "\n")
-    except Exception: pass
+    except Exception as e:
+        _pipe_warn("persona_l3_L722", e)
 
     return {"shadow_persona": shadow[:500], "divergence": divergence, "insight": insight}
 
