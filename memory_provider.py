@@ -11,20 +11,17 @@ from __future__ import annotations
 import json, logging, os, re, threading, time
 from typing import Any, Dict, List, Optional
 
-# 条件导入——兼容赫姆斯环境和独立运行时
-try:
-    from agent.memory_provider import MemoryProvider
-except ImportError:
-    class MemoryProvider:
-        name = "nexsandglass"
-        def is_available(self): return True
-        def initialize(self): pass
-        def shutdown(self): pass
-        def get_tool_schemas(self): return []
-        def handle_tool_call(self, name, args): return ""
-        def system_prompt_block(self): return ""
-        def prefetch(self, query): return None
-        def sync_turn(self, user_msg, assistant_msg): pass
+# 纯本地MemoryProvider——不导入Hermes核心模块避免死锁
+class MemoryProvider:
+    name = "nexsandglass"
+    def is_available(self): return True
+    def initialize(self): pass
+    def shutdown(self): pass
+    def get_tool_schemas(self): return []
+    def handle_tool_call(self, name, args): return ""
+    def system_prompt_block(self): return ""
+    def prefetch(self, query): return None
+    def sync_turn(self, user_msg, assistant_msg): pass
 
 try:
     from tools.registry import tool_error
