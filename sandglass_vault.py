@@ -735,6 +735,7 @@ def repair_sandglass(dry_run: bool = False) -> dict:
             "backup": backup, "dry_run": False}
 
 
-# V2.10.15: Timer延迟自愈——5秒后导入锁释放,安全执行+全覆盖
-import threading
-threading.Timer(5.0, _startup_autoheal).start()
+# V2.10.22: 延迟自愈函数——由 memory_provider.initialize() 调用
+def init_autoheal():
+    import threading
+    threading.Timer(5.0, _startup_autoheal).start()
