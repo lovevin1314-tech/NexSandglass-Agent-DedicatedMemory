@@ -670,6 +670,15 @@ class NexSandglassProvider(MemoryProvider):
         except Exception:
             pass
 
+    def post_setup(self, hermes_home: str, config: dict) -> None:
+        """Hermes memory setup钩子——自动激活NexSandglass。V2.10.24"""
+        import os
+        nb = os.environ.get("NEXSANDBASE_HOME") or os.path.expanduser("~/.neurobase")
+        print(f"\n  ✓ NexSandglass V2.10.24")
+        print(f"  沙漏目录：{nb}")
+        config.setdefault("memory", {})["provider"] = "nexsandglass"
+        print(f"  重启 Hermes 后生效。\n")
+
     def shutdown(self) -> None:
         """清理。"""
         logger.info("NexSandglass MemoryProvider shutdown")
