@@ -1370,7 +1370,6 @@ def _emotional_entropy(recent_n: int = 10) -> float:
     ~1.95 = 高熵（7种情绪均匀分布，波动大）
     """
     import math, os, json
-    from sandglass_paths import _NB
 
     # 优先: 会话级情绪摘要 (V2.9.9.1)
     emo_path = os.path.join(_NB, "emotion_session.jsonl")
