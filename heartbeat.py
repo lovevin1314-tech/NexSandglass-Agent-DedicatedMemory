@@ -47,11 +47,11 @@ def tick() -> dict:
     try:
         system = platform.system()
         if system == "Windows":
-            apps = os.popen("tasklist 2>nul").read()
+            apps = subprocess.run(["tasklist"], capture_output=True, text=True).stdout
         elif system == "Darwin":
-            apps = os.popen("ps -ax 2>/dev/null").read()
+            apps = subprocess.run(["ps","-ax"], capture_output=True, text=True).stdout
         else:
-            apps = os.popen("ps -aux 2>/dev/null").read()
+            apps = subprocess.run(["ps","aux"], capture_output=True, text=True).stdout
 
         if any(w in apps.lower() for w in ["code.exe", "devenv", "pycharm", "intellij"]):
             status["env"] = "开发"
