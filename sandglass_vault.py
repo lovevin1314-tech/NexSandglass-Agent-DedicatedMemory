@@ -52,11 +52,16 @@ def _tokenize(text: str) -> set:
 
 
 def _query_tokens(text: str) -> set:
-    """搜索分词：和_tokenize相同，但单字仅当输入只有一个中文字时才保留。"""
+    """搜索分词：和_tokenize相同，但单字仅当输入只有一个中文字时才保留。V2.9.29: +词干还原"""
     tokens = _tokenize(text)
     chars = "".join(re.findall(r"[\u4e00-\u9fff]", text))
     if len(chars) != 1:
-        tokens -= set(chars)  # 去单字
+        tokens -= set(chars)
+    # 词干还原（英文token）
+    try:
+        from l3_search_core import _stem
+        tokens = {_stem(t) if t.isascii() and t.isalpha() else t for t in tokens}
+    except Exception: pass
     return tokens
 
 
