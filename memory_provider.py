@@ -495,7 +495,7 @@ class NexSandglassProvider(MemoryProvider):
                         prefix = "✓" if i == 0 else "·"
                         t = text[:70].replace("\n", " ")
                         mem_lines.append(f"  {prefix} [{ts[:10]}] {t}")
-                    blocks.append("📋 记忆预览:\n" + "\n".join(mem_lines))
+                    blocks.append("📋 记忆预览:\n" + "\n".join(mem_lines) + "\n  → sandglass_search 可扩展更多")
             except: pass
             
             # ═══ 块3: 状态+决策 (~40t) ═══
