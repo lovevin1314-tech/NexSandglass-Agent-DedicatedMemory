@@ -679,26 +679,15 @@ class NexSandglassProvider(MemoryProvider):
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
 
     def prefetch(self, query: str) -> str:
-        """V2.10.7: 三块式轮次注入 — 搜索引导+记忆预览(带精搜引导)+状态决策。~150t。"""
+        """V2.10.55: 极简轮次注入 — 搜索引导+记忆预览。去重system_prompt_block已覆盖内容。"""
         try:
             blocks = []
             hints = getattr(self, '_prefetch_hints', [])
             
-            # ═══ 块1: 搜索引导 (~40t) ═══
+            # ═══ 块1: 搜索引导 ═══
             guide = []
             if hints:
                 guide.append(f"搜索: {' / '.join(hints[:3])}")
-            try:
-                db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
-                tags_set = set()
-                for r in db.execute("SELECT category, tags FROM fact_tags WHERE tags!='' ORDER BY rowid DESC LIMIT 10").fetchall():
-                    if r[1]:
-                        for t in r[1].split(",")[:2]:
-                            t = t.strip()
-                            if len(t) > 1: tags_set.add(t[:12])
-                db.close()
-                if tags_set: guide.append(f"标签: {', '.join(list(tags_set)[:4])}")
-            except: pass
             try:
                 from scene_l3 import scene_current
                 sc = scene_current()
@@ -706,7 +695,7 @@ class NexSandglassProvider(MemoryProvider):
             except: pass
             if guide: blocks.append(" | ".join(guide))
             
-            # ═══ 块2: 记忆预览 (~70t) — 带精搜引导 ═══
+            # ═══ 块2: 记忆预览 — 带精搜引导 ═══
             try:
                 from search_router import SearchRouter
                 sr = SearchRouter()
@@ -721,45 +710,8 @@ class NexSandglassProvider(MemoryProvider):
                     blocks.append("📋 记忆预览:\n" + "\n".join(mem_lines) + "\n  → sandglass_search 可扩展更多")
             except: pass
             
-            # ═══ 块3: 状态+决策 (~40t) ═══
-            from sandglass_think import comprehensive_offset, _emotional_entropy, _synthesize_3d
-            off = comprehensive_offset()
-            ent = _emotional_entropy()
-            mood = "平稳" if ent < 0.5 else ("波动" if ent < 1.0 else "高熵")
-            dirs = {"frugal": "省钱", "spend": "愿投", "drift": "放弃"}
-            off_d = dirs.get(off.get('direction',''), '平稳')
-            syn = _synthesize_3d(trigger="prefetch")
-            pi = syn.get("pipe_insights", "")
-            tangle = ""
-            if "纠结:" in pi: tangle = " 纠结:" + pi.split("纠结:")[1].split("|")[0].strip()
-            lines = [f"状态: {off_d}({off.get('offset',0):+d}%) | 🎭{mood}{tangle}"]
-            # 铁律
-            try:
-                from discipline import iron_rules_with_counts
-                rules = iron_rules_with_counts(2)
-                if rules: lines.append("⚠" + " ⚠".join(r[:30] for r,_ in rules[:2]))
-            except: pass
-            # 决策粒子
-            try:
-                dp_path = os.path.join(os.environ.get("NEXSANDBASE_HOME", os.path.expanduser("~/.neurobase")), "decision_particles.txt")
-                if os.path.exists(dp_path):
-                    with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
-                        dps = [l for l in f if l.strip() and not l.startswith("#")]
-                    if dps:
-                        last = dps[-1]
-                        if "→" in last:
-                            parts = last.split(" | ")
-                            if len(parts) >= 4: lines.append(f"决策: {parts[2][:35]} ({parts[3].strip()[:10]})")
-            except: pass
-            # 洞察精简
-            if pi:
-                snippets = [s.strip() for s in pi.split("|") if s.strip()]
-                key = [s[:40] for s in snippets if any(k in s for k in ["标签:", "告警:", "链:"])]
-                if key: lines.append(" | ".join(key[:2]))
-            blocks.append("\n".join(lines))
-            
             result = "\n\n".join(blocks)
-            return result[:700]  # 硬截断
+            return result[:250]  # 硬截断 335→250
         except Exception:
             return ""
 
