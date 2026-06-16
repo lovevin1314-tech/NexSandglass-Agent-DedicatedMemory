@@ -296,7 +296,7 @@ class NexSandglassProvider(MemoryProvider):
             except Exception as e:
                 logger.warning(f"增量初始化跳过: {e}")
             self._initialized = True
-            logger.info("NexSandglass V2.9.37 就绪")
+            logger.info(f"NexSandglass V{__version__} 就绪")
 
     def _safe_pipe(self, name, fn):
         """管道健康包装——失败时LLM可见降级"""
