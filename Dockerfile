@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 LABEL org.opencontainers.image.title="NexSandglass"
 LABEL org.opencontainers.image.description="沙漏记忆系统 — 零依赖 AI Agent 记忆引擎"
-LABEL org.opencontainers.image.version="2.10.5"
+LABEL org.opencontainers.image.version="2.10.8"
 
 ENV NEXSANDBASE_HOME=/data
 
