@@ -13,7 +13,7 @@
 > Plaintext storage, zero-dependency. Four-way concurrent search — FTS5 · IDX · TF-IDF · Shadow Sand.
 > Knows not just who you are, but how you became this way. Remembers what you said three days ago.
 
-> **V2.9.9.11 Data-Driven Persona:** 画像更新完全去LLM化 — fact_tags + decision_particles + offset 数据点自然累积。_llm 纯本地降级，persona_update() 零外部依赖自动生长。
+> **V2.10.1 PyPI:** `pip install nexsandglass` — 纯本地零依赖。投石问路+影子沙双引擎搜索，偏移率感知+管道聚合画像，四层问答式极简注入。
 
 > **Soul Distillation:** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories — we forge a unique, evolving soul that resonates with the user.
 
