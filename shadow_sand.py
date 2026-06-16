@@ -52,15 +52,17 @@ _ENTITY_RE = re.compile(
 )
 
 _conn = None
-
-_commit_pending = 0
+_conn_lock = threading.Lock()
 
 def _get_conn():
     global _conn
     if _conn is None:
-        _conn = sqlite3.connect(_SHADOW_DB, check_same_thread=False)
-        _conn.executescript(_SCHEMA)
-        _conn.commit()
+        with _conn_lock:
+            if _conn is None:
+                _conn = sqlite3.connect(_SHADOW_DB)
+                _conn.execute("PRAGMA journal_mode=WAL")
+                _conn.executescript(_SCHEMA)
+                _conn.commit()
     return _conn
 
 def _maybe_commit():
