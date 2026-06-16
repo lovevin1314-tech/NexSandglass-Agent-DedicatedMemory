@@ -1,0 +1,6 @@
+# 示例决策粒子 — 仅供Demo参考
+# ⚠️ 实际决策粒子由系统自动生成，位于 ~/.neurobase/persona/decision-log.jsonl
+
+2026-06-01 12:00:00 | 选A还是选B | 选A | neutral | demo示例
+2026-06-01 12:01:00 | 免费还是付费 | 免费 | frugal | demo示例,成本观
+2026-06-01 12:02:00 | 自己搞还是外包 | 自己搞 | frugal | demo示例,DIY倾向
