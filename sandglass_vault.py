@@ -608,7 +608,7 @@ def _import_plain(source_path: str) -> tuple:
 # V2.9.9.9: 沙漏自动修复——老用户坏行自愈
 # ═══════════════════════════════════════════════
 
-_TS_RE = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \|')
+# _TS_RE = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \|')  # V2.10.18: 重复定义已合并到L38
 
 
 def _is_valid_sandglass_line(line: str) -> bool:
