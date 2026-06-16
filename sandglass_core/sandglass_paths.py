@@ -40,7 +40,7 @@ def _resolve_nb() -> str:
     return default
 
 _NB = _resolve_nb()
-__version__ = "2.10.41"
+__version__ = "2.11.1"
 get_nb = _resolve_nb  # V2.10.41: 动态获取,post_setup修改环境变量后可用
 _SCRIPTS = os.path.join(_NB, "scripts")
 _PERSONA = os.path.join(_NB, "persona")

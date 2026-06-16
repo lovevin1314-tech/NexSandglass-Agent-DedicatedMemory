@@ -2,7 +2,7 @@
 
 > **`pip install nexsandglass`** · 纯本地 · 零依赖 · 零 API Key
 
-[![PyPI](https://img.shields.io/badge/PyPI-2.10.9-blue)](https://pypi.org/project/nexsandglass/)
+[![PyPI](https://img.shields.io/badge/PyPI-2.11.1-blue)](https://pypi.org/project/nexsandglass/)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
