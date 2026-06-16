@@ -2,7 +2,7 @@
 
 > **`pip install nexsandglass`** · 纯本地 · 零依赖 · 零 API Key
 
-[![PyPI](https://img.shields.io/badge/PyPI-2.10.5-blue)](https://pypi.org/project/nexsandglass/)
+[![PyPI](https://img.shields.io/badge/PyPI-2.10.8-blue)](https://pypi.org/project/nexsandglass/)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
@@ -52,7 +52,7 @@ python sandglass_mcp.py
 | ⚖️ 铁律因子 | 推前必确认 / 永远说实话 / 不先调研不动手 等铁律自动注入+计数 |
 | 🔍 四路并发搜索 | 影子沙 + FTS5 + IDX + TF-IDF，毫秒级响应，中英双语 |
 | 🎢 纠结度检测 | 决策链条完整追踪，犹豫模式识别，50%犹豫告警 |
-| 💉 极简注入 | ~60 tokens，两段式（搜索上下文+状态快照），LLM 一眼看懂 |
+| 💉 极简注入 | ~150t，三块式（搜索上下文+状态快照），LLM 一眼看懂 |
 | 🔒 全本地 | 数据不出设备，Python stdlib + SQLite，零外部依赖 |
 
 ---
