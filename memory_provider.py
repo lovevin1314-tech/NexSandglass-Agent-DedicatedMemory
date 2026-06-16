@@ -200,31 +200,23 @@ class NexSandglassProvider(MemoryProvider):
             if not os.path.exists(idx_done):
                 rebuild_index()
                 with open(idx_done, "w") as f: f.write("1")
-            # V2.9.38: 增量检查——仅处理新增沙子
-            checkpoint = os.path.join(nb, "sandglass_checkpoint")
-            last_ln = 0
-            if os.path.exists(checkpoint):
-                with open(checkpoint) as cf: last_ln = int(cf.read().strip() or 0)
-            
-            sand_path = os.path.join(nb, "sandglass.txt")
-            current_lines = 0
-            if os.path.exists(sand_path):
-                current_lines = sum(1 for _ in open(sand_path, encoding="utf-8", errors="replace"))
-            
-            if current_lines > last_ln:
-                # 增量处理：只扫新增行
-                try:
-                    import sqlite3
+            # V2.9.39: DB自省增量——用trust表MAX(line_num)替代外部checkpoint
+            try:
+                import sqlite3
+                sand_path = os.path.join(nb, "sandglass.txt")
+                if os.path.exists(sand_path):
+                    current_lines = sum(1 for _ in open(sand_path, encoding="utf-8", errors="replace"))
                     db = sqlite3.connect(os.path.join(nb, "shadow_sand.db"))
-                    # 新增行的 trust + fact_tags
-                    for ln in range(last_ln + 1, current_lines + 1):
-                        try: db.execute("INSERT OR IGNORE INTO trust (line_num, score) VALUES (?, 0.5)", (ln,))
-                        except: pass
-                    db.commit()
+                    max_trust = db.execute("SELECT COALESCE(MAX(line_num), 0) FROM trust").fetchone()[0]
                     db.close()
-                except Exception: pass
-                # 更新 checkpoint
-                with open(checkpoint, "w") as cf: cf.write(str(current_lines))
+                    if current_lines > max_trust:
+                        from shadow_sand import shadow_index
+                        with open(sand_path, encoding="utf-8", errors="replace") as f:
+                            for ln, line in enumerate(f, 1):
+                                if ln <= max_trust: continue
+                                text = line.strip()
+                                if text: shadow_index(text, line_num=ln)
+            except Exception: pass
             self._initialized = True
             logger.info("NexSandglass V2.9.37 就绪")
 
