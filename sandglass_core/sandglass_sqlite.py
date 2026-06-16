@@ -123,8 +123,10 @@ def search_year(query: str, year: str, limit: int = -1) -> list:
             conn = _get_db()
             sql = "SELECT s.id, s.ts, s.text FROM sandglass_fts f JOIN sandglass s ON s.id=f.rowid WHERE s.ts LIKE ? AND sandglass_fts MATCH ? ORDER BY rank"
             if limit > 0:
-                sql += " LIMIT ?"; params.append(limit)
-            cur = conn.execute(sql, (f"{year}%", tokens))
+                sql += " LIMIT ?"
+            params = [f"{year}%", tokens]
+            if limit > 0: params.append(limit)
+            cur = conn.execute(sql, params)
             return [(row[0], row[1], row[2]) for row in cur.fetchall()]
     except Exception:
         return []
@@ -145,8 +147,10 @@ def search(query: str, limit: int = 10) -> list:
             conn = _get_db()
             sql = "SELECT s.id, s.ts, s.text FROM sandglass_fts f JOIN sandglass s ON s.id = f.rowid WHERE sandglass_fts MATCH ? ORDER BY rank"
             if limit > 0:
-                sql += " LIMIT ?"; params.append(limit)
-            cur = conn.execute(sql, (tokens,))
+                sql += " LIMIT ?"
+            params = [tokens]
+            if limit > 0: params.append(limit)
+            cur = conn.execute(sql, params)
             return [(row[0], row[1], row[2]) for row in cur.fetchall()]
     except Exception:
         return []
