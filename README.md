@@ -98,10 +98,53 @@ python sandglass_mcp.py
 
 ---
 
+
+---
+
+## 教程
+
+### Agent 子代理隔离
+
+用 `NEXSANDBASE_HOME` 给不同 Agent 分配独立沙漏，记忆不串：
+
+```bash
+# Claude Code 专用
+NEXSANDBASE_HOME=~/.neurobase-claude python sandglass_mcp.py
+
+# Codex 专用
+NEXSANDBASE_HOME=~/.neurobase-codex python sandglass_mcp.py
+
+# 主 Agent
+export NEXSANDBASE_HOME=~/.neurobase
+```
+
+```python
+from sandglass_vault import search, count
+from sandglass_log import log_message
+
+log_message("今天讨论了搜索排序优化", "user")
+print(search("搜索排序"))
+print(f"沙漏总量: {count()}条")
+```
+
+### 一键搬家
+
+```bash
+# 打包全部记忆
+python -c "from sandglass_think import memory_migrate; print(memory_migrate())"
+# 解压到新电脑即刻恢复
+```
+
+### 从 Hermes 迁移
+
+```bash
+python hermes_to_sandglass.py  # 一行命令导入 Hermes 记忆
+```
+
 ## 版本历程
 
-### V2.10 (2026-06)
-PyPI 发布 `pip install nexsandglass`。两段式轮次注入(60t)，DB 自省增量启动，沙子自愈，Porter Stemmer，psychology_hint 15种模式，local_distill 管道蒸馏，enrich_choice 模板引擎。
+### V2.10 (2026-06) · PyPI 发布 + 双向注入
+PyPI 发布 `pip install nexsandglass`。三块式轮次注入(150t)+四层问答式会话注入(186t)，DB 自省增量启动，沙子自愈，Porter Stemmer，psychology_hint 15种模式，local_distill 管道蒸馏，enrich_choice 模板引擎。
 
 ### V2.9.28-42 (2026-06)
 极简注入优化(132→58t)，sim_bonus 线性化修复，`_llm` 全链路根除，停用词过滤(中38+英52)，shadow_index 实体提取修复，fact_tags 空标签回填，`_write_idx` RLock 并发安全，SimHash 跨会话持久化，five-facets.json 管道自动生成，首次画像管道化(`_pipe_build`)。
