@@ -487,6 +487,7 @@ def _load_persona() -> str:
 
 def _local_persona_extract() -> str:
     """本地提取基本画像——纯模式匹配。V1.3。"""
+    import os as _os
     from sandglass_vault import recent
     from collections import Counter
 
@@ -522,7 +523,7 @@ def _local_persona_extract() -> str:
             lines.append("")
     # 度量指标收集
     try:
-        ml = os.path.join(_NB, "metrics.log")
+        ml = _os.path.join(_NB, "metrics.log")
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
         from sandglass_vault import count
         total = count()
