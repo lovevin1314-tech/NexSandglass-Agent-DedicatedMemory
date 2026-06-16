@@ -169,28 +169,16 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
         (line_num,)
     )
 
-    # 兜底 tags：无 tags 时用实体名填充（接已有 _ENTITY_RE 管线，零新提取器）
+    # 兜底 tags：无 tags 时用实体名填充
     if not tags and entities_found:
-        # 去重取前5个实体作为标签
-        seen = set()
-        unique_entities = []
-        # 若调用方未传 tags → 用已提取的实体作为兜底标签（接已有 _ENTITY_RE 管道）
-        if not tags and entities_found:
-            tags = ",".join(entities_found[:10])
+        tags = ",".join(entities_found[:10])
 
-        # 写入信任记录
-        db.execute(
-            "INSERT OR IGNORE INTO trust (line_num, score) VALUES (?, 0.5)",
-            (line_num,)
-        )
-
-        # 写入标签
-        if category != "general" or tags:
-            # V2.9.20: general 自动降级 → 用首标签作为分类
-            if category in ("general", "exam_general") and tags:
-                first_tag = tags.split(",")[0].strip()
-                if first_tag:
-                    category = first_tag[:30]
+    # 写入标签
+    if category != "general" or tags:
+        if category in ("general", "exam_general") and tags:
+            first_tag = tags.split(",")[0].strip()
+            if first_tag:
+                category = first_tag[:30]
             db.execute(
                 "INSERT OR REPLACE INTO fact_tags (line_num, category, tags) VALUES (?, ?, ?)",
                 (line_num, category, tags)
