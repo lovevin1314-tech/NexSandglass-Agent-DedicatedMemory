@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: nexsandglass
-Version: 2.10.4
+Version: 2.10.5
 Summary: 沙漏记忆系统 — 纯本地零依赖L3思考层
 Home-page: https://github.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory
 Author: NeuroBase
@@ -22,7 +22,7 @@ Dynamic: requires-python
 
 > **`pip install nexsandglass`** · 纯本地 · 零依赖 · 零 API Key
 
-[![PyPI](https://img.shields.io/badge/PyPI-2.10.4-blue)](https://pypi.org/project/nexsandglass/)
+[![PyPI](https://img.shields.io/badge/PyPI-2.10.5-blue)](https://pypi.org/project/nexsandglass/)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
@@ -30,7 +30,7 @@ Dynamic: requires-python
 
 **不是记住你说过什么——是理解你怎么变成今天的你。**
 
-投石问路 + 影子沙双引擎搜索 · 偏移率感知 · 管道聚合画像 · 四层问答式极简注入。纯本地，零依赖，越用越懂你。
+灵魂蒸馏 · 偏移率感知 · 铁律因子 · 四路并发搜索 · 极简注入。纯本地，零依赖，越用越懂你。
 
 ---
 
@@ -55,16 +55,25 @@ hermes plugins install lovevin1314-tech/NexSandglass
 # 重启 Desktop → 设置 → 记忆体 → 选择 NexSandglass
 ```
 
-**MCP 用户：**
+**MCP / Docker：**
 ```bash
 git clone https://github.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory
 python sandglass_mcp.py
 ```
 
-**Docker：**
-```bash
-docker-compose up -d
-```
+---
+
+## 核心能力
+
+| 能力 | 说明 |
+|------|------|
+| 🧬 灵魂蒸馏 | fact_tags + decision_particles → 从沙子里自然生长出画像，越用越懂你 |
+| 📊 偏移率追踪 | 省钱/愿投/放弃 三维量化 + 决策疲劳检测 + 15种心理预判 |
+| ⚖️ 铁律因子 | 推前必确认 / 永远说实话 / 不先调研不动手 等铁律自动注入+计数 |
+| 🔍 四路并发搜索 | 影子沙 + FTS5 + IDX + TF-IDF，毫秒级响应，中英双语 |
+| 🎢 纠结度检测 | 决策链条完整追踪，犹豫模式识别，50%犹豫告警 |
+| 💉 极简注入 | ~60 tokens，两段式（搜索上下文+状态快照），LLM 一眼看懂 |
+| 🔒 全本地 | 数据不出设备，Python stdlib + SQLite，零外部依赖 |
 
 ---
 
@@ -77,20 +86,9 @@ docker-compose up -d
 | 决策追踪 | ❌ | **决策粒子+偏移率+心理预判** |
 | 情绪感知 | ❌ | **情绪熵（会话级摘要）** |
 | 画像溯源 | ❌ | **可追溯到行号** |
+| 铁律系统 | ❌ | **自动注入+违规计数** |
 | 搜索 | 向量检索 | **四路并发（影子沙+FTS5+IDX+TF-IDF）** |
 | 安装 | 服务栈 | **pip install** |
-
----
-
-## 五大支柱
-
-| 支柱 | 做什么 |
-|------|--------|
-| 🧬 管道聚合画像 | fact_tags + decision_particles → 越用越懂你 |
-| 📊 偏移率 | 省钱/愿投/放弃 三维量化 + 跨阶段对比 |
-| 🔍 搜索滤镜 | 六维感知扩展关键词 |
-| 🧵 织布机 | 四支柱合成 + 矛盾检测 |
-| 🪡 织线 | 正则三元组，纯本地因果链 |
 
 ---
 
@@ -122,11 +120,17 @@ docker-compose up -d
 
 ## 版本历程
 
-### V2.10 — PyPI 发布
-`pip install nexsandglass` — 全球 AI Agent 一键安装。两段式轮次注入(60t)，DB 自省增量启动，沙子自愈，Porter Stemmer。
+### V2.10 (2026-06)
+PyPI 发布 `pip install nexsandglass`。两段式轮次注入(60t)，DB 自省增量启动，沙子自愈，Porter Stemmer，psychology_hint 15种模式，local_distill 管道蒸馏，enrich_choice 模板引擎。
 
-### V2.9 — 极简注入 + 纯本地化
-四路并发搜索 + 管道聚合画像 + 去 LLM 全链路闭环。偏移率·纠结度·铁律因子·停用词过滤。
+### V2.9.28-42 (2026-06)
+极简注入优化(132→58t)，sim_bonus 线性化修复，`_llm` 全链路根除，停用词过滤(中38+英52)，shadow_index 实体提取修复，fact_tags 空标签回填，`_write_idx` RLock 并发安全，SimHash 跨会话持久化，five-facets.json 管道自动生成，首次画像管道化(`_pipe_build`)。
 
-### V1.x — 奠基
+### V2.9.11-27 (2026-06)
+数据点自生长(画像 LLM→数据点驱动)，搜索密度回归 ratio，C组语义扩展(决策粒子注入 7.5x)，管道洞察接入 LLM，铁律因子统一命名，函数名/变量名 LLM 残留全清。
+
+### V2.9 极简注入
+四路并发搜索，织线知识图谱，四层问答式注入(~60t)，管道聚合画像，偏移率·纠结度·scene_l3。
+
+### V1.x 奠基
 偏移率·情绪感知·决策粒子·影子沙·织布机·场景系统·回音折
