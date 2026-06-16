@@ -4,7 +4,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "nexsandglass"
-version = "2.10.3"
+version = "2.10.4"
 description = "沙漏记忆系统 — 纯本地零依赖L3思考层"
 readme = "README.md"
 requires-python = ">=3.10"
