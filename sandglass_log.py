@@ -58,6 +58,19 @@ def log_message(text: str, sender: str = "agent") -> bool:
         # 工具调用过滤：<invoke> XML / {"function": JSON 不入沙漏
         if sender != "user" and ("<invoke" in text or '"function":' in text):
             return False
+        # V2.10.9: Markdown格式过滤——AI回复中的表格/代码块/标题不入沙漏
+        if sender == "agent":
+            stripped = text.strip()
+            if (stripped.startswith("```")
+                or (stripped.startswith("|") and stripped.endswith("|"))
+                or re.match(r'^\|[-:| ]+\|$', stripped)
+                or re.match(r'^[-*]{3,}$', stripped)
+                or re.match(r'^#{1,6}\s', stripped)
+                or re.match(r'^>\s', stripped)):
+                return False
+            if (stripped.startswith("**") and stripped.endswith("**")
+                and len(stripped) <= 80 and not re.search(r'\d', stripped)):
+                return False
         # AI低价值回复过滤（V2.1）
         if sender == "agent" and _estimate_info_value(text) < 0.3:
             return False
