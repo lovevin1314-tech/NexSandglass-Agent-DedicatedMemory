@@ -676,6 +676,10 @@ class NexSandglassProvider(MemoryProvider):
         nb = os.environ.get("NEXSANDBASE_HOME") or ""
         # 自动搜索已有沙漏数据
         search_paths = [nb] if nb else []
+        # config.yaml 中用户自定义路径
+        cfg_home = config.get("memory", {}).get("nexsandglass", {}).get("home")
+        if cfg_home and cfg_home not in search_paths:
+            search_paths.append(cfg_home)
         search_paths.append(os.path.join(os.path.expanduser("~"), ".neurobase"))
         found = None
         for p in search_paths:
