@@ -13,6 +13,11 @@ import os, mmap, re, concurrent.futures, math
 from sandglass_vault import _SANDGLASS, _parse_line
 from sandglass_paths import _NB
 import statistics
+import logging
+
+# V2.11.1: 本地 stub——避免循环导入 memory_provider
+def _pipe_warn(name, e):
+    logging.getLogger(__name__).warning(f"管道 [{name}] 降级: {e}")
 from l3_search_core import simhash as _l3_simhash
 from sandglass_vault import _query_tokens
 
@@ -249,12 +254,12 @@ class SearchRouter:
     """搜索路由器——四路并发 + 沙子密度融合(density×trust+simhash) + 动态扩窗 + mmap兜底。
     V2.8.6: 统一为唯一搜索入口。
     """
-    def __init__(self, shadow=None, fts5=None, idx=None, tfidf=None, mmap=None):
+    def __init__(self, shadow=None, fts5=None, idx=None, tfidf=None, mmap_fb=None):
         self.shadow = shadow or ShadowSearch()
         self.fts5 = fts5 or Fts5Search()
         self.idx = idx or IdxSearch()
         self.tfidf = tfidf or TfidfSearch()
-        self.mmapfallback = mmap or MmapFallback()
+        self.mmapfallback = mmap_fb or MmapFallback()
 
     def search(self, query: str, limit: int = 30) -> list:
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:

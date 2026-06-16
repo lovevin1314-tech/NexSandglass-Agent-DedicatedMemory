@@ -8,6 +8,10 @@ import re
 import statistics
 import time
 import urllib.request
+
+# V2.11.1: 本地 stub——避免循环导入 memory_provider
+def _pipe_warn(name, e):
+    logging.getLogger(__name__).warning(f"管道 [{name}] 降级: {e}")
 import urllib.error
 from datetime import datetime
 
@@ -1340,23 +1344,6 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
         return data
     except Exception:
         return {}
-
-        m = re.search(r"\{.*\}", result, re.DOTALL)
-        if m:
-            data = json.loads(m.group())
-            data["source"] = "3D 玻璃合成"
-            data["timestamp"] = datetime.now().isoformat()
-            data["offset"] = comp
-            data["depth"] = {
-                "frugal": comp.get("frugal_pct", comp["offset"] if comp["direction"] == "frugal" else 0),
-                "spend": comp.get("spend_pct", abs(comp["offset"]) if comp["direction"] == "spend" else 0),
-                "drift": comp.get("drift_pct", 100 if comp["direction"] == "drift" else 0),
-            }
-
-            # 永久保存注解
-            _save_annotation(data, trigger if trigger else "periodic")
-
-            return data
 
         return {"raw": result, "source": "3D 玻璃合成（非JSON）"}
 
