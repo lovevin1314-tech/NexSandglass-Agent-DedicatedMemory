@@ -1247,7 +1247,8 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
             top_tags = [(t, c) for t, c in tags.most_common(3) if c >= 2]
             if top_tags:
                 pipe_insights.append(f"标签: {'·'.join(f'{t}({c})' for t,c in top_tags)}")
-        except Exception: pass
+        except Exception as e:
+            _pipe_warn("sandglass_think_L1250", e)
         
         # offset 拐点
         off_dir = comp.get("direction", "neutral")
@@ -1304,7 +1305,8 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
                             arrows = last.split("→")
                             compact = "→".join(a.strip()[:8] for a in arrows[:3])
                             pipe_insights.append(f"链: {compact}")
-        except Exception: pass
+        except Exception as e:
+            _pipe_warn("sandglass_think_L1307", e)
         
         # scene 场景感知（个人困惑=纠结场景）
         try:
@@ -1312,7 +1314,8 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
             sc = scene_current()
             if sc and any(s in str(sc) for s in ["个人困惑", "困惑"]):
                 pipe_insights.append(f"场景: 纠结期")
-        except Exception: pass
+        except Exception as e:
+            _pipe_warn("sandglass_think_L1315", e)
         
         # weave 告警
         try:
@@ -1320,7 +1323,8 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
             lag = sand_since_update()
             if lag > 100:
                 pipe_insights.append(f"告警: 画像滞后{lag}条")
-        except Exception: pass
+        except Exception as e:
+            _pipe_warn("sandglass_think_L1323", e)
         
         data = {
             "persona_type": persona_text.split(chr(10))[0].replace("#","").strip()[:30] if persona_text else "未知",

@@ -9,7 +9,7 @@ import os, logging
 _logger = logging.getLogger(__name__)
 
 def _resolve_nb() -> str:
-    """V2.10.35: 多级fallback——环境变量→config.yaml→默认。含路径诊断日志。"""
+    """V2.10.36: 多级fallback——环境变量→config.yaml→默认。含路径诊断日志。"""
     # 1. 环境变量优先
     nb = os.environ.get("NEXSANDBASE_HOME")
     if nb and os.path.isdir(nb):
@@ -40,7 +40,7 @@ def _resolve_nb() -> str:
     return default
 
 _NB = _resolve_nb()
-__version__ = "2.10.35"
+__version__ = "2.10.36"
 _SCRIPTS = os.path.join(_NB, "scripts")
 _PERSONA = os.path.join(_NB, "persona")
 _ARCHIVE = os.path.join(_NB, "archive")

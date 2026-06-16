@@ -101,7 +101,8 @@ def _query_tokens(text: str) -> set:
     try:
         from l3_search_core import _stem
         tokens = {_stem(t) if t.isascii() and t.isalpha() else t for t in tokens}
-    except Exception: pass
+    except Exception as e:
+        _pipe_warn("sandglass_vault_L104", e)
     return tokens
 
 
@@ -265,7 +266,8 @@ def _sync_index() -> dict:
             return {}
         _idx_cache = idx
         try: _idx_mtime = os.path.getmtime(_SANDGLASS)
-        except Exception: pass
+        except Exception as e:
+            _pipe_warn("sandglass_vault_L268", e)
         return idx
 
     except Exception:

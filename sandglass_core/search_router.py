@@ -68,7 +68,8 @@ def sand_density(candidates, query_tokens, query) -> list:
         line_nums = {c[0] for c in candidates if len(c) > 0}
         boosted = shadow_boost(line_nums, limit=len(candidates))
         trust_scores = {ln: score for score, ln in boosted}
-    except Exception: pass
+    except Exception as e:
+        _pipe_warn("search_router_L71", e)
 
     q_len = max(len(query_tokens), 1)
     scored = []
