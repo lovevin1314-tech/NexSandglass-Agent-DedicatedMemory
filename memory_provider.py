@@ -216,7 +216,8 @@ class NexSandglassProvider(MemoryProvider):
                                 if ln <= max_trust: continue
                                 text = line.strip()
                                 if text: shadow_index(text, line_num=ln)
-            except Exception: pass
+            except Exception as e:
+                logger.warning(f"增量初始化跳过: {e}")
             self._initialized = True
             logger.info("NexSandglass V2.9.37 就绪")
 
