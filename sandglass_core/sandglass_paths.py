@@ -7,8 +7,31 @@ NexSandglass 路径配置 — 单一真相来源 V2.2
 
 import os
 
-_NB = os.environ.get("NEXSANDBASE_HOME") or os.path.join(os.path.expanduser("~"), ".neurobase")
-__version__ = "2.10.23"
+def _resolve_nb() -> str:
+    """V2.10.25: 多级fallback——环境变量→config.yaml→shell profile→默认。
+    修复Desktop不继承shell环境变量的问题。"""
+    # 1. 环境变量优先
+    nb = os.environ.get("NEXSANDBASE_HOME")
+    if nb and os.path.isdir(nb): return nb
+    
+    # 2. Hermes config.yaml
+    for cfg_path in [
+        os.path.join(os.path.expanduser("~"), ".hermes", "config.yaml"),
+        os.path.join(os.path.expanduser("~"), "AppData", "Local", "hermes", "config.yaml"),
+    ]:
+        try:
+            import yaml
+            with open(cfg_path, encoding="utf-8") as f:
+                cfg = yaml.safe_load(f)
+            nb = cfg.get("memory", {}).get("nexsandglass", {}).get("home")
+            if nb and os.path.isdir(nb): return nb
+        except: pass
+    
+    # 3. 默认
+    return os.path.join(os.path.expanduser("~"), ".neurobase")
+
+_NB = _resolve_nb()
+__version__ = "2.10.25"
 _SCRIPTS = os.path.join(_NB, "scripts")
 _PERSONA = os.path.join(_NB, "persona")
 _ARCHIVE = os.path.join(_NB, "archive")
