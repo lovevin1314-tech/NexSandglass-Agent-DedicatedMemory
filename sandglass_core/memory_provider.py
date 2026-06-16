@@ -8,7 +8,7 @@ NexSandglass MemoryProvider — MemoryProvider for Hermes
 """
 from __future__ import annotations
 
-import json, logging, os, re, threading, time
+import json, logging, os, re, sqlite3, threading, time
 from typing import Any, Dict, List, Optional
 from sandglass_paths import _NB
 
@@ -290,7 +290,6 @@ class NexSandglassProvider(MemoryProvider):
 
                 _pipe_warn("pipe", e)            # V2.9.39: DB自省增量——用trust表MAX(line_num)替代外部checkpoint
             try:
-                import sqlite3
                 sand_path = os.path.join(nb, "sandglass.txt")
                 if os.path.exists(sand_path):
                     current_lines = sum(1 for _ in open(sand_path, encoding="utf-8", errors="replace"))
@@ -433,7 +432,6 @@ class NexSandglassProvider(MemoryProvider):
             
             # 铁律：从 five-facets.json 注入结构化事实（importance×confidence 排序）
             try:
-                import json
                 facets_path = os.path.join(_NB, "profile", "five-facets.json")
                 if os.path.exists(facets_path):
                     with open(facets_path, "r", encoding="utf-8") as f:
@@ -457,7 +455,6 @@ class NexSandglassProvider(MemoryProvider):
             
             # 关注：从fact_tags高频标签
             try:
-                import sqlite3
                 from collections import Counter
                 db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
                 tags = Counter()
@@ -504,7 +501,6 @@ class NexSandglassProvider(MemoryProvider):
             # 最近决策（管道洞察已含，此处只补情绪）
             decisions = []
             try:
-                import json
                 dlog = os.path.join(_NB, "persona", "decision-log.jsonl")
                 if os.path.exists(dlog):
                     with open(dlog, "r", encoding="utf-8") as f:
@@ -652,7 +648,6 @@ class NexSandglassProvider(MemoryProvider):
             if hints:
                 guide.append(f"搜索: {' / '.join(hints[:3])}")
             try:
-                import sqlite3
                 db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
                 tags_set = set()
                 for r in db.execute("SELECT category, tags FROM fact_tags WHERE tags!='' ORDER BY rowid DESC LIMIT 10").fetchall():
@@ -759,7 +754,6 @@ class NexSandglassProvider(MemoryProvider):
 
     def post_setup(self, hermes_home: str, config: dict) -> None:
         """V2.10.26: 自动检测沙漏目录——零配置一键激活。"""
-        import os
         nb = os.environ.get("NEXSANDBASE_HOME") or ""
         # 自动搜索已有沙漏数据
         search_paths = [nb] if nb else []
@@ -862,7 +856,6 @@ class NexSandglassProvider(MemoryProvider):
             # V2.9.9.1: 情绪会话摘要
             try:
                 from emotion_vocab import detect as emotion_detect
-                import json
                 mood_counts = {}
                 for msg in messages:
                     if msg.get("role") == "user":
