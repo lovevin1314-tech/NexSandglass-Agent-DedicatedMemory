@@ -730,8 +730,5 @@ def repair_sandglass(dry_run: bool = False) -> dict:
             "backup": backup, "dry_run": False}
 
 
-# ── 模块导入时自动触发修复 ──
-try:
-    _startup_autoheal()
-except Exception:
-    pass
+# V2.10.14: _startup_autoheal 由 memory_provider.initialize() 显式调用
+# 不在此处模块级触发——避免导入锁+重型I/O造成死锁
