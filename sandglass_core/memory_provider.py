@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json, logging, os, re, threading, time
 from typing import Any, Dict, List, Optional
+from sandglass_paths import _NB
 
 # 纯本地MemoryProvider——不导入Hermes核心模块避免死锁
 # Hermes通过register()函数发现插件,不检查继承关系
