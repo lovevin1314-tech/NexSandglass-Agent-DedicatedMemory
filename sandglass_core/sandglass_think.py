@@ -1363,7 +1363,7 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
     except Exception:
         return {}
 
-def _emotional_entropy(recent_n: int = 10) -> float:
+def _emotional_entropy(recent_n: int = 20) -> float:
     """
     香农熵——量化情绪波动程度。V2.9.9.1: 优先读会话摘要，降级扫沙子。
     0 = 完全平静（全是同一种情绪）
@@ -1420,7 +1420,7 @@ def _emotional_entropy(recent_n: int = 10) -> float:
             entropy -= p * math.log(p)
     return round(entropy, 2)
 
-def entropy_chart(recent_n: int = 10) -> str:
+def entropy_chart(recent_n: int = 20) -> str:
     """
     情绪熵 ASCII 可视化。
     """
