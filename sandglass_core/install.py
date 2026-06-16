@@ -2,7 +2,7 @@
 """NexSandglass V2.9.9 — 一键安装+验证 (Python stdlib, 零依赖)"""
 import os, sys, shutil
 
-VERSION = "2.9.9"
+VERSION = "2.10.47"
 NB = os.path.join(os.path.expanduser("~"), ".neurobase")
 HERMES = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~/.local/share")), "hermes")
 
@@ -19,6 +19,7 @@ MODULES = [
     "decision_particles.py", "emotion_vocab.py",
     "shadow_sand.py", "search_router.py", "l0_buffer.py",
     "soul_diff.py", "plugin.py", "migrate_v2_4.py", "metrics.py",
+    "agent_bootstrap.py",
 ]
 
 DIRS = [
@@ -102,6 +103,19 @@ def main():
         print(f"✅ full_sanity: {fs['passed']}/4")
     except Exception as e:
         print(f"⚠️ 验证失败: {e}")
+
+    # 7. 全平台自举（V2.10.47）
+    print()
+    print("═" * 40)
+    print("全平台 MCP 自举（自动配置各 Agent）...")
+    try:
+        from agent_bootstrap import bootstrap_all
+        results = bootstrap_all(NB)
+        ok = sum(1 for v in results.values() if v == "ok")
+        skip = sum(1 for v in results.values() if v in ("skip", "exists"))
+        print(f"✅ {ok} 个注入, {skip} 个跳过")
+    except Exception as e:
+        print(f"⚠️ 自举跳过: {e}")
 
     print()
     print(f"✅ NexSandglass V{VERSION} 安装完成！")
