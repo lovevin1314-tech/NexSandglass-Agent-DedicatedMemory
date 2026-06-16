@@ -28,15 +28,22 @@ def _tokenize(text: str) -> str:
     return " ".join(sorted(t for t in tokens if t))
 
 
+_fts_conn = None
+_fts_lock = threading.Lock()
+
 def _get_db():
-    os.makedirs(os.path.dirname(_DB), exist_ok=True)
-    conn = sqlite3.connect(_DB, check_same_thread=False)
-    conn.execute("PRAGMA journal_mode=WAL")  # 支持多进程并发
-    conn.execute("PRAGMA synchronous=NORMAL")  # 性能优化，安全够用
-    conn.execute("CREATE TABLE IF NOT EXISTS sandglass (id INTEGER PRIMARY KEY, ts TEXT, sender TEXT, text TEXT)")
-    conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS sandglass_fts USING fts5(tokens)")
-    conn.commit()
-    return conn
+    global _fts_conn
+    if _fts_conn is None:
+        with _fts_lock:
+            if _fts_conn is None:
+                os.makedirs(os.path.dirname(_DB), exist_ok=True)
+                _fts_conn = sqlite3.connect(_DB, check_same_thread=False)
+                _fts_conn.execute("PRAGMA journal_mode=WAL")
+                _fts_conn.execute("PRAGMA synchronous=NORMAL")
+                _fts_conn.execute("CREATE TABLE IF NOT EXISTS sandglass (id INTEGER PRIMARY KEY, ts TEXT, sender TEXT, text TEXT)")
+                _fts_conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS sandglass_fts USING fts5(tokens)")
+                _fts_conn.commit()
+    return _fts_conn
 
 
 def sync_all() -> int:
