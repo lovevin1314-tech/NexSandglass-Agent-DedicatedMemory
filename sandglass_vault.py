@@ -33,6 +33,46 @@ _idx_mtime: float = 0
 # ── 并发安全：保护 _IDX 文件的读写，避免 Windows os.replace 冲突 ──
 _idx_lock = threading.RLock()
 
+# V2.9.9.9: 启动自检——发现坏行自动修复，保证老用户无痛自愈
+_HEAL_MARKER = os.path.join(_NB, ".sandglass_healed")
+_TS_RE = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \|')
+
+
+def _startup_autoheal() -> dict:
+    """模块首次导入时的自动修复检查。（在模块末尾调用）"""
+    if not os.path.exists(_SANDGLASS):
+        return {"action": "skip", "reason": "no sandglass file"}
+    if os.path.exists(_HEAL_MARKER):
+        try:
+            if os.path.getmtime(_HEAL_MARKER) >= os.path.getmtime(_SANDGLASS):
+                return {"action": "skip", "reason": "already healed"}
+        except Exception:
+            pass
+    orphan_count = 0
+    with open(_SANDGLASS, "r", encoding="utf-8") as f:
+        for line in f:
+            stripped = line.strip()
+            if stripped and not _TS_RE.match(stripped):
+                orphan_count += 1
+                if orphan_count > 10:
+                    break
+    if orphan_count <= 10:
+        try:
+            with open(_HEAL_MARKER, "w") as f:
+                f.write(datetime.now().isoformat())
+        except Exception:
+            pass
+        return {"action": "skip", "reason": f"only {orphan_count} orphans"}
+    try:
+        result = repair_sandglass(dry_run=False)
+        with open(_HEAL_MARKER, "w") as f:
+            f.write(datetime.now().isoformat())
+        result["action"] = "healed"
+        return result
+    except Exception as e:
+        logger.warning(f"sandglass: startup autoheal failed: {e}")
+        return {"action": "error", "error": str(e)}
+
 
 # ═══════════════════════════════════════════════
 # 投石问路
@@ -562,3 +602,136 @@ def _import_plain(source_path: str) -> tuple:
             except Exception:
                 skipped += 1
     return imported, skipped
+
+
+# ═══════════════════════════════════════════════
+# V2.9.9.9: 沙漏自动修复——老用户坏行自愈
+# ═══════════════════════════════════════════════
+
+_TS_RE = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \|')
+
+
+def _is_valid_sandglass_line(line: str) -> bool:
+    """格式校验（复用已有 _parse_line 管道）：时间戳 | 发送者 | 文本"""
+    if not line.strip():
+        return False
+    if not _TS_RE.match(line.strip()):
+        return False
+    parts = line.strip().split(" | ", 2)
+    return len(parts) >= 3 and len(parts[0]) == 19
+
+
+def repair_sandglass(dry_run: bool = False) -> dict:
+    """扫描 sandglass.txt，将多行消息的孤儿行合并回父消息。
+    
+    原理：多行消息中的 \\n 导致后续行缺少时间戳成为"坏行"。
+    修复策略：遇到坏行时将其文本拼接到上一条有效消息末尾（空格分隔）。
+    空行直接丢弃。
+    
+    参数：
+        dry_run=True → 只统计，不修改文件
+        dry_run=False → 原子写入 + 全量重建索引
+    
+    返回：{valid, orphans, empty, repaired_count, dry_run}
+    """
+    path = _SANDGLASS
+    if not os.path.exists(path):
+        return {"valid": 0, "orphans": 0, "empty": 0, "repaired_count": 0, "dry_run": dry_run}
+    
+    # 读取全部行
+    with open(path, "r", encoding="utf-8") as f:
+        raw_lines = f.readlines()
+    
+    # 扫描并修复
+    repaired = []       # 修复后的行（每条 = 完整有效行）
+    stats = {"valid": 0, "orphans": 0, "empty": 0}
+    current = None      # 当前正在构建的有效行 (ts, sender, text_parts)
+    
+    for raw in raw_lines:
+        stripped = raw.strip()
+        
+        if not stripped:
+            stats["empty"] += 1
+            continue
+        
+        if _TS_RE.match(stripped):
+            # 遇到新有效行：先保存上一条
+            if current is not None:
+                ts, sender, parts = current
+                repaired.append(f"{ts} | {sender} | {' '.join(parts)}\n")
+                stats["valid"] += 1
+            
+            # 开始新记录
+            parts = stripped.split(" | ", 2)
+            ts = parts[0]
+            sender = parts[1] if len(parts) > 1 else "?"
+            text = parts[2] if len(parts) > 2 else ""
+            current = (ts, sender, [text])
+        else:
+            # 孤儿行：拼接到当前父消息
+            if current is not None:
+                current[2].append(stripped)
+            else:
+                # 文件开头就是坏行——给它一个兜底时间戳
+                current = ("1970-01-01 00:00:00", "unknown", [stripped])
+            stats["orphans"] += 1
+    
+    # 保存最后一条
+    if current is not None:
+        ts, sender, parts = current
+        repaired.append(f"{ts} | {sender} | {' '.join(parts)}\n")
+        stats["valid"] += 1
+    
+    if dry_run:
+        return {**stats, "repaired_count": stats["orphans"], "dry_run": True,
+                "would_write": len(repaired), "original_lines": len(raw_lines)}
+    
+    # 原子写入：先写临时文件，再替换
+    import shutil
+    backup = path + ".pre_repair_bak"
+    shutil.copy2(path, backup)
+    
+    tmp = path + ".repair_tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.writelines(repaired)
+    os.replace(tmp, path)
+    
+    # 重建所有索引
+    try:
+        rebuild_index()
+    except Exception:
+        pass
+    try:
+        from sandglass_sqlite import sync_full
+        sync_full()
+    except Exception:
+        try:
+            from sandglass_sqlite import sync_incremental
+            sync_incremental()
+        except Exception:
+            pass
+    try:
+        from shadow_sand import _get_conn
+        db = _get_conn()
+        db.execute("DELETE FROM trust")
+        db.execute("DELETE FROM entities")
+        db.execute("DELETE FROM fact_tags")
+        db.commit()
+    except Exception:
+        pass
+    
+    # 清理索引缓存
+    global _idx_cache, _idx_mtime
+    _idx_cache = None
+    _idx_mtime = 0
+    
+    return {**stats, "repaired_count": stats["orphans"],
+            "repaired_lines": len(repaired), "original_lines": len(raw_lines),
+            "backup": backup, "dry_run": False}
+
+
+# ── 模块导入时自动触发修复 ──
+try:
+    _startup_autoheal()
+except Exception:
+    pass
