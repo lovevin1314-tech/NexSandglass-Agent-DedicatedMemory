@@ -1,3 +1,23 @@
+Metadata-Version: 2.4
+Name: nexsandglass
+Version: 2.10.3
+Summary: 沙漏记忆系统 — 纯本地零依赖L3思考层
+Home-page: https://github.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory
+Author: NeuroBase
+Project-URL: Homepage, https://github.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Dynamic: author
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-python
+
 # NexSandglass ⏳ — 沙漏记忆系统
 
 > **`pip install nexsandglass`** · 纯本地 · 零依赖 · 零 API Key
