@@ -17,16 +17,20 @@ logger = logging.getLogger(__name__)
 
 # V2.9.29: Porter Stemmer — 轻量词干还原(零依赖)
 def _stem(word: str) -> str:
-    """极简词干还原。覆盖常见后缀，零外部依赖。"""
+    """极简词干还原。覆盖常见后缀，零外部依赖。V2.9.29: VC保护防误切"""
     w = word.lower()
     if len(w) <= 3: return w
-    # Step 1: 去掉 -ing/-ed 及其变体
+    vowels = set('aeiou')
+    # Step 1: 去掉 -ing/-ed，仅当词干含元音时才去双辅音
     if w.endswith('ing') and len(w) > 5:
         w = w[:-3]
-        if w.endswith(w[-1]): w = w[:-1]  # running→run
+        # 双辅音检查: running→run(√), happening→happe(×)→happen(√)
+        if len(w) >= 3 and w[-1] == w[-2] and w[-2] not in vowels and w[-3] in vowels:
+            w = w[:-1]
     elif w.endswith('ed') and len(w) > 4:
         w = w[:-2]
-        if w.endswith(w[-1]): w = w[:-1]
+        if len(w) >= 3 and w[-1] == w[-2] and w[-2] not in vowels and w[-3] in vowels:
+            w = w[:-1]
     # Step 2: 去掉 -tion, -ness, -ly
     if w.endswith('tion') and len(w) > 6: w = w[:-4] + 'te'
     elif w.endswith('ness') and len(w) > 6: w = w[:-4]
