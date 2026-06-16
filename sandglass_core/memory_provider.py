@@ -260,7 +260,7 @@ class NexSandglassProvider(MemoryProvider):
                 sys.path.insert(0, nb_scripts)
 
             from sandglass_vault import rebuild_index
-            from sandglass_paths import validate
+            from sandglass_paths import validate, __version__
             validate()
             # V2.9.37: 索引重建仅首次运行
             idx_done = os.path.join(nb, "idx_done")
