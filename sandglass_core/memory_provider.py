@@ -705,7 +705,8 @@ class NexSandglassProvider(MemoryProvider):
         os.environ["NEXSANDBASE_HOME"] = found
         config.setdefault("memory", {})["nexsandglass"] = {"home": found}
         config["memory"]["provider"] = "nexsandglass"
-        print(f"\n  ✓ NexSandglass V2.10.27 已激活")
+        config["memory"]["memory_char_limit"] = 1  # 关内置记忆
+        print(f"\n  ✓ NexSandglass V2.10.45 已激活")
         print(f"  沙漏目录：{found}")
         try:
             from sandglass_vault import count
