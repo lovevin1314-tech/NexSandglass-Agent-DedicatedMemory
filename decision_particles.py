@@ -280,7 +280,30 @@ def _learn(tags: str, choice: str = "") -> None:
 # ═══════════════════════════════════════════════
 
 def _enrich_choice_desc(question: str, choice: str) -> str:
-    """纯本地引擎 — 直接返回原选择"""
+    """V2.9.36: 模板引擎——从链条推断+标签中生成选择理由。纯本地。"""
+    templates = {
+        "习惯回退": lambda: f"选了{choice}，回归到习惯选项",
+        "选择困难": lambda: f"选了{choice}，经过多次犹豫后的最终选择",
+        "决策疲劳": lambda: f"选了{choice}，在决策疲劳状态下的简化选择",
+    }
+    # 尝试从最近决策粒子中提取推断
+    try:
+        import os, re
+        dp_path = os.path.join(os.environ.get("NEXSANDBASE_HOME", 
+            os.path.join(os.path.expanduser("~"), ".neurobase")), "decision_particles.txt")
+        if os.path.exists(dp_path):
+            with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
+                dps = [l.strip() for l in f if l.strip() and not l.startswith("#")]
+            if dps:
+                last = dps[-1]
+                for pattern, fn in templates.items():
+                    if pattern in last:
+                        return fn()
+                # 方向推断
+                if "| frugal" in last: return f"选了{choice} — 成本导向"
+                if "| spend" in last: return f"选了{choice} — 效率优先"
+    except Exception:
+        pass
     return choice
 
 
