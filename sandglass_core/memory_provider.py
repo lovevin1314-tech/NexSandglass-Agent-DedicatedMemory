@@ -692,7 +692,7 @@ class NexSandglassProvider(MemoryProvider):
                 from scene_l3 import scene_current
                 sc = scene_current()
                 if sc: guide.append(f"📍 {'·'.join(sc[:2])}")
-            except: pass
+            except Exception: pass
             if guide: blocks.append(" | ".join(guide))
             
             # ═══ 块2: 记忆预览 — 带精搜引导 ═══
@@ -708,7 +708,7 @@ class NexSandglassProvider(MemoryProvider):
                         t = text[:70].replace("\n", " ")
                         mem_lines.append(f"  {prefix} [{ts[:10]}] {t}")
                     blocks.append("📋 记忆预览:\n" + "\n".join(mem_lines) + "\n  → sandglass_search 可扩展更多")
-            except: pass
+            except Exception: pass
             
             result = "\n\n".join(blocks)
             return result[:250]  # 硬截断 335→250
@@ -770,7 +770,7 @@ class NexSandglassProvider(MemoryProvider):
             from sandglass_vault import count
             total = count()
             print(f"  沙漏记录：{total}条")
-        except: pass
+        except Exception: pass
         print(f"  重启后开始记录。\n")
 
     def shutdown(self) -> None:
