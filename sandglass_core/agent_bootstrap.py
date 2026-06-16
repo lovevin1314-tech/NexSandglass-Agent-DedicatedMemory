@@ -16,7 +16,7 @@ agent_bootstrap.py — NexSandglass 全平台自举 V2.10.47
 
 import os, sys, json
 
-VERSION = "2.10.47"
+VERSION = "2.11.1"
 
 # ═══ 平台定义 ═══
 # 每个 label 可有多个 path（备选），按优先级排列
