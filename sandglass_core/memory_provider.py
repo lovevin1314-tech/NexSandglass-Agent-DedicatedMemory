@@ -339,35 +339,28 @@ class NexSandglassProvider(MemoryProvider):
             identity_parts = []
             
             # 身份：从画像快照提取
-            try:
-                from persona_l3 import _local_persona_extract
-                local = _local_persona_extract()
-                if local and local != "数据不足":
-                    for line in local.split("\n"):
-                        if "：" in line or ":" in line:
-                            identity_parts.append(line.strip()[:60])
-            except Exception: pass
+            local = self._safe_pipe("persona_extract", lambda: __import__("persona_l3")._local_persona_extract() or "")
+            if local and local != "数据不足":
+                for line in local.split("\n"):
+                    if "：" in line or ":" in line:
+                        identity_parts.append(line.strip()[:60])
             
-            # 铁律：从 five-facets.json 注入结构化事实（importance×confidence 排序）
-            try:
+            # 铁律：PipelineHealth管道
+            def _load_facets():
                 import json
                 facets_path = os.path.join(_NB, "profile", "five-facets.json")
-                if os.path.exists(facets_path):
-                    with open(facets_path, "r", encoding="utf-8") as f:
-                        facets = json.load(f)
-                    all_entries = []
-                    for facet_name in ["fact","preference","restriction","task_pattern","style"]:
-                        for entry in facets.get(facet_name, []):
-                            imp = entry.get("importance", 0)
-                            conf = entry.get("confidence", 0)
-                            all_entries.append((imp * conf, entry["content"]))
-                    all_entries.sort(reverse=True)
-                    for _, content in all_entries[:5]:
-                        # V2.9.28: 极简注入→只取标题（"："前的部分）
-                        title = content.split("：")[0].split(":")[0].split("=")[0].strip()[:20]
-                        if title and title not in identity_parts:
-                            identity_parts.append(title)
-            except Exception: pass
+                if not os.path.exists(facets_path): return []
+                with open(facets_path, "r", encoding="utf-8") as f:
+                    facets = json.load(f)
+                entries = []
+                for fn in ["fact","preference","restriction","task_pattern","style"]:
+                    for e in facets.get(fn,[]):
+                        entries.append((e.get("importance",0)*e.get("confidence",0), e["content"]))
+                entries.sort(reverse=True)
+                return [c.split("：")[0].split(":")[0].split("=")[0].strip()[:20] for _,c in entries[:5]]
+            titles = self._safe_pipe("five_facets", _load_facets) or []
+            for t in titles:
+                if t not in identity_parts: identity_parts.append(t)
             
             # 决策：管道洞察已含偏移方向，此处不重复
             
@@ -388,11 +381,8 @@ class NexSandglassProvider(MemoryProvider):
             
             # 场景
             scene_text = ""
-            try:
-                from scene_l3 import scene_current
-                scenes = scene_current()
-                if scenes: scene_text = ", ".join(scenes[:3])
-            except Exception: pass
+            scenes = self._safe_pipe("scene", lambda: __import__("scene_l3").scene_current()) or []
+            if scenes: scene_text = ", ".join(scenes[:3])
             
             if not identity_parts:
                 identity_parts.append("身份: 待积累（使用中自动发现）")
@@ -402,13 +392,9 @@ class NexSandglassProvider(MemoryProvider):
                 blocks.append(f"📍 {scene_text}")
 
             # V2.9.9.7: 溯源异常告警
-            try:
-                from l3_persona_verify import persona_verify
-                pv = persona_verify()
-                if pv.get("failed", 0) > 0:
-                    blocks.append(f"⚠️ 画像溯源异常：{pv['failed']}条声明源行已变更")
-            except Exception:
-                pass
+            pv = self._safe_pipe("persona_verify", lambda: __import__("l3_persona_verify").persona_verify())
+            if pv and pv.get("failed", 0) > 0:
+                blocks.append(f"⚠️ 画像溯源异常：{pv['failed']}条声明源行已变更")
 
             # ═══════ 第二层：你在往哪走（极简） ═══════
             layer2 = []
