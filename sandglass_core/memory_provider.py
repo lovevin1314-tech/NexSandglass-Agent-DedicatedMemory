@@ -436,8 +436,8 @@ class NexSandglassProvider(MemoryProvider):
                 if os.path.exists(facets_path):
                     with open(facets_path, "r", encoding="utf-8") as f:
                         facets = json.load(f)
-                    # V2.10.53: 分类型注入——身份≠边界，分开显示
-                    for ftype, count in [("fact", 2), ("preference", 1), ("restriction", 2)]:
+                    # V2.10.54: fact全量注入——同分挑选导致核心身份随机丢失
+                    for ftype, count in [("fact", 99), ("preference", 1), ("restriction", 2)]:
                         scored = []
                         for entry in facets.get(ftype, []):
                             imp = entry.get("importance", 0)
