@@ -872,7 +872,14 @@ class NexSandglassProvider(MemoryProvider):
     # ═══════ 可选钩子 ═══════
 
     def on_memory_write(self, action: str, target: str, content: str, metadata: dict = None) -> None:
-        """镜像内置记忆写入——同步落沙。"""
+        """镜像内置记忆写入——过滤低价值噪声后落沙。"""
+        # 过滤内置记忆噪声
+        noise_patterns = [
+            "Self-audit:", "verify format", "not substring",
+            "MEMORY.md is", "USER.md is"
+        ]
+        if any(p.lower() in content.lower() for p in noise_patterns):
+            return  # 不落沙，防止污染
         try:
             from sandglass_log import log_message
             text = f"[{action}] {target}: {content[:200]}"
