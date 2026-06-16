@@ -195,29 +195,37 @@ class NexSandglassProvider(MemoryProvider):
             from sandglass_vault import rebuild_index
             from sandglass_paths import validate
             validate()
-            rebuild_index()
-            # V2.9.21: 回填空tags（重启时一次性执行）
-            try:
-                import sqlite3, re
-                db = sqlite3.connect(os.path.join(nb, "shadow_sand.db"))
-                rows = db.execute("SELECT rowid, line_num FROM fact_tags WHERE tags='' OR tags IS NULL").fetchall()
-                if rows:
-                    sand_path = os.path.join(nb, "sandglass.txt")
-                    if os.path.exists(sand_path):
-                        with open(sand_path, "r", encoding="utf-8", errors="replace") as sf:
-                            sand_lines = sf.readlines()
-                        ENTITY_RE = re.compile(r'(?:[A-Z][a-z]{2,}(?:[A-Z][a-z]{2,})+|[A-Z]{2,}|[A-Z][a-z]+(?:[ -][A-Z][a-z]+)*|[\u4e00-\u9fff]{2,6})')
-                        for rid, ln in rows:
-                            if 0 < ln <= len(sand_lines):
-                                text = sand_lines[ln - 1]
-                                entities = [m.group().strip() for m in ENTITY_RE.finditer(text) if len(m.group().strip()) > 1]
-                                if entities:
-                                    db.execute("UPDATE fact_tags SET tags=?, category=? WHERE rowid=?", (",".join(entities[:10]), entities[0][:30], rid))
-                        db.commit()
-                db.close()
-            except Exception: pass
+            # V2.9.37: 索引重建仅首次运行
+            idx_done = os.path.join(nb, "idx_done")
+            if not os.path.exists(idx_done):
+                rebuild_index()
+                with open(idx_done, "w") as f: f.write("1")
+            # V2.9.37: 一次性回填——完成后写标记，后续重启跳过
+            backfill_done = os.path.join(nb, "backfill_done")
+            if not os.path.exists(backfill_done):
+                try:
+                    import sqlite3, re
+                    db = sqlite3.connect(os.path.join(nb, "shadow_sand.db"))
+                    rows = db.execute("SELECT rowid, line_num FROM fact_tags WHERE tags='' OR tags IS NULL").fetchall()
+                    if rows:
+                        sand_path = os.path.join(nb, "sandglass.txt")
+                        if os.path.exists(sand_path):
+                            with open(sand_path, "r", encoding="utf-8", errors="replace") as sf:
+                                sand_lines = sf.readlines()
+                            ENTITY_RE = re.compile(r'(?:[A-Z][a-z]{2,}(?:[A-Z][a-z]{2,})+|[A-Z]{2,}|[A-Z][a-z]+(?:[ -][A-Z][a-z]+)*|[\u4e00-\u9fff]{2,6})')
+                            for rid, ln in rows:
+                                if 0 < ln <= len(sand_lines):
+                                    text = sand_lines[ln - 1]
+                                    entities = [m.group().strip() for m in ENTITY_RE.finditer(text) if len(m.group().strip()) > 1]
+                                    if entities:
+                                        db.execute("UPDATE fact_tags SET tags=?, category=? WHERE rowid=?", (",".join(entities[:10]), entities[0][:30], rid))
+                            db.commit()
+                    db.close()
+                    # 标记完成
+                    with open(backfill_done, "w") as bf: bf.write("1")
+                except Exception: pass
             self._initialized = True
-            logger.info("NexSandglass V2.9.34 就绪")
+            logger.info("NexSandglass V2.9.37 就绪")
 
     def system_prompt_block(self) -> str:
         """V2.9.8: 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完"""
