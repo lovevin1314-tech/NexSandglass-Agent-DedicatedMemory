@@ -1,10 +1,10 @@
 #!/bin/bash
-# NexSandglass V2.10.11 — macOS/Linux 安装脚本
+# NexSandglass V2.10.8 — macOS/Linux 安装脚本
 # 极简注入 · 五大支柱 · 零依赖
 set -e
 
 echo "╔══════════════════════════════════╗"
-echo "║  NexSandglass V2.10.11 安装程序    ║"
+echo "║  NexSandglass V2.10.8 安装程序    ║"
 echo "║  极简注入 · 五大支柱 · 零依赖    ║"
 echo "╚══════════════════════════════════╝"
 echo ""
@@ -53,7 +53,7 @@ echo "✅ MemoryProvider 插件已部署"
 echo "✅ Gateway 插件已部署"
 
 echo ""
-echo "✅ NexSandglass V2.10.11 安装完成！"
+echo "✅ NexSandglass V2.10.8 安装完成！"
 echo ""
 echo "📂 33模块 + MemoryProvider + Gateway插件"
 echo "🔐 明文存储 — OS层全盘加密保护（BitLocker/FileVault/LUKS）"
