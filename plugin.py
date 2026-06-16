@@ -1,17 +1,17 @@
-"""NeuroBase Sandglass Plugin — 消息落沙 + 记忆提供者。V2.10.19"""
+"""NeuroBase Sandglass Plugin — 消息落沙 + 记忆提供者。V2.10.23"""
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "sandglass_core"))
+
 import logging
 from datetime import datetime
-
 logger = logging.getLogger(__name__)
 
 def _get_sandglass_path():
-    import os
     from sandglass_paths import _NB
     return os.path.join(_NB, "sandglass.txt")
 
 def _on_message(event, **_kw) -> None:
     try:
-        import os
         sandglass_path = _get_sandglass_path()
         os.makedirs(os.path.dirname(sandglass_path), exist_ok=True)
         sender = getattr(event.source, "user_id", "") or ""
@@ -23,9 +23,6 @@ def _on_message(event, **_kw) -> None:
         logger.exception("sandglass: FAILED")
 
 def register(ctx) -> None:
-    """Hermes插件入口。Gateway钩子+MemoryProvider同时注册。"""
-    import sys, os
-    sys.path.insert(0, os.path.dirname(__file__))
     ctx.register_hook("pre_gateway_dispatch", _on_message)
     from memory_provider import NexSandglassProvider
     ctx.register_memory_provider(NexSandglassProvider())
