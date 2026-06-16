@@ -571,7 +571,6 @@ def _infer_expand(query: str) -> list:
 def _infer_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage_ctx: str, dp_ctx: str = "", decision_bias: str = "") -> list:
     """结合画像+场景+阶段+决策粒子四维上下文扩展关键词。纯本地——同义词+决策粒子标签。"""
     from l3_search_core import _synonym_expand
-    import re
     keywords = [query]
     # 1. 同义词扩展
     expanded = _synonym_expand(query)

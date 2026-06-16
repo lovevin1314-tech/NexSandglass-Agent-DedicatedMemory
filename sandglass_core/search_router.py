@@ -12,7 +12,6 @@ V2.8.6: 统一搜索入口 — search_semantic 委托 SearchRouter
 import os, mmap, re, concurrent.futures, math
 from sandglass_vault import _SANDGLASS, _parse_line
 from sandglass_paths import _NB
-import statistics
 import logging
 
 # V2.11.1: 本地 stub——避免循环导入 memory_provider
