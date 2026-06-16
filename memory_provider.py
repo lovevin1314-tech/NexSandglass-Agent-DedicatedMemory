@@ -452,17 +452,23 @@ class NexSandglassProvider(MemoryProvider):
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
 
     def prefetch(self, query: str) -> str:
-        """每轮对话前注入织布机摘要——偏移+情绪+场景。主注入已有全貌，这里只给最动态的信号。"""
+        """每轮对话前注入最动态信号——偏移+情绪+纠结度。管道洞察已入主注入，此处只补实时变化。"""
         try:
-            from sandglass_think import comprehensive_offset, _current_stage, _emotional_entropy
+            from sandglass_think import comprehensive_offset, _emotional_entropy, _synthesize_3d
             off = comprehensive_offset()
             ent = _emotional_entropy()
             mood = "平稳" if ent < 0.5 else ("波动" if ent < 1.0 else "高熵")
             dirs = {"frugal": "省钱", "spend": "愿投", "drift": "放弃"}
             off_d = dirs.get(off.get('direction',''), '平稳')
+            # 纠结度——最动态的实时信号
+            syn = _synthesize_3d(trigger="prefetch")
+            pi = syn.get("pipe_insights", "")
+            tangle = ""
+            if "纠结:" in pi:
+                tangle = pi.split("纠结:")[1].split("|")[0].strip()
             return (
-                f"## 当前\n"
-                f"偏移: {off_d}({off.get('offset',0):+d}%) | 情绪: {mood}\n"
+                f"偏移: {off_d}({off.get('offset',0):+d}%) | 情绪: {mood}"
+                + (f" | 纠结: {tangle}" if tangle else "")
             )
         except Exception:
             return ""
