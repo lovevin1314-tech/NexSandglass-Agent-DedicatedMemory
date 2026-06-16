@@ -452,30 +452,62 @@ class NexSandglassProvider(MemoryProvider):
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
 
     def prefetch(self, query: str) -> str:
-        """每轮对话前注入最动态信号——偏移+情绪+纠结度。管道洞察已入主注入，此处只补实时变化。"""
+        """V2.9.33: 三块式轮次注入 — 搜索引导+记忆候选+状态决策。10管道全接。"""
         try:
+            parts = []
+            
+            # ── 块1: 搜索引导（40-60t）──
+            search_hints = getattr(self, '_prefetch_hints', [])
+            if search_hints:
+                parts.append(f"🔍 {', '.join(search_hints[:4])}")
+            
+            # ── 块2: 记忆候选（60-100t）──
+            memories = getattr(self, '_prefetch_memories', [])
+            if memories:
+                mem_lines = []
+                for i, (score, ts, text) in enumerate(memories[:3]):
+                    prefix = "✓" if i == 0 else "·"
+                    mem_lines.append(f"  {prefix} [{ts[:10]}] {text[:80]}")
+                parts.append("📋 相关:\n" + "\n".join(mem_lines))
+            
+            # ── 块3: 状态+决策（50-90t）──
             from sandglass_think import comprehensive_offset, _emotional_entropy, _synthesize_3d
             off = comprehensive_offset()
             ent = _emotional_entropy()
             mood = "平稳" if ent < 0.5 else ("波动" if ent < 1.0 else "高熵")
             dirs = {"frugal": "省钱", "spend": "愿投", "drift": "放弃"}
             off_d = dirs.get(off.get('direction',''), '平稳')
-            # 纠结度——最动态的实时信号
             syn = _synthesize_3d(trigger="prefetch")
             pi = syn.get("pipe_insights", "")
+            # 纠结度
             tangle = ""
-            if "纠结:" in pi:
-                tangle = pi.split("纠结:")[1].split("|")[0].strip()
-            return (
-                f"偏移: {off_d}({off.get('offset',0):+d}%) | 情绪: {mood}"
-                + (f" | 纠结: {tangle}" if tangle else "")
-                + (f" | 搜: {', '.join(getattr(self, '_prefetch_hints', [])[:3])}" if getattr(self, '_prefetch_hints', []) else "")
-            )
+            if "纠结:" in pi: tangle = pi.split("纠结:")[1].split("|")[0].strip()
+            state = f"状态: {off_d}({off.get('offset',0):+d}%) | {'🎭'+mood if mood!='平稳' else '平稳'}"
+            if tangle: state += f" | 纠结:{tangle}"
+            # 场景
+            try:
+                from scene_l3 import scene_current
+                sc = scene_current()
+                if sc: state += f" | {sc[0]}"
+            except: pass
+            parts.append(state)
+            # 铁律（按相关性，最多2条）
+            try:
+                from discipline import iron_rules_with_counts
+                rules = iron_rules_with_counts(2)
+                if rules:
+                    parts.append("⚠" + " ⚠".join(r[:25] for r,_ in rules[:2]))
+            except: pass
+            # 管道洞察
+            if pi: parts.append(pi[:120])
+            
+            result = "\n".join(parts)
+            return result[:600]  # 硬截断 ~250 tokens
         except Exception:
             return ""
 
     def queue_prefetch(self, query: str) -> None:
-        """后台预热——用查询语义扩展预热搜索词。接_infer_expand_with_context管道。"""
+        """后台预热——语义扩展+预搜记忆候选。接_infer_expand+SearchRouter管道。"""
         try:
             from sandglass_think import _infer_expand_with_context, search_filter
             sf = search_filter(query)
@@ -488,10 +520,15 @@ class NexSandglassProvider(MemoryProvider):
                 ctx.get("dp_context", ""),
                 ctx.get("decision_bias", "")
             )
-            if expanded and len(expanded) > 1:
-                self._prefetch_hints = expanded[1:5]  # 扩展词给LLM搜索提示
+            self._prefetch_hints = expanded[1:5] if expanded and len(expanded) > 1 else []
+            # 块2: 预搜记忆候选
+            from search_router import SearchRouter
+            sr = SearchRouter()
+            results = sr.search(query, 3)
+            self._prefetch_memories = [(1.0 - i*0.1, r[1], r[2][:80]) for i, r in enumerate(results[:3])]
         except Exception:
             self._prefetch_hints = []
+            self._prefetch_memories = []
 
     def sync_turn(self, user_msg: str, assistant_msg: str, **kwargs) -> None:
         """每轮对话后落沙。"""
