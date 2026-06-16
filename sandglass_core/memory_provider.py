@@ -259,6 +259,8 @@ class NexSandglassProvider(MemoryProvider):
         with self._lock:
             if self._initialized:
                 return
+            # V2.10.47: 自举——自动配置 Hermes memory provider（新用户零手动）
+            self._bootstrap_hermes_config()
             # 确保 sandglass 模块可导入
             import sys
             nb = os.environ.get("NEXSANDBASE_HOME") or os.path.expanduser("~/.neurobase")
@@ -306,6 +308,77 @@ class NexSandglassProvider(MemoryProvider):
                 logger.warning(f"增量初始化跳过: {e}")
             self._initialized = True
             logger.info(f"NexSandglass V{__version__} 就绪")
+    def _bootstrap_hermes_config(self) -> None:
+        """V2.10.47: 首次初始化时自动配置 Hermes——零手动。
+        
+        检测 config.yaml 中 memory 段：
+        - provider 非 "nexsandglass" → 自动设为 "nexsandglass"
+        - memory_enabled 非 false → 自动设为 false（不设 char_limit，避免反弹）
+        
+        幂等：_bootstrapped flag 文件写入一次后跳过检查。
+        """
+        try:
+            import yaml as _yaml
+        except ImportError:
+            # 无 YAML 库 → 静默跳过（极少情况）
+            return
+        
+        try:
+            # 检查是否已自举过
+            nb = os.environ.get("NEXSANDBASE_HOME") or os.path.expanduser("~/.neurobase")
+            boot_flag = os.path.join(nb, "_bootstrapped")
+            if os.path.exists(boot_flag):
+                return
+            
+            # 找 Hermes config.yaml
+            hermes_home = os.environ.get("HERMES_HOME") or os.path.join(
+                os.environ.get("LOCALAPPDATA", os.path.expanduser("~/.local/share")),
+                "hermes"
+            )
+            config_path = os.path.join(hermes_home, "config.yaml")
+            if not os.path.exists(config_path):
+                # 尝试备选路径
+                alt = os.path.expanduser("~/.hermes/config.yaml")
+                if os.path.exists(alt):
+                    config_path = alt
+                else:
+                    return  # 找不到 config，不阻塞
+            
+            # 读配置
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = _yaml.safe_load(f) or {}
+            
+            changed = False
+            
+            # memory 段
+            if "memory" not in config:
+                config["memory"] = {}
+            mem = config["memory"]
+            
+            # provider → "nexsandglass"
+            if mem.get("provider") != "nexsandglass":
+                mem["provider"] = "nexsandglass"
+                changed = True
+            
+            # memory_enabled → false（关键：不设 char_limit=1，避免反弹）
+            if mem.get("memory_enabled") is not False:
+                mem["memory_enabled"] = False
+                changed = True
+            
+            # 写入
+            if changed:
+                with open(config_path, "w", encoding="utf-8") as f:
+                    _yaml.safe_dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                logger.info(f"NexSandglass 自举完成：config.yaml memory 段已自动配置")
+            
+            # 写 flag（无论是否 changed——避免每次初始化都读 YAML）
+            os.makedirs(os.path.dirname(boot_flag), exist_ok=True)
+            with open(boot_flag, "w") as f:
+                f.write(f"NexSandglass V2.10.47 bootstrapped at {os.path.join(hermes_home, 'config.yaml')}\n")
+        
+        except Exception as e:
+            # 绝不因自举失败阻塞初始化
+            logger.warning(f"NexSandglass 自举跳过: {e}")
 
     def _safe_pipe(self, name, fn):
         """管道健康包装——失败时LLM可见降级"""
