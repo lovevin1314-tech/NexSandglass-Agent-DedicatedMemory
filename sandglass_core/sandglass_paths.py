@@ -5,14 +5,16 @@ NexSandglass 路径配置 — 单一真相来源 V2.2
 用法: from sandglass_paths import _NB, _SCRIPTS, _PERSONA, ... 
 """
 
-import os
+import os, logging
+_logger = logging.getLogger(__name__)
 
 def _resolve_nb() -> str:
-    """V2.10.25: 多级fallback——环境变量→config.yaml→shell profile→默认。
-    修复Desktop不继承shell环境变量的问题。"""
+    """V2.10.27: 多级fallback——环境变量→config.yaml→默认。含路径诊断日志。"""
     # 1. 环境变量优先
     nb = os.environ.get("NEXSANDBASE_HOME")
-    if nb and os.path.isdir(nb): return nb
+    if nb and os.path.isdir(nb):
+        _logger.info(f"NexSandglass: 路径=环境变量 {nb}")
+        return nb
     
     # 2. Hermes config.yaml
     for cfg_path in [
@@ -24,14 +26,21 @@ def _resolve_nb() -> str:
             with open(cfg_path, encoding="utf-8") as f:
                 cfg = yaml.safe_load(f)
             nb = cfg.get("memory", {}).get("nexsandglass", {}).get("home")
-            if nb and os.path.isdir(nb): return nb
-        except: pass
+            if nb and os.path.isdir(nb):
+                _logger.info(f"NexSandglass: 路径=config.yaml {nb}")
+                return nb
+        except ImportError:
+            _logger.debug("yaml未安装,跳过config.yaml解析")
+        except Exception as e:
+            _logger.warning(f"config.yaml解析失败: {e}")
     
     # 3. 默认
-    return os.path.join(os.path.expanduser("~"), ".neurobase")
+    default = os.path.join(os.path.expanduser("~"), ".neurobase")
+    _logger.warning(f"NexSandglass: 路径=默认 {default} (检查NEXSANDBASE_HOME或config.yaml)")
+    return default
 
 _NB = _resolve_nb()
-__version__ = "2.10.25"
+__version__ = "2.10.27"
 _SCRIPTS = os.path.join(_NB, "scripts")
 _PERSONA = os.path.join(_NB, "persona")
 _ARCHIVE = os.path.join(_NB, "archive")
