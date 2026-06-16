@@ -29,7 +29,18 @@ print(search("搜索排序"))
 print(f"沙漏总量: {count()}条")
 ```
 
-**Hermes 用户：**
+**Hermes Studio / Desktop 用户（推荐）：**
+```bash
+hermes plugins install lovevin1314-tech/NexSandglass    # 首次安装
+hermes plugins update NexSandglass                       # 升级到最新
+```
+重启 Desktop → 设置 → 记忆体 → 选择 NexSandglass → 开始对话
+
+**已安装过？直接更新：**
+```bash
+hermes plugins update NexSandglass
+# 或强制重装: hermes plugins remove NexSandglass && hermes plugins install lovevin1314-tech/NexSandglass
+```
 ```bash
 hermes plugins install lovevin1314-tech/NexSandglass
 # 重启 Desktop → 设置 → 记忆体 → 选择 NexSandglass
