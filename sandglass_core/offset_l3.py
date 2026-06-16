@@ -218,7 +218,7 @@ def comprehensive_offset(scene: str = "") -> dict:
         try:
             _weave_guard = True
             weave_contradiction()
-        except: pass
+        except Exception: pass
         finally:
             _weave_guard = False
     return result
