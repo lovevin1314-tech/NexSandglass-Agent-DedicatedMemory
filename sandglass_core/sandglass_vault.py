@@ -386,7 +386,7 @@ def _mmap_search(query: str, limit: int, month: str, stage_filter: bool = False)
                 stages = stage_list()
                 if len(stages) >= 2:
                     scan_months.append(stages[-2].get("name", current))
-            except: pass
+            except Exception: pass
         with open(_SANDGLASS, "rb") as f:
             with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                 line_start = 0; line_num = 0
