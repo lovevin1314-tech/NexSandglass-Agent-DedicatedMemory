@@ -228,6 +228,10 @@ _TOOL_SCHEMAS = [
 ]
 
 
+def _pipe_warn(name, e):
+    """管道降级日志——无闭包,零作用域问题"""
+    logger.warning(f"管道 [{name}] 降级: {e}")
+
 class NexSandglassProvider(MemoryProvider):
     """NexSandglass 记忆提供器——替代 Holographic，纯本地零依赖。"""
 
@@ -271,13 +275,15 @@ class NexSandglassProvider(MemoryProvider):
             try:
                 from sandglass_vault import init_autoheal
                 init_autoheal()
-            except Exception: pass
-            # V2.10.14: 沙漏自愈——仅在initialize()时跑，不在模块导入时跑
+            except Exception as e:
+
+                _pipe_warn("pipe", e)            # V2.10.14: 沙漏自愈——仅在initialize()时跑，不在模块导入时跑
             try:
                 from sandglass_vault import _startup_autoheal
                 _startup_autoheal()
-            except Exception: pass
-            # V2.9.39: DB自省增量——用trust表MAX(line_num)替代外部checkpoint
+            except Exception as e:
+
+                _pipe_warn("pipe", e)            # V2.9.39: DB自省增量——用trust表MAX(line_num)替代外部checkpoint
             try:
                 import sqlite3
                 sand_path = os.path.join(nb, "sandglass.txt")
@@ -346,7 +352,8 @@ class NexSandglassProvider(MemoryProvider):
                     for line in local.split("\n"):
                         if "：" in line or ":" in line:
                             identity_parts.append(line.strip()[:60])
-            except Exception: pass
+            except Exception as e:
+                _pipe_warn("five_facets", e)
             
             # 铁律：从 five-facets.json 注入结构化事实（importance×confidence 排序）
             try:
@@ -367,7 +374,8 @@ class NexSandglassProvider(MemoryProvider):
                         title = content.split("：")[0].split(":")[0].split("=")[0].strip()[:20]
                         if title and title not in identity_parts:
                             identity_parts.append(title)
-            except Exception: pass
+            except Exception as e:
+                _pipe_warn("persona_extract", e)
             
             # 决策：管道洞察已含偏移方向，此处不重复
             
@@ -384,16 +392,18 @@ class NexSandglassProvider(MemoryProvider):
                 db.close()
                 top = [t for t,_ in tags.most_common(3) if _ >= 2]
                 if top: identity_parts.append(f"关注: {', '.join(top)}")
-            except Exception: pass
-            
+            except Exception as e:
+
+                _pipe_warn("pipe", e)            
             # 场景
             scene_text = ""
             try:
                 from scene_l3 import scene_current
                 scenes = scene_current()
                 if scenes: scene_text = ", ".join(scenes[:3])
-            except Exception: pass
-            
+            except Exception as e:
+
+                _pipe_warn("pipe", e)            
             if not identity_parts:
                 identity_parts.append("身份: 待积累（使用中自动发现）")
             
@@ -537,8 +547,9 @@ class NexSandglassProvider(MemoryProvider):
                 syn = _synthesize_3d(trigger="inject")
                 if syn and syn.get("pipe_insights"):
                     blocks.append(f"🔍 {syn['pipe_insights']}")
-            except Exception: pass
+            except Exception as e:
 
+                _pipe_warn("pipe", e)
             # ═══════ 尾部 ═══════
             # V2.10.19: 管道降级报告——LLM可见
             degraded = self._degraded_report()
