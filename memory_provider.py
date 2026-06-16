@@ -195,6 +195,11 @@ class NexSandglassProvider(MemoryProvider):
             if not os.path.exists(idx_done):
                 rebuild_index()
                 with open(idx_done, "w") as f: f.write("1")
+            # V2.10.14: 沙漏自愈——仅在initialize()时跑，不在模块导入时跑
+            try:
+                from sandglass_vault import _startup_autoheal
+                _startup_autoheal()
+            except Exception: pass
             # V2.9.39: DB自省增量——用trust表MAX(line_num)替代外部checkpoint
             try:
                 import sqlite3
