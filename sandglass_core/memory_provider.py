@@ -373,7 +373,7 @@ class NexSandglassProvider(MemoryProvider):
             # 写 flag（无论是否 changed——避免每次初始化都读 YAML）
             os.makedirs(os.path.dirname(boot_flag), exist_ok=True)
             with open(boot_flag, "w") as f:
-                f.write(f"NexSandglass V2.10.47 bootstrapped at {os.path.join(hermes_home, 'config.yaml')}\n")
+                f.write(f"NexSandglass V{__version__} bootstrapped at {os.path.join(hermes_home, 'config.yaml')}\n")
         
         except Exception as e:
             # 绝不因自举失败阻塞初始化
@@ -764,7 +764,7 @@ class NexSandglassProvider(MemoryProvider):
         os.environ["NEXSANDBASE_HOME"] = found
         config.setdefault("memory", {})["nexsandglass"] = {"home": found}
         config["memory"]["provider"] = "nexsandglass"
-        print(f"\n  ✓ NexSandglass V2.10.46 已激活")
+        print(f"\n  ✓ NexSandglass V{__version__} 已激活")
         print(f"  沙漏目录：{found}")
         try:
             from sandglass_vault import count
