@@ -436,20 +436,20 @@ class NexSandglassProvider(MemoryProvider):
                 if os.path.exists(facets_path):
                     with open(facets_path, "r", encoding="utf-8") as f:
                         facets = json.load(f)
-                    all_entries = []
-                    for facet_name in ["fact","preference","restriction","task_pattern","style"]:
-                        for entry in facets.get(facet_name, []):
+                    # V2.10.53: 分类型注入——身份≠边界，分开显示
+                    for ftype, count in [("fact", 2), ("preference", 1), ("restriction", 2)]:
+                        scored = []
+                        for entry in facets.get(ftype, []):
                             imp = entry.get("importance", 0)
                             conf = entry.get("confidence", 0)
-                            all_entries.append((imp * conf, entry["content"]))
-                    all_entries.sort(reverse=True)
-                    for _, content in all_entries[:5]:
-                        # V2.10.52: 扩展注入→取标题+首段内容(50字)
-                        title = content.split("：")[0].split(":")[0].split("=")[0].strip()[:30]
-                        if not title:
-                            title = content[:30]
-                        if title and title not in identity_parts:
-                            identity_parts.append(title)
+                            scored.append((imp * conf, entry["content"]))
+                        scored.sort(reverse=True)
+                        for _, content in scored[:count]:
+                            title = content.split("：")[0].split(":")[0].split("=")[0].strip()[:30]
+                            if not title:
+                                title = content[:30]
+                            if title and title not in identity_parts:
+                                identity_parts.append(title)
             except Exception as e:
                 _pipe_warn("persona_extract", e)
             
