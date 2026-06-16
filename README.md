@@ -2,7 +2,7 @@
 
 > **`pip install nexsandglass`** · 纯本地 · 零依赖 · 零 API Key
 
-[![PyPI](https://img.shields.io/badge/PyPI-2.10.8-blue)](https://pypi.org/project/nexsandglass/)
+[![PyPI](https://img.shields.io/badge/PyPI-2.10.9-blue)](https://pypi.org/project/nexsandglass/)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
@@ -114,6 +114,40 @@ python sandglass_mcp.py
 
 ## 教程
 
+### 安装
+
+```bash
+# Hermes Studio / Desktop（推荐—小白用户首选）
+hermes plugins install lovevin1314-tech/NexSandglass
+# 重启 → 设置 → 记忆体 → 选择 NexSandglass → 开始对话
+
+# 升级到最新版
+hermes plugins update NexSandglass
+
+# 开发者—任何 Python 项目
+pip install nexsandglass
+```
+
+### 实用范例
+
+```python
+from sandglass_vault import search, count, recent
+from sandglass_log import log_message
+
+# 写入记忆（自动落沙）
+log_message("今天讨论了搜索排序优化", "user")
+
+# 搜索记忆（毫秒级）
+for ln, ts, text in search("搜索排序", limit=3):
+    print(f"[{ts}] {text[:80]}")
+
+# 最近记忆
+for ln, ts, text in recent(5):
+    print(f"[{ts}] {text[:60]}")
+
+print(f"沙漏总量: {count()}条")
+```
+
 ### Agent 子代理隔离
 
 用 `NEXSANDBASE_HOME` 给不同 Agent 分配独立沙漏，记忆不串：
@@ -121,35 +155,23 @@ python sandglass_mcp.py
 ```bash
 # Claude Code 专用
 NEXSANDBASE_HOME=~/.neurobase-claude python sandglass_mcp.py
-
 # Codex 专用
 NEXSANDBASE_HOME=~/.neurobase-codex python sandglass_mcp.py
-
 # 主 Agent
 export NEXSANDBASE_HOME=~/.neurobase
-```
-
-```python
-from sandglass_vault import search, count
-from sandglass_log import log_message
-
-log_message("今天讨论了搜索排序优化", "user")
-print(search("搜索排序"))
-print(f"沙漏总量: {count()}条")
 ```
 
 ### 一键搬家
 
 ```bash
-# 打包全部记忆
 python -c "from sandglass_think import memory_migrate; print(memory_migrate())"
-# 解压到新电脑即刻恢复
+# 解压 tar.gz 到新电脑即刻恢复全部记忆
 ```
 
 ### 从 Hermes 迁移
 
 ```bash
-python hermes_to_sandglass.py  # 一行命令导入 Hermes 记忆
+python hermes_to_sandglass.py  # 一行命令导入 Hermes 历史记忆
 ```
 
 ## 版本历程
