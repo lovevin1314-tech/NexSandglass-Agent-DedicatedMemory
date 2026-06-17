@@ -332,17 +332,33 @@ def _pipe_build(first_line: int, last_line: int, total: int) -> str:
 
 
 def _sync_five_facets(first_line: int = 0, last_line: int = 0, total: int = 0):
-    """V2.9.24: 管道自动生成 five-facets.json — 用户零操作。
-    从 persona.md + iron_rules.txt + offset + fact_tags 聚合。
-    """
+    """V2.9.24+: 管道自动生成 five-facets.json — 合并模式，保留手动条目。
+    从 persona.md + iron_rules.txt + offset + fact_tags 聚合，
+    与现有数据合并，不覆盖 source!='pipe' 的手动条目。"""
     import json
     ff_path = os.path.join(_NB, "profile", "five-facets.json")
     now = datetime.now().strftime("%Y-%m-%d")
-    
-    ff = {"_schema": "five-facet-profile-v1", "_updated": now, "_source": "pipe-auto"}
-    
-    # fact: 从 persona.md 提取
-    ff["fact"] = []
+
+    # Load existing data (merge mode — don't lose manual entries)
+    existing = {"fact": [], "preference": [], "restriction": []}
+    if os.path.exists(ff_path):
+        try:
+            with open(ff_path, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception:
+            pass
+
+    ff = {
+        "_schema": "five-facet-profile-v1",
+        "_updated": now,
+        "_source": "pipe-auto+manual",
+        "fact": [],
+        "preference": [],
+        "restriction": [],
+    }
+
+    # fact: 从 persona.md 提取 — 合并到现有非pipe条目
+    pipe_facts = []
     if os.path.exists(_PERSONA):
         with open(_PERSONA, "r", encoding="utf-8", errors="replace") as f:
             persona_text = f.read()
@@ -350,20 +366,48 @@ def _sync_five_facets(first_line: int = 0, last_line: int = 0, total: int = 0):
             line = line.strip()
             if line.startswith("- **") and "：" in line:
                 key, val = line.replace("- **", "").split("：", 1)
-                ff["fact"].append({"title": key.strip(), "content": val.strip()[:80],
-                                   "importance": 0.8, "confidence": 0.9, "source": "pipe", "updated": now})
-    
-    # restriction: 从 iron_rules.txt
-    ff["restriction"] = []
+                pipe_facts.append({
+                    "title": key.strip(), "content": val.strip()[:120],
+                    "importance": 0.8, "confidence": 0.9, "source": "pipe", "updated": now
+                })
+
+    # Merge: keep manual facts, add new pipe facts (dedup by title)
+    seen_titles = set()
+    for item in existing.get("fact", []):
+        if item.get("source") != "pipe":  # Preserve manual entries
+            ff["fact"].append(item)
+            seen_titles.add(item.get("title", ""))
+    for item in pipe_facts:
+        if item["title"] not in seen_titles:
+            ff["fact"].append(item)
+            seen_titles.add(item["title"])
+
+    # preference: 完全保留现有数据（pipe不自动生成preference）
+    ff["preference"] = existing.get("preference", [])
+
+    # restriction: 从 iron_rules.txt — 合并到现有
+    pipe_restrictions = []
     ir_path = os.path.join(_NB, "iron_rules.txt")
     if os.path.exists(ir_path):
         with open(ir_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                if line:
-                    ff["restriction"].append({"title": line[:30], "content": line,
-                                              "importance": 1.0, "confidence": 1.0, "source": "iron_rules", "updated": now})
-    
+                if line and not line.startswith("#"):
+                    pipe_restrictions.append({
+                        "title": line[:30], "content": line,
+                        "importance": 1.0, "confidence": 1.0, "source": "iron_rules", "updated": now
+                    })
+
+    seen_titles = set()
+    for item in existing.get("restriction", []):
+        if item.get("source") != "pipe":
+            ff["restriction"].append(item)
+            seen_titles.add(item.get("title", ""))
+    for item in pipe_restrictions:
+        if item["title"] not in seen_titles:
+            ff["restriction"].append(item)
+            seen_titles.add(item["title"])
+
     try:
         os.makedirs(os.path.dirname(ff_path), exist_ok=True)
         with open(ff_path, "w", encoding="utf-8") as f:
