@@ -328,12 +328,13 @@ def _sync_five_facets(first_line: int = 0, last_line: int = 0, total: int = 0):
     - source != 'pipe' 的手工条目永久保留（human 优先于 auto）
     - pipe 条目按 title 去重后追加
     - preference 全保留（pipe 不生成）
-    设计原案: PR #33 by delphi1979 (2026-06-17) — 本版按 V3.1.4 代码基重写并采纳。
+    设计原案: PR #33 by delphi1979 (2026-06-17) — 原始实现即本函数首次落地，本版按 V3.1.4 代码基重写采纳。
     """
     import json
     ff_path = os.path.join(_NB, "profile", "five-facets.json")
     now = datetime.now().strftime("%Y-%m-%d")
 
+    # Load existing data (merge mode — don't lose manual entries)  # 原案: delphi1979
     # 加载现有数据（合并模式——不丢手工条目）
     existing: dict = {}
     if os.path.exists(ff_path):
@@ -380,12 +381,18 @@ def _sync_five_facets(first_line: int = 0, last_line: int = 0, total: int = 0):
         with open(ir_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                if line:
+                if line and not line.startswith("#"):  # delphi1979/#33: 跳过注释行
                     pipe_restrictions.append({"title": line[:30], "content": line,
                                               "importance": 1.0, "confidence": 1.0, "source": "iron_rules", "updated": now})
     manual_restrictions = [i for i in existing.get("restriction", []) if isinstance(i, dict) and i.get("source") not in ("iron_rules", "pipe")]
     seen_rt: set = {i.get("content", "") for i in pipe_restrictions}
-    ff["restriction"] = manual_restrictions + [i for i in pipe_restrictions if i["content"] not in seen_rt or True]
+    # restriction 去重: 按 content 去重（delphi1979/#33 按 title 去重的思想）
+    seen_rt2: set = set()
+    ff["restriction"] = []
+    for item in manual_restrictions + pipe_restrictions:
+        if item["content"] not in seen_rt2:
+            ff["restriction"].append(item)
+            seen_rt2.add(item["content"])
 
     try:
         os.makedirs(os.path.dirname(ff_path), exist_ok=True)
