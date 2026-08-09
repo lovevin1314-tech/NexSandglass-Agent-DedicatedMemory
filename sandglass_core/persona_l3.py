@@ -6,6 +6,9 @@ from sandglass_vault import _tokenize
 from sandglass_vault import recent as sv_recent, search as sv_search, count as sv_count
 from sandglass_paths import _NB
 
+def _pipe_warn(name, e):
+    logging.getLogger(__name__).warning(f"管道 [{name}] 降级: {e}")
+
 _VAULT = _NB
 _PERSONA_DIR = os.path.join(_VAULT, "persona")
 _PERSONA = os.path.join(_PERSONA_DIR, "persona.md")
