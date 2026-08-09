@@ -293,9 +293,8 @@ class NexSandglassProvider(MemoryProvider):
                 sand_path = os.path.join(nb, "sandglass.txt")
                 if os.path.exists(sand_path):
                     current_lines = sum(1 for _ in open(sand_path, encoding="utf-8", errors="replace"))
-                    db = sqlite3.connect(os.path.join(nb, "shadow_sand.db"), check_same_thread=False)
-                    max_trust = db.execute("SELECT COALESCE(MAX(line_num), 0) FROM trust").fetchone()[0]
-                    db.close()
+                    from shadow_sand import shadow_max_trust
+                    max_trust = shadow_max_trust()
                     if current_lines > max_trust:
                         from shadow_sand import shadow_index
                         with open(sand_path, encoding="utf-8", errors="replace") as f:
@@ -458,13 +457,11 @@ class NexSandglassProvider(MemoryProvider):
             # 关注：从fact_tags高频标签
             try:
                 from collections import Counter
-                db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
+                from shadow_sand import shadow_top_tags
                 tags = Counter()
-                for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
-                    for t in r[0].split(","):
-                        t = t.strip()
-                        if t and len(t) > 1: tags[t] += 1
-                db.close()
+                for t in shadow_top_tags(limit=2000):
+                    t = t.strip()
+                    if t and len(t) > 1: tags[t] += 1
                 top = [t for t,_ in tags.most_common(3) if _ >= 2]
                 if top: identity_parts.append(f"关注: {', '.join(top)}")
             except Exception as e:
@@ -472,14 +469,8 @@ class NexSandglassProvider(MemoryProvider):
                 _pipe_warn("pipe", e)
             # V2.10.52: 实体注入——影子沙entities表接system_prompt
             try:
-                db2 = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
-                ent_rows = db2.execute("""
-                    SELECT name, line_nums FROM entities 
-                    WHERE length(name) >= 2 
-                    ORDER BY length(line_nums) - length(replace(line_nums,',','')) DESC 
-                    LIMIT 5
-                """).fetchall()
-                db2.close()
+                from shadow_sand import shadow_top_entities
+                ent_rows = shadow_top_entities(limit=5)
                 if ent_rows:
                     ents = [e[0] for e in ent_rows if len(e[0]) >= 2 and not e[0].startswith(('什么','怎么','这个','那个')) and ' ' not in e[0] and len(e[0]) <= 8]
                     if ents:
