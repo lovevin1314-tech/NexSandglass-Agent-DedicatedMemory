@@ -559,7 +559,10 @@ def search_semantic(query: str, limit: int = 10) -> list:
         density = sand_density(text, query_tokens)
         enriched.append((ln, ts, text, f"sand:{density:.2f}"))
 
-    return sentiment_rerank(enriched, _sentiment_wind())
+    reranked = sentiment_rerank(enriched, _sentiment_wind())
+    # 还原为3元组——调用方(memory_provider/tool层)按 (ln, ts, text) 解包，
+    # sand: 密度标签曾导致 "too many values to unpack (expected 3)"
+    return [(ln, ts, text) for ln, ts, text, _sand in reranked]
 
 def _infer_expand(query: str) -> list:
     """语义扩展——同义词词典 + TF-IDF 动态扩展。纯本地。"""

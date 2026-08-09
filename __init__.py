@@ -188,7 +188,9 @@ class NexSandglassProvider(MemoryProvider):
             # 确保 sandglass 模块可导入
             import sys
             _NB_DATA = os.environ.get("NEXSANDBASE_HOME") or os.path.expanduser("~/.neurobase")
-            _NB_SCRIPTS = os.path.join(os.path.expanduser("~/.neurobase"), "scripts")
+            # 优先加载插件自带 sandglass_core（git 仓库，最新代码）——
+            # 旧代码曾硬编码 ~/.neurobase/scripts 副本导致修复不生效
+            _NB_SCRIPTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sandglass_core")
             if _NB_SCRIPTS not in sys.path:
                 sys.path.insert(0, _NB_SCRIPTS)
 
