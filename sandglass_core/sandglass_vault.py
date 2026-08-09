@@ -281,35 +281,43 @@ def _sync_index() -> dict:
 
 def search(query: str, limit: int = 10, month: str = "") -> list:
     """搜索沙漏。返回 [(行号, 时间, 明文), ...]。
-    委托给 SearchRouter 三层架构——影子沙→投石问路→mmap。"""
+    V3: 涟漪感知。按设计定稿：调用方先分词，感知 search(word) 查单 token。带异常兜底。"""
     try:
-        from search_router import SearchRouter, ShadowSearch, Fts5Search, IdxSearch, TfidfSearch, MmapFallback
-        router = SearchRouter(
-            ShadowSearch(_SANDGLASS),
-            Fts5Search(),
-            IdxSearch(_SANDGLASS, _IDX),
-            TfidfSearch(),
-            MmapFallback(_SANDGLASS)
-        )
-        return router.search(query, limit)
+        import sys, os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "v3"))
+        from perception_neuron import search as perc_search, _tokenize
+        # V3 设计定稿：感知 search(word) 接收单 token，多字查询由调用方分词后取并集
+        tokens = _tokenize(query)
+        if not tokens:
+            return []
+        line_nums = set()
+        for t in tokens:
+            line_nums.update(perc_search(t))
+        if not line_nums:
+            return []
+        results = []
+        with open(_SANDGLASS, encoding="utf-8") as f:
+            lines = f.readlines()
+        for ln in sorted(line_nums):
+            if ln > len(lines):
+                continue
+            parts = lines[ln-1].rstrip("\n").split(" | ", 2)
+            if len(parts) >= 3:
+                results.append((ln, parts[0], parts[2]))
+            else:
+                results.append((ln, parts[0], lines[ln-1].rstrip("\n")))
+            if len(results) >= limit:
+                break
+        return results
     except Exception:
-        return _legacy_search(query, limit, month)
-
-
-def _legacy_search(query, limit, month):
-    """Fallback: mmap全量扫描 → FTS5精排。只在SearchRouter不可用时触发。"""
-    try:
-        mmap_results = _mmap_search(query, 500, month)
-        if mmap_results:
-            from sandglass_sqlite import search_in, sync_incremental
-            sync_incremental()
-            line_nums = [r[0] for r in mmap_results[:500]]
-            ranked = search_in(line_nums, query)
-            if ranked:
-                return [(r[0], r[1], r[2]) for r in ranked[:limit]]
-        return [(r[0], r[1], r[2]) for r in mmap_results[:limit]]
-    except Exception:
-        logger.warning("sandglass: search(%r) failed", query, exc_info=True)
+        # 感知链路失败 → 降级到投石问路索引（恢复基准版的 fallback 能力）
+        try:
+            from sandglass_vault import idx_search
+            idx = idx_search(query, limit)
+            if idx:
+                return idx
+        except Exception:
+            pass
         return []
 
 
@@ -464,10 +472,12 @@ def sandglass_import(source_path: str, source_format: str = "sandglass") -> dict
         else:
             return {"error": f"不支持格式: {source_format}"}
         
-        # 导入后重建索引
+        # 导入后重建索引 (V3: 涟漪感知)
         try:
-            from sandglass_sqlite import sync_incremental
-            sync_incremental()
+            import sys, os as _os
+            sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), "..", "v3"))
+            from perception_neuron import sense as perc_sense
+            perc_sense()
         except Exception:
             pass
 
@@ -699,31 +709,28 @@ def repair_sandglass(dry_run: bool = False) -> dict:
         f.writelines(repaired)
     os.replace(tmp, path)
     
-    # 重建所有索引
+    # 重建所有索引 (V3: 涟漪感知)
     try:
-        rebuild_index()
+        import sys, os as _os
+        sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), "..", "v3"))
+        from perception_neuron import sense as perc_sense
+        perc_sense()
     except Exception:
         pass
     try:
-        from sandglass_sqlite import sync_full
-        sync_full()
+        from cognition_neuron import sense as cog_sense
+        cog_sense()
     except Exception:
-        try:
-            from sandglass_sqlite import sync_incremental
-            sync_incremental()
-        except Exception:
-            pass
-    # V2.10.16: 先备份再清空——防止rebuild失败后数据丢失
+        pass
+    # V3: 清涟漪索引缓存
     try:
-        from shadow_sand import _get_conn
-        db = _get_conn()
-        import shutil
-        shadow_bak = _SHADOW_DB + ".pre_repair_bak"
-        shutil.copy2(_SHADOW_DB, shadow_bak)
-        db.execute("DELETE FROM trust")
-        db.execute("DELETE FROM entities")
-        db.execute("DELETE FROM fact_tags")
-        db.commit()
+        import sqlite3 as _sql
+        for _dbf in ["perception.db", "cognition.db"]:
+            _dbp = os.path.join(_NB, _dbf)
+            if os.path.exists(_dbp):
+                _sql.connect(_dbp).execute("DELETE FROM idx")
+                _sql.connect(_dbp).execute("DELETE FROM facts")
+                _sql.connect(_dbp).execute("DELETE FROM triples")
     except Exception:
         pass
     
