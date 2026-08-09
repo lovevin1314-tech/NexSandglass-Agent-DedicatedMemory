@@ -9,7 +9,7 @@ import statistics
 import time
 import urllib.request
 
-# V2.11.1: 本地 stub——避免循环导入 memory_provider
+# V2.20.1: 本地 stub——避免循环导入 memory_provider
 def _pipe_warn(name, e):
     logging.getLogger(__name__).warning(f"管道 [{name}] 降级: {e}")
 import urllib.error

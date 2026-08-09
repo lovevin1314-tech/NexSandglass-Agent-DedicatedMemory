@@ -14,7 +14,7 @@ from sandglass_vault import _SANDGLASS, _parse_line
 from sandglass_paths import _NB
 import logging
 
-# V2.11.1: 本地 stub——避免循环导入 memory_provider
+# V2.20.1: 本地 stub——避免循环导入 memory_provider
 def _pipe_warn(name, e):
     logging.getLogger(__name__).warning(f"管道 [{name}] 降级: {e}")
 from l3_search_core import simhash as _l3_simhash
