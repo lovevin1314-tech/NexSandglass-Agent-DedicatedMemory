@@ -15,8 +15,10 @@ _SHADOW_DB = os.path.join(_NB, "shadow_sand.db")
 
 def set_shadow_path(path: str):
     """重定向影子沙路径——基准测试用。"""
-    global _SHADOW_DB, _conn
+    global _SHADOW_DB, _conn, _conn_inode
     _SHADOW_DB = path
+    # 路径变了必须废弃旧连接，否则仍指向旧库
+    _close_conn()
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS trust (
@@ -52,10 +54,33 @@ _ENTITY_RE = re.compile(
 )
 
 _conn = None
+_conn_inode = None  # 连接建立时 shadow_sand.db 的 inode——文件被替换后靠它检测
 _conn_lock = threading.Lock()
 
+def _close_conn():
+    """废弃当前连接（文件被替换/路径重定向时调用）。"""
+    global _conn, _conn_inode
+    c, _conn = _conn, None
+    _conn_inode = None
+    if c is not None:
+        try:
+            c.close()
+        except Exception:
+            pass
+
+def _db_inode() -> int:
+    """当前磁盘上 shadow_sand.db 的 inode；文件不存在返回 0。"""
+    try:
+        return os.stat(_SHADOW_DB).st_ino
+    except OSError:
+        return 0
+
 def _get_conn():
-    global _conn
+    global _conn, _conn_inode
+    cur = _db_inode()
+    if _conn is not None and _conn_inode is not None and cur != _conn_inode:
+        # 磁盘文件已被替换/重建（inode 变了）→ 旧连接指向已删除的文件，必须重连
+        _close_conn()
     if _conn is None:
         with _conn_lock:
             if _conn is None:
@@ -63,6 +88,7 @@ def _get_conn():
                 _conn.execute("PRAGMA journal_mode=WAL")
                 _conn.executescript(_SCHEMA)
                 _conn.commit()
+                _conn_inode = _db_inode()
     return _conn
 
 def _maybe_commit():
@@ -109,6 +135,47 @@ def shadow_search(query: str, limit: int = 10) -> list:
         return scored[:limit]
 
     return []
+
+
+def shadow_max_trust() -> int:
+    """trust 表最大行号——增量初始化断点。"""
+    try:
+        row = _get_conn().execute("SELECT COALESCE(MAX(line_num), 0) FROM trust").fetchone()
+        return int(row[0]) if row else 0
+    except Exception:
+        return 0
+
+
+def shadow_top_tags(limit: int = 2000) -> list:
+    """fact_tags 全部非空标签——由调用方做 Counter 聚合。"""
+    try:
+        rows = _get_conn().execute(
+            "SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类' LIMIT ?",
+            (limit,)
+        ).fetchall()
+        out = []
+        for r in rows:
+            for t in r[0].split(","):
+                t = t.strip()
+                if t:
+                    out.append(t)
+        return out
+    except Exception:
+        return []
+
+
+def shadow_top_entities(limit: int = 5) -> list:
+    """按关联行数降序取实体——system_prompt 实体注入用。"""
+    try:
+        return _get_conn().execute(
+            "SELECT name, line_nums FROM entities "
+            "WHERE length(name) >= 2 "
+            "ORDER BY length(line_nums) - length(replace(line_nums,',','')) DESC "
+            "LIMIT ?",
+            (limit,)
+        ).fetchall()
+    except Exception:
+        return []
 
 
 def shadow_boost(candidate_lines: set, limit: int = 10) -> list:
