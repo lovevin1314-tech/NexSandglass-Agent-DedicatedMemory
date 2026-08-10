@@ -219,7 +219,11 @@ class NexSandglassProvider(MemoryProvider):
                 db.close()
             except Exception: pass
             self._initialized = True
-            logger.info("NexSandglass V2.9.34 就绪")
+            try:
+                from sandglass_paths import __version__ as _ver
+            except Exception:
+                _ver = "2.20.1"
+            logger.info(f"NexSandglass V{_ver} 就绪")
 
     def system_prompt_block(self) -> str:
         """V2.9.8: 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完"""

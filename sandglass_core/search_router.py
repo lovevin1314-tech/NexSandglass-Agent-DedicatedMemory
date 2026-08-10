@@ -249,16 +249,44 @@ class MmapFallback:
             return []
 
 
+class ArchiveSearch:
+    """冷沙搜索（第六路）——接 sandglass_archive.search_archive 已有管道（播种不提取）。
+    触发：热沙结果不足，或查询含时间线索（去年/6月/2026-06 等指向已归档月份）。
+    冷沙行号是文件内行号，多文件冲突 → 标识/去重用 ts（全局唯一），行号加偏移防与热沙撞号。"""
+
+    def search(self, query: str, limit: int = 30) -> list:
+        try:
+            from sandglass_archive import search_archive
+            tokens = _query_tokens(query)
+            if not tokens:
+                return []
+            hits = {}  # ts -> [text, hit_count]
+            for tok in list(tokens)[:5]:
+                for ln, ts, text in search_archive(tok, max(limit * 4, 40)):
+                    if not ts:
+                        continue
+                    if ts not in hits:
+                        hits[ts] = [text, 0]
+                    hits[ts][1] += 1
+            scored = sorted(hits.items(), key=lambda kv: kv[1][1], reverse=True)
+            return [(1_000_000 + i, ts, text)
+                    for i, (ts, (text, _)) in enumerate(scored[:limit])]
+        except Exception:
+            return []
+
+
 class SearchRouter:
     """搜索路由器——四路并发 + 沙子密度融合(density×trust+simhash) + 动态扩窗 + mmap兜底。
     V2.8.6: 统一为唯一搜索入口。
+    V2.20.1+: 第六路 ArchiveSearch 冷沙兜底（热沙不足/时间线索时触发）。
     """
-    def __init__(self, shadow=None, fts5=None, idx=None, tfidf=None, mmap_fb=None):
+    def __init__(self, shadow=None, fts5=None, idx=None, tfidf=None, mmap_fb=None, archive=None):
         self.shadow = shadow or ShadowSearch()
         self.fts5 = fts5 or Fts5Search()
         self.idx = idx or IdxSearch()
         self.tfidf = tfidf or TfidfSearch()
         self.mmapfallback = mmap_fb or MmapFallback()
+        self.archive = archive or ArchiveSearch()
 
     def search(self, query: str, limit: int = 30) -> list:
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
@@ -266,10 +294,12 @@ class SearchRouter:
             fut_fts5 = ex.submit(self.fts5.search, query, max(limit * 2, 30))
             fut_idx = ex.submit(self.idx.search, query, max(limit * 2, 30))
             fut_tfidf = ex.submit(self.tfidf.search, query, max(limit * 2, 30))
+            fut_archive = ex.submit(self.archive.search, query, max(limit * 2, 30))  # 第六路：冷沙
         shadow_hits = fut_shadow.result() or []
         fts5_hits = fut_fts5.result() or []
         idx_hits = fut_idx.result() or []
         tfidf_hits = fut_tfidf.result() or []
+        archive_hits = fut_archive.result() or []
         if shadow_hits:
             try:
                 from shadow_sand import shadow_retrieval_bump
@@ -277,7 +307,7 @@ class SearchRouter:
             except: pass
         all_candidates = []
         seen = set()
-        for hits in [fts5_hits, idx_hits, tfidf_hits]:
+        for hits in [fts5_hits, idx_hits, tfidf_hits, archive_hits]:
             for item in hits:
                 ln = item[0]
                 if ln not in seen:
