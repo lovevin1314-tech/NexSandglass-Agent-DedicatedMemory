@@ -16,7 +16,7 @@ agent_bootstrap.py — NexSandglass 全平台自举 V2.10.47
 
 import os, sys, json
 
-VERSION = "2.20.1"
+VERSION = "2.20.5"
 
 # ═══ 平台定义 ═══
 # 每个 label 可有多个 path（备选），按优先级排列
@@ -132,7 +132,9 @@ def _pick_path(paths: list) -> dict:
 def bootstrap_all(nb: str = None) -> dict:
     """全平台自举。返回 {label: status}"""
     if nb is None:
-        nb = os.environ.get("NEXSANDBASE_HOME") or os.path.expanduser("~/.neurobase")
+        # V2.20.2: 统一路径解析——复用 sandglass_paths.get_nb() 单一真相来源
+        from sandglass_paths import get_nb
+        nb = get_nb()
 
     sandglass_mcp_path = _get_sandglass_mcp_path(nb)
     if not os.path.exists(sandglass_mcp_path):
@@ -178,7 +180,9 @@ def bootstrap_all(nb: str = None) -> dict:
 
 # ═══ CLI ═══
 if __name__ == "__main__":
-    nb = os.environ.get("NEXSANDBASE_HOME") or os.path.expanduser("~/.neurobase")
+    # V2.20.2: 统一路径解析——复用 sandglass_paths.get_nb() 单一真相来源
+    from sandglass_paths import get_nb
+    nb = get_nb()
     print(f"NexSandglass V{VERSION} — 全平台 MCP 自举")
     print(f"沙漏: {nb}\n")
 

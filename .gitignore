@@ -20,3 +20,8 @@ decision_particles.txt
 echo_wind.jsonl
 *.env
 *.key
+
+# 构建与打包产物
+build/
+dist/
+*.egg-info/

@@ -1,5 +1,5 @@
 """
-NexSandglass V2.20.1 — 感知深度
+NexSandglass V2.20.5 — 感知深度
 =================================
 识别 → 觉察(含情绪感知) → 提醒
 三层独立函数 + pulse() 编排。
@@ -175,7 +175,7 @@ def _layer3_remind(signals: list):
 # ══════════════════════════════════════════════════════════
 
 def pulse(user_message: str = "") -> str:
-    """三层感知编排。自动中英切换。V2.20.1: 三层独立函数。"""
+    """三层感知编排。自动中英切换。V2.20.4: 三层独立函数。"""
 
     signals = []
     is_cn = any('\u4e00' <= c <= '\u9fff' for c in user_message) if user_message else True

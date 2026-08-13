@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json, logging, os, re, sqlite3, threading, time
 from typing import Any, Dict, List, Optional
-from sandglass_paths import _NB
+from sandglass_paths import _NB, get_nb
 
 # 纯本地MemoryProvider——不导入Hermes核心模块避免死锁
 # Hermes通过register()函数发现插件,不检查继承关系
@@ -263,7 +263,8 @@ class NexSandglassProvider(MemoryProvider):
             self._bootstrap_hermes_config()
             # 确保 sandglass 模块可导入
             import sys
-            nb = os.environ.get("NEXSANDBASE_HOME") or os.path.expanduser("~/.neurobase")
+            # V2.20.2: 统一路径解析——复用 sandglass_paths.get_nb() 单一真相来源
+            nb = get_nb()
             nb_scripts = os.path.join(nb, "scripts")
             if nb_scripts not in sys.path:
                 sys.path.insert(0, nb_scripts)
@@ -323,7 +324,8 @@ class NexSandglassProvider(MemoryProvider):
         
         try:
             # 检查是否已自举过
-            nb = os.environ.get("NEXSANDBASE_HOME") or os.path.expanduser("~/.neurobase")
+            # V2.20.2: 统一路径解析——复用 sandglass_paths.get_nb() 单一真相来源
+            nb = get_nb()
             boot_flag = os.path.join(nb, "_bootstrapped")
             if os.path.exists(boot_flag):
                 return
@@ -455,6 +457,8 @@ class NexSandglassProvider(MemoryProvider):
             # 决策：管道洞察已含偏移方向，此处不重复
             
             # 关注：从fact_tags高频标签
+            # V2.20.4: 与 __init__.py 同口径——统一走 shadow_top_tags()
+            # （行号门控 + 三道闸 + 内容特征过滤）
             try:
                 from collections import Counter
                 from shadow_sand import shadow_top_tags
@@ -669,8 +673,9 @@ class NexSandglassProvider(MemoryProvider):
             logger.warning("system_prompt_block 整体失败", exc_info=True)
             return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
 
-    def prefetch(self, query: str) -> str:
-        """V2.10.55: 极简轮次注入 — 搜索引导+记忆预览。去重system_prompt_block已覆盖内容。"""
+    def prefetch(self, query: str, **kwargs) -> str:
+        """V2.10.55: 极简轮次注入 — 搜索引导+记忆预览。去重system_prompt_block已覆盖内容。
+        V2.20.5: 签名兼容 Hermes — 接受 session_id 等关键字参数。"""
         try:
             blocks = []
             hints = getattr(self, '_prefetch_hints', [])
@@ -706,8 +711,9 @@ class NexSandglassProvider(MemoryProvider):
         except Exception:
             return ""
 
-    def queue_prefetch(self, query: str) -> None:
-        """后台预热——语义扩展+标签提取。激励LLM主动调sandglass_search。"""
+    def queue_prefetch(self, query: str, **kwargs) -> None:
+        """后台预热——语义扩展+标签提取。激励LLM主动调sandglass_search。
+        V2.20.5: 签名兼容 Hermes — 接受 session_id 等关键字参数。"""
         try:
             from sandglass_think import _infer_expand_with_context, search_filter
             sf = search_filter(query)
@@ -725,13 +731,48 @@ class NexSandglassProvider(MemoryProvider):
             self._prefetch_hints = []
 
     def sync_turn(self, user_msg: str, assistant_msg: str, **kwargs) -> None:
-        """每轮对话后落沙。"""
+        """每轮对话后落沙。V2.20.5: 同时消费 Hermes 传入的 messages 历史消息。"""
         try:
             from sandglass_log import log_message
+
+            logged_texts = set()
+
+            def _log_once(text, sender):
+                # 与当前 user_msg/assistant_msg 及历史消息列表去重，避免重复落沙
+                normalized = str(text or "").strip()
+                if not normalized or normalized in logged_texts:
+                    return
+                logged_texts.add(normalized)
+                log_message(text, sender)
+
             if user_msg:
-                log_message(user_msg, "user")
+                _log_once(user_msg, "user")
             if assistant_msg:
-                log_message(assistant_msg, "agent")
+                _log_once(assistant_msg, "agent")
+
+            # Hermes 契约兼容：若传入 messages 列表，则把其中的 user/assistant
+            # 角色消息也落沙；结构不明时打印结构并保守忽略。
+            messages = kwargs.get("messages")
+            if isinstance(messages, list):
+                for item in messages:
+                    if not isinstance(item, dict):
+                        print(f"[sync_turn] unknown message item structure: {type(item).__name__}: {item!r}")
+                        continue
+                    role = item.get("role")
+                    content = item.get("content")
+                    if role in ("user", "human"):
+                        sender = "user"
+                    elif role in ("assistant", "ai", "agent"):
+                        sender = "agent"
+                    else:
+                        continue
+                    if isinstance(content, str):
+                        _log_once(content, sender)
+                    else:
+                        print(f"[sync_turn] unknown content structure for role={role!r}: {type(content).__name__}: {content!r}")
+            elif messages is not None:
+                print(f"[sync_turn] unknown messages structure: {type(messages).__name__}: {messages!r}")
+
             self._turn_count += 1
         except Exception:
             pass

@@ -14,7 +14,7 @@ from sandglass_vault import _SANDGLASS, _parse_line
 from sandglass_paths import _NB
 import logging
 
-# V2.20.1: 本地 stub——避免循环导入 memory_provider
+# V2.20.3: 本地 stub——避免循环导入 memory_provider
 def _pipe_warn(name, e):
     logging.getLogger(__name__).warning(f"管道 [{name}] 降级: {e}")
 from l3_search_core import simhash as _l3_simhash
@@ -278,7 +278,7 @@ class ArchiveSearch:
 class SearchRouter:
     """搜索路由器——四路并发 + 沙子密度融合(density×trust+simhash) + 动态扩窗 + mmap兜底。
     V2.8.6: 统一为唯一搜索入口。
-    V2.20.1+: 第六路 ArchiveSearch 冷沙兜底（热沙不足/时间线索时触发）。
+    V2.20.3+: 第六路 ArchiveSearch 冷沙兜底（热沙不足/时间线索时触发）。
     """
     def __init__(self, shadow=None, fts5=None, idx=None, tfidf=None, mmap_fb=None, archive=None):
         self.shadow = shadow or ShadowSearch()

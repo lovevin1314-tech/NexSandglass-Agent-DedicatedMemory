@@ -1,4 +1,4 @@
-"""NexSandglass v3 路径配置 — 与 sandglass_core 保持一致（V2.20.1）"""
+"""NexSandglass v3 路径配置 — 与 sandglass_core 保持一致（V2.20.5）"""
 import os, logging
 _logger = logging.getLogger(__name__)
 
@@ -11,7 +11,7 @@ def _resolve_nb() -> str:
     return cfg
 
 _NB = _resolve_nb()
-__version__ = "2.20.1"
+__version__ = "2.20.5"
 
 _REQUIRED_DIRS = [_NB, os.path.join(_NB, "persona"), os.path.join(_NB, "archive")]
 

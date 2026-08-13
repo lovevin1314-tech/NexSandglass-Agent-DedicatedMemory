@@ -289,8 +289,8 @@ def _enrich_choice_desc(question: str, choice: str) -> str:
     # 尝试从最近决策粒子中提取推断
     try:
         import os, re
-        dp_path = os.path.join(os.environ.get("NEXSANDBASE_HOME", 
-            os.path.join(os.path.expanduser("~"), ".neurobase")), "decision_particles.txt")
+        # V2.20.2: 统一路径解析——复用 sandglass_paths._NB，不再手算 fallback
+        dp_path = os.path.join(_NB, "decision_particles.txt")
         if os.path.exists(dp_path):
             with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
                 dps = [l.strip() for l in f if l.strip() and not l.startswith("#")]
