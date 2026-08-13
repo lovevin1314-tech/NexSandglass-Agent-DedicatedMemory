@@ -8,7 +8,7 @@ NexSandglass MemoryProvider — MemoryProvider for Hermes
 """
 from __future__ import annotations
 
-import json, logging, os, re, threading, time
+import collections, hashlib, json, logging, os, re, threading, time
 from typing import Any, Dict, List, Optional
 
 # 条件导入——兼容赫姆斯环境和独立运行时
@@ -169,6 +169,52 @@ class NexSandglassProvider(MemoryProvider):
         self._lock = threading.Lock()
         self._initialized = False
         self._turn_count = 0
+        # V2.20.3: 阶段一——注入块内容hash缓存 + prefetch 3轮去重（纯内存，跨会话重置）
+        self._session_id = ""
+        self._inject_cached_hash: Optional[str] = None
+        self._inject_cached_text: Optional[str] = None
+        self._prefetch_query_history: Any = collections.deque(maxlen=3)
+        self._queue_prefetch_query_history: Any = collections.deque(maxlen=3)
+        self._prefetch_last_text: str = ""
+        self._prefetch_hints: list = []
+
+    # ═══════ V2.20.3 阶段一：token 优化——注入缓存 + prefetch 去重 ═══════
+
+    def _reset_stage1_cache(self) -> None:
+        """V2.20.3: 清空阶段一内存缓存（注入块hash缓存 + prefetch 3轮去重）。须在持锁下调用。"""
+        self._inject_cached_hash = None
+        self._inject_cached_text = None
+        self._prefetch_query_history.clear()
+        self._queue_prefetch_query_history.clear()
+        self._prefetch_last_text = ""
+        # V2.20.5: 连同 prefetch 生成的 hints 一起清理，避免跨会话残留
+        if getattr(self, "_prefetch_hints", None):
+            self._prefetch_hints.clear()
+
+    @staticmethod
+    def _normalize_query(query: str) -> str:
+        """V2.20.3: prefetch去重用——空白/大小写归一。失败返回空串（不去重）。"""
+        try:
+            return " ".join(str(query or "").strip().lower().split())
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _query_similar(a: str, b: str) -> bool:
+        """V2.20.3: 保守近似判定——精确相等 / 包含 / 显著token重叠。"""
+        try:
+            if not a or not b:
+                return False
+            if a == b:
+                return True
+            if len(a) >= 4 and len(b) >= 4 and (a in b or b in a):
+                return True
+            ta, tb = set(a.split()), set(b.split())
+            if ta and tb:
+                return len(ta & tb) / min(len(ta), len(tb)) >= 0.6
+            return False
+        except Exception:
+            return False
 
     # ═══════ MemoryProvider 核心接口 ═══════
 
@@ -183,16 +229,24 @@ class NexSandglassProvider(MemoryProvider):
     def initialize(self, session_id: str = "", **kwargs) -> None:
         """设置沙漏路径、重建投石问路索引。"""
         with self._lock:
+            # V2.20.3: 跨会话重置——session_id 变化时清空阶段一缓存（同一实例复用场景）
+            if session_id and session_id != self._session_id:
+                self._reset_stage1_cache()
+                self._session_id = session_id
             if self._initialized:
                 return
             # 确保 sandglass 模块可导入
             import sys
-            _NB_DATA = os.environ.get("NEXSANDBASE_HOME") or os.path.expanduser("~/.neurobase")
             # 优先加载插件自带 sandglass_core（git 仓库，最新代码）——
             # 旧代码曾硬编码 ~/.neurobase/scripts 副本导致修复不生效
             _NB_SCRIPTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sandglass_core")
             if _NB_SCRIPTS not in sys.path:
                 sys.path.insert(0, _NB_SCRIPTS)
+
+            # V2.20.2: 统一路径解析——复用 sandglass_paths.get_nb()（环境变量→config.yaml→默认），
+            # 不再手算 fallback，避免与 sandglass_paths 解析不一致而读到 ~/.neurobase 空壳
+            from sandglass_paths import get_nb
+            _NB_DATA = get_nb()
 
             from sandglass_vault import rebuild_index
             from sandglass_paths import validate
@@ -208,13 +262,18 @@ class NexSandglassProvider(MemoryProvider):
                     if os.path.exists(sand_path):
                         with open(sand_path, "r", encoding="utf-8", errors="replace") as sf:
                             sand_lines = sf.readlines()
-                        ENTITY_RE = re.compile(r'(?:[A-Z][a-z]{2,}(?:[A-Z][a-z]{2,})+|[A-Z]{2,}|[A-Z][a-z]+(?:[ -][A-Z][a-z]+)*|[\u4e00-\u9fff]{2,6})')
                         for rid, ln in rows:
                             if 0 < ln <= len(sand_lines):
                                 text = sand_lines[ln - 1]
-                                entities = [m.group().strip() for m in ENTITY_RE.finditer(text) if len(m.group().strip()) > 1]
+                                # V2.20.4: 统一提取器——与 shadow_index 同源（停用词/长度/ASCII/别名归一化）
+                                try:
+                                    from shadow_sand import extract_tags
+                                    entities = extract_tags(text)
+                                except Exception:
+                                    ENTITY_RE = re.compile(r'(?:[A-Z][a-z]{2,}(?:[A-Z][a-z]{2,})+|[A-Z]{2,}|[A-Z][a-z]+(?:[ -][A-Z][a-z]+)*|[\u4e00-\u9fff]{2,6})')
+                                    entities = [m.group().strip() for m in ENTITY_RE.finditer(text) if len(m.group().strip()) > 1]
                                 if entities:
-                                    db.execute("UPDATE fact_tags SET tags=?, category=? WHERE rowid=?", (",".join(entities[:10]), entities[0][:30], rid))
+                                    db.execute("UPDATE fact_tags SET tags=? WHERE rowid=?", (",".join(entities[:10]), rid))
                         db.commit()
                 db.close()
             except Exception: pass
@@ -222,15 +281,17 @@ class NexSandglassProvider(MemoryProvider):
             try:
                 from sandglass_paths import __version__ as _ver
             except Exception:
-                _ver = "2.20.1"
+                _ver = "2.20.5"
             logger.info(f"NexSandglass V{_ver} 就绪")
 
     def system_prompt_block(self) -> str:
-        """V2.9.8: 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完"""
+        """V2.9.8: 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完
+        V2.20.3: 内容hash缓存——相同数据必返回与上次字节完全一致的字符串（服务端前缀KV缓存命中）。"""
         try:
             from sandglass_vault import count
             from sandglass_think import comprehensive_offset, _current_stage
             from sandglass_think import _emotional_entropy, search_filter
+            from sandglass_paths import _NB
 
             total = count()
             off = comprehensive_offset()
@@ -282,16 +343,15 @@ class NexSandglassProvider(MemoryProvider):
             # 决策：管道洞察已含偏移方向，此处不重复
             
             # 关注：从fact_tags高频标签
+            # V2.20.4: 与 memory_provider.py 同口径——统一走 shadow_sand.shadow_top_tags()
+            # （行号门控 + 三道闸 + 内容特征过滤），收编裸连接
             try:
-                import sqlite3, os
                 from collections import Counter
-                db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"))
+                from shadow_sand import shadow_top_tags
                 tags = Counter()
-                for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
-                    for t in r[0].split(","):
-                        t = t.strip()
-                        if t and len(t) > 1: tags[t] += 1
-                db.close()
+                for t in shadow_top_tags(limit=2000):
+                    t = t.strip()
+                    if t and len(t) > 1: tags[t] += 1
                 top = [t for t,_ in tags.most_common(3) if _ >= 2]
                 if top: identity_parts.append(f"关注: {', '.join(top)}")
             except Exception: pass
@@ -329,7 +389,6 @@ class NexSandglassProvider(MemoryProvider):
             decisions = []
             try:
                 import json, os
-                from sandglass_paths import _NB
                 dlog = os.path.join(_NB, "persona", "decision-log.jsonl")
                 if os.path.exists(dlog):
                     with open(dlog, "r", encoding="utf-8") as f:
@@ -452,14 +511,33 @@ class NexSandglassProvider(MemoryProvider):
             # ═══════ 尾部 ═══════
             blocks.append(f"沙漏: {total}条 | 阶段: {stage}")
 
-            return "\n\n".join(blocks).strip()
+            content = "\n\n".join(blocks).strip()
         except Exception:
             logger.warning("system_prompt_block 整体失败", exc_info=True)
-            return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
-
-    def prefetch(self, query: str) -> str:
-        """V2.9.34: 两段式轮次注入 — 搜索上下文+状态快照。~60t。激励LLM主动搜索。"""
+            content = "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
+        # V2.20.3: 内容hash缓存——hash相同→复用上次字符串（字节级稳定）；
+        # 缓存任何异常→照常返回本次生成内容（异常兜底，不吞注入）
         try:
+            digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            with self._lock:
+                if digest == self._inject_cached_hash:
+                    return self._inject_cached_text
+                self._inject_cached_hash = digest
+                self._inject_cached_text = content
+        except Exception:
+            pass
+        return content
+
+    def prefetch(self, query: str, **kwargs) -> str:
+        """V2.9.34: 两段式轮次注入 — 搜索上下文+状态快照。~60t。激励LLM主动搜索。
+        V2.20.3: 同query 3轮内重复→跳过重算，复用上次快照（字节级稳定）。
+        V2.20.5: 签名兼容 Hermes — 接受 session_id 等关键字参数。"""
+        try:
+            nq = self._normalize_query(query)
+            if nq:
+                with self._lock:
+                    if any(self._query_similar(nq, hq) for hq in self._prefetch_query_history):
+                        return self._prefetch_last_text  # V2.20.3: 3轮内重复→跳过重算
             parts = []
             
             # ═══ 块A: 搜索上下文 (~25t) ═══
@@ -499,13 +577,25 @@ class NexSandglassProvider(MemoryProvider):
             parts.append("\n".join(lines))
             
             result = "\n".join(parts)
-            return result[:500]  # ~60t 硬截断
+            result = result[:500]  # ~60t 硬截断
+            if nq:
+                with self._lock:
+                    self._prefetch_query_history.append(nq)
+                    self._prefetch_last_text = result
+            return result
         except Exception:
             return ""
 
-    def queue_prefetch(self, query: str) -> None:
-        """后台预热——语义扩展+标签提取。激励LLM主动调sandglass_search。"""
+    def queue_prefetch(self, query: str, **kwargs) -> None:
+        """后台预热——语义扩展+标签提取。激励LLM主动调sandglass_search。
+        V2.20.3: 同query 3轮内重复→跳过，保留上次 hints，避免每轮重复扩展。
+        V2.20.5: 签名兼容 Hermes — 接受 session_id 等关键字参数。"""
         try:
+            nq = self._normalize_query(query)
+            if nq:
+                with self._lock:
+                    if any(self._query_similar(nq, hq) for hq in self._queue_prefetch_query_history):
+                        return  # V2.20.3: 3轮内重复→跳过（保留上次 _prefetch_hints）
             from sandglass_think import _infer_expand_with_context, search_filter
             sf = search_filter(query)
             ctx = sf or {}
@@ -518,6 +608,9 @@ class NexSandglassProvider(MemoryProvider):
                 ctx.get("decision_bias", "")
             )
             self._prefetch_hints = expanded[1:5] if expanded and len(expanded) > 1 else []
+            if nq:
+                with self._lock:
+                    self._queue_prefetch_query_history.append(nq)
         except Exception:
             self._prefetch_hints = []
 
@@ -590,8 +683,14 @@ class NexSandglassProvider(MemoryProvider):
             return tool_error(f"fact_feedback error: {e}")
 
     def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
-        """会话结束——落沙 + 偏移检查 + V2.9.9.1情绪摘要。"""
+        """会话结束——落沙 + 偏移检查 + V2.9.9.1情绪摘要。V2.20.3: 顺带重置阶段一缓存。"""
         try:
+            # V2.20.3: 会话结束→重置阶段一缓存，防串会话（失败不影响落沙）
+            try:
+                with self._lock:
+                    self._reset_stage1_cache()
+            except Exception:
+                logger.debug("on_session_end 重置阶段一缓存失败（非致命）", exc_info=True)
             # 落最后一轮对话
             for msg in messages[-5:]:
                 role = msg.get("role", "user")
@@ -633,6 +732,16 @@ class NexSandglassProvider(MemoryProvider):
 
         except Exception:
             pass
+
+    def on_session_switch(self, new_session_id: str, **kwargs) -> None:
+        """V2.20.3: 会话切换（/new /reset /resume /branch /压缩）→ 重置阶段一缓存。"""
+        try:
+            with self._lock:
+                if new_session_id:
+                    self._session_id = new_session_id
+                self._reset_stage1_cache()
+        except Exception:
+            logger.debug("on_session_switch 重置阶段一缓存失败（非致命）", exc_info=True)
 
     # ═══════ 工具暴露 ═══════
 

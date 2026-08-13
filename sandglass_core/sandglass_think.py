@@ -9,7 +9,7 @@ import statistics
 import time
 import urllib.request
 
-# V2.20.1: 本地 stub——避免循环导入 memory_provider
+# V2.20.3: 本地 stub——避免循环导入 memory_provider
 def _pipe_warn(name, e):
     logging.getLogger(__name__).warning(f"管道 [{name}] 降级: {e}")
 import urllib.error
@@ -908,7 +908,8 @@ def local_distill(period: str = "daily") -> str:
         lines.append(f"偏移: {dirs.get(d,d)}{off.get('offset',0):+d}%({off.get('sample',0)}次) | 情绪熵:{ent:.2f} | 沙量:{total}")
         
         # 关键标签
-        db = sqlite3.connect(os.path.join(os.environ.get("NEXSANDBASE_HOME", os.path.join(os.path.expanduser("~"), ".neurobase")), "shadow_sand.db"), check_same_thread=False)
+        # V2.20.2: 统一路径解析——复用 sandglass_paths._NB，不再手算 fallback
+        db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
         tags = Counter()
         for r in db.execute("SELECT tags FROM fact_tags WHERE tags!='' AND tags!='未分类'").fetchall():
             for t in r[0].split(","):
@@ -919,7 +920,8 @@ def local_distill(period: str = "daily") -> str:
         if top: lines.append(f"标签: {', '.join(f'{t}({c})' for t,c in top)}")
         
         # 决策粒子
-        dp_path = os.path.join(os.environ.get("NEXSANDBASE_HOME", os.path.join(os.path.expanduser("~"), ".neurobase")), "decision_particles.txt")
+        # V2.20.2: 统一路径解析——复用 sandglass_paths._NB
+        dp_path = os.path.join(_NB, "decision_particles.txt")
         if os.path.exists(dp_path):
             with open(dp_path, encoding="utf-8", errors="replace") as f:
                 dps = [l.strip() for l in f if l.strip() and not l.startswith("#")]

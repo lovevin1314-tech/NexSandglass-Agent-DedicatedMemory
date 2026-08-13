@@ -40,7 +40,7 @@ def _resolve_nb() -> str:
     return default
 
 _NB = _resolve_nb()
-__version__ = "2.20.1"
+__version__ = "2.20.5"
 get_nb = _resolve_nb  # V2.10.41: 动态获取,post_setup修改环境变量后可用
 _SCRIPTS = os.path.join(_NB, "scripts")
 _PERSONA = os.path.join(_NB, "persona")
@@ -71,4 +71,12 @@ def validate() -> dict:
             created.append(d)
         else:
             existed.append(d)
-    return {"nb": _NB, "created": created, "existed": existed, "ok": True}
+    # V2.20.2: 空壳目录告警——最终解析目录没有 sandglass.txt 说明可能命中了
+    # ~/.neurobase 之类的迁移副本/空目录，明确提示而不是静默空转
+    sandglass_txt = os.path.exists(os.path.join(_NB, "sandglass.txt"))
+    if not sandglass_txt:
+        _logger.warning(
+            f"NexSandglass: {_NB} 下缺少 sandglass.txt —— 疑似空壳/迁移副本目录。"
+            "请检查环境变量 NEXSANDBASE_HOME 或 config.yaml 的 memory.nexsandglass.home 是否指向真实数据目录"
+        )
+    return {"nb": _NB, "created": created, "existed": existed, "sandglass_txt": sandglass_txt, "ok": True}

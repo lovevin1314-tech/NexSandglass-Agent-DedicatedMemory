@@ -12,6 +12,7 @@ import math
 import os
 import hashlib
 import logging
+from sandglass_paths import _NB
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +93,7 @@ def sand_density(text: str, query_tokens: set) -> float:
 _SIMHASH_BITS = 128
 _simhash_cache = {}  # V2.0.5: 预计算缓存，key=text[:500], val=fingerprint
 _SIMHASH_CACHE_MAX = 10000  # V2.1.11: LRU上限，超过清空重建
-_SIMHASH_CACHE_FILE = os.path.join(os.path.expanduser("~"), ".neurobase", "simhash_cache.json")
+_SIMHASH_CACHE_FILE = os.path.join(_NB, "simhash_cache.json")
 
 def _load_simhash_cache():
     """启动时从磁盘加载缓存。"""
