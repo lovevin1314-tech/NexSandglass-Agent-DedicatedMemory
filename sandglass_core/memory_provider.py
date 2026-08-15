@@ -39,7 +39,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # 版本号由主人最终确认，熔炼迭代禁止自行 bump。
-__version__ = "2.20.5"
+__version__ = "2.20.6"
 
 # ══════════════════════════════════════════════════════════
 # 工具方法——把 sandglass 函数暴露给 Hermes 模型调用
