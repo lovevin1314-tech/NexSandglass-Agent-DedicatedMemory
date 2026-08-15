@@ -1,105 +1,45 @@
 """
-NexSandglass MemoryProvider — MemoryProvider for Hermes
+NexSandglass MemoryProvider — 核心下沉版（熔炼任务 B）
 ========================================================
-让 Hermes 使用 NexSandglass 作为记忆后端，替代 Holographic。
+让任意 agent 使用 NexSandglass 作为记忆后端，替代 Holographic。
+
+本文件是沙漏唯一核心实现：NexSandglassProvider、工具 schema、
+system_prompt_block 组装、prefetch/queue_prefetch、落沙钩子、计数。
+agent 适配层（Hermes 的 __init__.py / plugin.py）只做路径准备与注册转发，
+不得再出现第二份 NexSandglassProvider。
 
 零API Key、零外部依赖——纯本地驱动。投石问路（倒排索引）优先、
 五维权重排序、偏移率感知、回音折情绪追踪、影子灵魂预测。
 """
 from __future__ import annotations
 
-import json, logging, os, re, sqlite3, threading, time
+import collections, hashlib, json, logging, os, re, threading, time
 from typing import Any, Dict, List, Optional
-from sandglass_paths import _NB, get_nb
 
-# 纯本地MemoryProvider——不导入Hermes核心模块避免死锁
-# Hermes通过register()函数发现插件,不检查继承关系
-class MemoryProvider:
-    name = "nexsandglass"
-    def is_available(self): return True
-    def initialize(self): pass
-    def shutdown(self): pass
-    def get_tool_schemas(self): return []
-    def handle_tool_call(self, name, args): return ""
-    def system_prompt_block(self): return ""
-    def prefetch(self, query): return None
-    def sync_turn(self, user_msg, assistant_msg): pass
+# 条件导入——兼容赫姆斯环境和独立运行时
+try:
+    from agent.memory_provider import MemoryProvider
+except ImportError:
+    class MemoryProvider:
+        name = "nexsandglass"
+        def is_available(self): return True
+        def initialize(self): pass
+        def shutdown(self): pass
+        def get_tool_schemas(self): return []
+        def handle_tool_call(self, name, args): return ""
+        def system_prompt_block(self): return ""
+        def prefetch(self, query): return None
+        def sync_turn(self, user_msg, assistant_msg): pass
 
-def tool_error(msg): return json.dumps({"error": msg})
+try:
+    from tools.registry import tool_error
+except ImportError:
+    def tool_error(msg): return json.dumps({"error": msg})
 
 logger = logging.getLogger(__name__)
-# ══════════════════════════════════════════════════════════
-# 管道健康追踪器 — 失败重试+降级报告+自动复活
-# ══════════════════════════════════════════════════════════
-import time as _time, traceback as _traceback
-from collections import defaultdict as _defaultdict
 
-class PipelineHealth:
-    """管道健康状态机：OK → 瞬态重试 → 降级 → 定期复活"""
-    
-    def __init__(self):
-        self._state = {}  # name → {failures, last_error, suppressed_until}
-        self._lock = threading.Lock()
-        self.TRANSIENT_PATTERNS = [
-            "database is locked", "database locked",
-            "threading", "Lock", "timeout",
-            "disk I/O error", "Permission denied"
-        ]
-        self.MAX_RETRIES = 3
-        self.SUPPRESS_AFTER = 5
-        self.RESURRECT_INTERVAL = 300  # 降级后5分钟尝试复活
-    
-    def _is_transient(self, error: Exception) -> bool:
-        msg = str(error).lower()
-        return any(p.lower() in msg for p in self.TRANSIENT_PATTERNS)
-    
-    def execute(self, name: str, fn):
-        """执行管道，瞬态错误自动重试，持久错误降级+定期复活。
-        返回 (result, degraded_note)"""
-        with self._lock:
-            s = self._state.get(name, {})
-            if s.get("suppressed_until", 0) > _time.time():
-                return None, f"[{name} 降级中]"
-        
-        last_error = None
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                result = fn()
-                with self._lock:
-                    self._state[name] = {"failures": 0, "last_ok": _time.time()}
-                return result, None
-            except Exception as e:
-                last_error = e
-                if not self._is_transient(e): break
-                if attempt < self.MAX_RETRIES - 1: _time.sleep(0.3 * (attempt + 1))
-        
-        with self._lock:
-            s = self._state.get(name, {"failures": 0})
-            s["failures"] = s.get("failures", 0) + 1
-            s["last_error"] = str(last_error)[:120]
-            if s["failures"] >= self.SUPPRESS_AFTER:
-                s["suppressed_until"] = _time.time() + self.RESURRECT_INTERVAL
-                logger.warning(f"管道 [{name}] 连续失败{s['failures']}次，降级{self.RESURRECT_INTERVAL}s: {s['last_error']}")
-            else:
-                logger.warning(f"管道 [{name}] 第{s['failures']}次失败: {s['last_error']}")
-            self._state[name] = s
-        
-        return None, f"[{name} 不可用: {str(last_error)[:60]}]"
-    
-    def degraded_summary(self) -> str:
-        """LLM可见的降级报告"""
-        with self._lock:
-            degraded = []
-            for name, s in self._state.items():
-                if s.get("failures", 0) > 0:
-                    status = "降级" if s.get("suppressed_until", 0) > _time.time() else "异常"
-                    degraded.append(f"  {status} [{name}]: {s.get('last_error', '?')[:50]}")
-            if degraded:
-                return "⚠️ 部分记忆管道异常:\n" + "\n".join(degraded)
-            return ""
-
-_pipeline_health = PipelineHealth()
-
+# 版本号由主人最终确认，熔炼迭代禁止自行 bump。
+__version__ = "2.20.5"
 
 # ══════════════════════════════════════════════════════════
 # 工具方法——把 sandglass 函数暴露给 Hermes 模型调用
@@ -229,12 +169,6 @@ _TOOL_SCHEMAS = [
 ]
 
 
-def _pipe_warn(name, e):
-    """管道降级——PipelineHealth追踪+LLM可见"""
-    logger.warning(f"管道 [{name}] 降级: {e}")
-    # 记录到PipelineHealth——用于自动复活和LLM降级报告
-    _pipeline_health.execute(name, lambda: (_ for _ in ()).throw(e))
-
 class NexSandglassProvider(MemoryProvider):
     """NexSandglass 记忆提供器——替代 Holographic，纯本地零依赖。"""
 
@@ -243,6 +177,54 @@ class NexSandglassProvider(MemoryProvider):
         self._lock = threading.Lock()
         self._initialized = False
         self._turn_count = 0
+        # V2.20.3: 阶段一——注入块内容hash缓存 + prefetch 3轮去重（纯内存，跨会话重置）
+        self._session_id = ""
+        self._inject_cached_hash: Optional[str] = None
+        self._inject_cached_text: Optional[str] = None
+        self._prefetch_query_history: Any = collections.deque(maxlen=3)
+        self._queue_prefetch_query_history: Any = collections.deque(maxlen=3)
+        self._prefetch_last_text: str = ""
+        self._prefetch_hints: list = []
+        self._last_rule_context: str = ""
+
+    # ═══════ V2.20.3 阶段一：token 优化——注入缓存 + prefetch 去重 ═══════
+
+    def _reset_stage1_cache(self) -> None:
+        """V2.20.3: 清空阶段一内存缓存（注入块hash缓存 + prefetch 3轮去重）。须在持锁下调用。"""
+        self._inject_cached_hash = None
+        self._inject_cached_text = None
+        self._prefetch_query_history.clear()
+        self._queue_prefetch_query_history.clear()
+        self._prefetch_last_text = ""
+        self._last_rule_context = ""
+        # V2.20.5: 连同 prefetch 生成的 hints 一起清理，避免跨会话残留
+        if getattr(self, "_prefetch_hints", None):
+            self._prefetch_hints.clear()
+
+    @staticmethod
+    def _normalize_query(query: str) -> str:
+        """V2.20.3: prefetch去重用——空白/大小写归一。失败返回空串（不去重）。"""
+        try:
+            return " ".join(str(query or "").strip().lower().split())
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _query_similar(a: str, b: str) -> bool:
+        """V2.20.3: 保守近似判定——精确相等 / 包含 / 显著token重叠。"""
+        try:
+            if not a or not b:
+                return False
+            if a == b:
+                return True
+            if len(a) >= 4 and len(b) >= 4 and (a in b or b in a):
+                return True
+            ta, tb = set(a.split()), set(b.split())
+            if ta and tb:
+                return len(ta & tb) / min(len(ta), len(tb)) >= 0.6
+            return False
+        except Exception:
+            return False
 
     # ═══════ MemoryProvider 核心接口 ═══════
 
@@ -257,152 +239,71 @@ class NexSandglassProvider(MemoryProvider):
     def initialize(self, session_id: str = "", **kwargs) -> None:
         """设置沙漏路径、重建投石问路索引。"""
         with self._lock:
+            # V2.20.3: 跨会话重置——session_id 变化时清空阶段一缓存（同一实例复用场景）
+            if session_id and session_id != self._session_id:
+                self._reset_stage1_cache()
+                self._session_id = session_id
             if self._initialized:
                 return
-            # V2.10.47: 自举——自动配置 Hermes memory provider（新用户零手动）
-            self._bootstrap_hermes_config()
             # 确保 sandglass 模块可导入
             import sys
-            # V2.20.2: 统一路径解析——复用 sandglass_paths.get_nb() 单一真相来源
-            nb = get_nb()
-            nb_scripts = os.path.join(nb, "scripts")
-            if nb_scripts not in sys.path:
-                sys.path.insert(0, nb_scripts)
+            # 本文件现已位于 sandglass_core/ 内，直接把自身目录加入 sys.path，
+            # 保证 from sandglass_* import ... 能命中同目录核心模块。
+            _NB_SCRIPTS = os.path.dirname(os.path.abspath(__file__))
+            if _NB_SCRIPTS not in sys.path:
+                sys.path.insert(0, _NB_SCRIPTS)
+
+            # V2.20.2: 统一路径解析——复用 sandglass_paths.get_nb()（环境变量→config.yaml→默认），
+            # 不再手算 fallback，避免与 sandglass_paths 解析不一致而读到 ~/.neurobase 空壳
+            from sandglass_paths import get_nb
+            _NB_DATA = get_nb()
 
             from sandglass_vault import rebuild_index
-            from sandglass_paths import validate, __version__
+            from sandglass_paths import validate
             validate()
-            # V2.9.37: 索引重建仅首次运行
-            idx_done = os.path.join(nb, "idx_done")
-            if not os.path.exists(idx_done):
-                rebuild_index()
-                with open(idx_done, "w") as f: f.write("1")
-            # V2.10.22: 自愈Timer——initialize()时启动，不在模块导入时跑
+            rebuild_index()
+            # V2.9.21: 回填空tags（重启时一次性执行）
             try:
-                from sandglass_vault import init_autoheal
-                init_autoheal()
-            except Exception as e:
-
-                _pipe_warn("pipe", e)            # V2.10.14: 沙漏自愈——仅在initialize()时跑，不在模块导入时跑
-            try:
-                from sandglass_vault import _startup_autoheal
-                _startup_autoheal()
-            except Exception as e:
-
-                _pipe_warn("pipe", e)            # V2.9.39: DB自省增量——用trust表MAX(line_num)替代外部checkpoint
-            try:
-                sand_path = os.path.join(nb, "sandglass.txt")
-                if os.path.exists(sand_path):
-                    current_lines = sum(1 for _ in open(sand_path, encoding="utf-8", errors="replace"))
-                    from shadow_sand import shadow_max_trust
-                    max_trust = shadow_max_trust()
-                    if current_lines > max_trust:
-                        from shadow_sand import shadow_index
-                        with open(sand_path, encoding="utf-8", errors="replace") as f:
-                            for ln, line in enumerate(f, 1):
-                                if ln <= max_trust: continue
-                                text = line.strip()
-                                if text: shadow_index(text, line_num=ln)
-            except Exception as e:
-                logger.warning(f"增量初始化跳过: {e}")
+                import sqlite3, re
+                db = sqlite3.connect(os.path.join(_NB_DATA, "shadow_sand.db"))
+                rows = db.execute("SELECT rowid, line_num FROM fact_tags WHERE tags='' OR tags IS NULL").fetchall()
+                if rows:
+                    sand_path = os.path.join(_NB_DATA, "sandglass.txt")
+                    if os.path.exists(sand_path):
+                        with open(sand_path, "r", encoding="utf-8", errors="replace") as sf:
+                            sand_lines = sf.readlines()
+                        for rid, ln in rows:
+                            if 0 < ln <= len(sand_lines):
+                                text = sand_lines[ln - 1]
+                                # V2.20.4: 统一提取器——与 shadow_index 同源（停用词/长度/ASCII/别名归一化）
+                                try:
+                                    from shadow_sand import extract_tags
+                                    entities = extract_tags(text)
+                                except Exception:
+                                    ENTITY_RE = re.compile(r'(?:[A-Z][a-z]{2,}(?:[A-Z][a-z]{2,})+|[A-Z]{2,}|[A-Z][a-z]+(?:[ -][A-Z][a-z]+)*|[\u4e00-\u9fff]{2,6})')
+                                    entities = [m.group().strip() for m in ENTITY_RE.finditer(text) if len(m.group().strip()) > 1]
+                                if entities:
+                                    db.execute("UPDATE fact_tags SET tags=? WHERE rowid=?", (",".join(entities[:10]), rid))
+                        db.commit()
+                db.close()
+            except Exception:
+                logger.warning("initialize 回填空tags失败", exc_info=True)
             self._initialized = True
-            logger.info(f"NexSandglass V{__version__} 就绪")
-    def _bootstrap_hermes_config(self) -> None:
-        """V2.10.47: 首次初始化时自动配置 Hermes——零手动。
-        
-        检测 config.yaml 中 memory 段：
-        - provider 非 "nexsandglass" → 自动设为 "nexsandglass"
-        - memory_enabled 非 false → 自动设为 false（不设 char_limit，避免反弹）
-        
-        幂等：_bootstrapped flag 文件写入一次后跳过检查。
-        """
-        try:
-            import yaml as _yaml
-        except ImportError:
-            # 无 YAML 库 → 静默跳过（极少情况）
-            return
-        
-        try:
-            # 检查是否已自举过
-            # V2.20.2: 统一路径解析——复用 sandglass_paths.get_nb() 单一真相来源
-            nb = get_nb()
-            boot_flag = os.path.join(nb, "_bootstrapped")
-            if os.path.exists(boot_flag):
-                return
-            
-            # 找 Hermes config.yaml
-            hermes_home = os.environ.get("HERMES_HOME") or os.path.join(
-                os.environ.get("LOCALAPPDATA", os.path.expanduser("~/.local/share")),
-                "hermes"
-            )
-            config_path = os.path.join(hermes_home, "config.yaml")
-            if not os.path.exists(config_path):
-                # 尝试备选路径
-                alt = os.path.expanduser("~/.hermes/config.yaml")
-                if os.path.exists(alt):
-                    config_path = alt
-                else:
-                    return  # 找不到 config，不阻塞
-            
-            # 读配置
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = _yaml.safe_load(f) or {}
-            
-            changed = False
-            
-            # memory 段
-            if "memory" not in config:
-                config["memory"] = {}
-            mem = config["memory"]
-            
-            # provider → "nexsandglass"
-            if mem.get("provider") != "nexsandglass":
-                mem["provider"] = "nexsandglass"
-                changed = True
-            
-            # memory_enabled → false（关键：不设 char_limit=1，避免反弹）
-            if mem.get("memory_enabled") is not False:
-                mem["memory_enabled"] = False
-                changed = True
-            
-            # 写入
-            if changed:
-                with open(config_path, "w", encoding="utf-8") as f:
-                    _yaml.safe_dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-                logger.info(f"NexSandglass 自举完成：config.yaml memory 段已自动配置")
-            
-            # 写 flag（无论是否 changed——避免每次初始化都读 YAML）
-            os.makedirs(os.path.dirname(boot_flag), exist_ok=True)
-            with open(boot_flag, "w") as f:
-                f.write(f"NexSandglass V{__version__} bootstrapped at {os.path.join(hermes_home, 'config.yaml')}\n")
-        
-        except Exception as e:
-            # 绝不因自举失败阻塞初始化
-            logger.warning(f"NexSandglass 自举跳过: {e}")
+            try:
+                from sandglass_paths import __version__ as _ver
+            except Exception:
+                _ver = "2.20.5"
+            logger.info(f"NexSandglass V{_ver} 就绪")
 
-    def _safe_pipe(self, name, fn):
-        """管道健康包装——失败时LLM可见降级"""
-        result, note = _pipeline_health.execute(name, fn)
-        if note:
-            if not hasattr(self, '_degraded_notes'):
-                self._degraded_notes = []
-            self._degraded_notes.append(note)
-        return result
-    
-    def _degraded_report(self):
-        """收集本轮所有降级，注入LLM可见"""
-        report = _pipeline_health.degraded_summary()
-        if hasattr(self, '_degraded_notes') and self._degraded_notes:
-            report += "\n" + "\n".join(self._degraded_notes)
-            self._degraded_notes = []
-        return report
-    
     def system_prompt_block(self) -> str:
-        """V2.9.8: 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完"""
+        """V2.9.8: 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完
+        V2.20.3: 内容hash缓存——相同数据必返回与上次字节完全一致的字符串（服务端前缀KV缓存命中）。"""
+        injected_rules = []
         try:
             from sandglass_vault import count
             from sandglass_think import comprehensive_offset, _current_stage
             from sandglass_think import _emotional_entropy, search_filter
+            from sandglass_paths import _NB
 
             total = count()
             off = comprehensive_offset()
@@ -417,6 +318,39 @@ class NexSandglassProvider(MemoryProvider):
 
             blocks = []
 
+            # ═══════ 纪律最前：红牌常驻 + 普通触发（单3） ═══════
+            try:
+                from discipline import iron_rule_layers, iron_rule_inject_bump
+                rule_context_parts = [
+                    getattr(self, "_last_rule_context", ""),
+                    getattr(self, "_prefetch_last_text", ""),
+                    " ".join(getattr(self, "_prefetch_hints", []) or []),
+                ]
+                rule_context = " ".join([part for part in rule_context_parts if part])
+                layers = iron_rule_layers(context=rule_context)
+                iron_lines = []
+                if layers["red"]:
+                    iron_lines.append("铁律：")
+                    iron_lines.extend(
+                        f"  [red] {item['text']} ×{item['score']}"
+                        for item in layers["red"]
+                    )
+                if layers["normal"]:
+                    if not layers["red"]:
+                        iron_lines.append("铁律：")
+                    iron_lines.extend(
+                        f"  [normal] {item['text']} ×{item['score']} [触发:{item['triggered_by']}]"
+                        for item in layers["normal"]
+                    )
+                if iron_lines:
+                    blocks.append("\n".join(iron_lines))
+                    injected_rules = [
+                        item["text"]
+                        for item in layers["red"] + layers["normal"]
+                    ]
+            except Exception:
+                logger.debug("铁律双层注入失败", exc_info=True)
+
             # ═══════ 第一层：你是谁 V2.9.9.10 数据点 ═══════
             identity_parts = []
             
@@ -428,37 +362,36 @@ class NexSandglassProvider(MemoryProvider):
                     for line in local.split("\n"):
                         if "：" in line or ":" in line:
                             identity_parts.append(line.strip()[:60])
-            except Exception as e:
-                _pipe_warn("five_facets", e)
+            except Exception:
+                logger.warning("system_prompt_block 身份画像提取失败", exc_info=True)
             
             # 铁律：从 five-facets.json 注入结构化事实（importance×confidence 排序）
             try:
+                import json
                 facets_path = os.path.join(_NB, "profile", "five-facets.json")
                 if os.path.exists(facets_path):
                     with open(facets_path, "r", encoding="utf-8") as f:
                         facets = json.load(f)
-                    # V2.10.54: fact全量注入——同分挑选导致核心身份随机丢失
-                    for ftype, count in [("fact", 99), ("preference", 1), ("restriction", 2)]:
-                        scored = []
-                        for entry in facets.get(ftype, []):
+                    all_entries = []
+                    for facet_name in ["fact","preference","restriction","task_pattern","style"]:
+                        for entry in facets.get(facet_name, []):
                             imp = entry.get("importance", 0)
                             conf = entry.get("confidence", 0)
-                            scored.append((imp * conf, entry["content"]))
-                        scored.sort(reverse=True)
-                        for _, content in scored[:count]:
-                            title = content.split("：")[0].split(":")[0].split("=")[0].strip()[:30]
-                            if not title:
-                                title = content[:30]
-                            if title and title not in identity_parts:
-                                identity_parts.append(title)
-            except Exception as e:
-                _pipe_warn("persona_extract", e)
+                            all_entries.append((imp * conf, entry["content"]))
+                    all_entries.sort(reverse=True)
+                    for _, content in all_entries[:5]:
+                        # V2.9.28: 极简注入→只取标题（"："前的部分）
+                        title = content.split("：")[0].split(":")[0].split("=")[0].strip()[:20]
+                        if title and title not in identity_parts:
+                            identity_parts.append(title)
+            except Exception:
+                logger.warning("system_prompt_block five-facets 注入失败", exc_info=True)
             
             # 决策：管道洞察已含偏移方向，此处不重复
             
             # 关注：从fact_tags高频标签
-            # V2.20.4: 与 __init__.py 同口径——统一走 shadow_top_tags()
-            # （行号门控 + 三道闸 + 内容特征过滤）
+            # V2.20.4: 与 memory_provider.py 同口径——统一走 shadow_sand.shadow_top_tags()
+            # （行号门控 + 三道闸 + 内容特征过滤），收编裸连接
             try:
                 from collections import Counter
                 from shadow_sand import shadow_top_tags
@@ -468,28 +401,18 @@ class NexSandglassProvider(MemoryProvider):
                     if t and len(t) > 1: tags[t] += 1
                 top = [t for t,_ in tags.most_common(3) if _ >= 2]
                 if top: identity_parts.append(f"关注: {', '.join(top)}")
-            except Exception as e:
-
-                _pipe_warn("pipe", e)
-            # V2.10.52: 实体注入——影子沙entities表接system_prompt
-            try:
-                from shadow_sand import shadow_top_entities
-                ent_rows = shadow_top_entities(limit=5)
-                if ent_rows:
-                    ents = [e[0] for e in ent_rows if len(e[0]) >= 2 and not e[0].startswith(('什么','怎么','这个','那个')) and ' ' not in e[0] and len(e[0]) <= 8]
-                    if ents:
-                        identity_parts.append(f"实体: {', '.join(ents[:5])}")
             except Exception:
-                pass
+                logger.warning("system_prompt_block 高频标签注入失败", exc_info=True)
+            
             # 场景
             scene_text = ""
             try:
                 from scene_l3 import scene_current
                 scenes = scene_current()
                 if scenes: scene_text = ", ".join(scenes[:3])
-            except Exception as e:
-
-                _pipe_warn("pipe", e)            
+            except Exception:
+                logger.warning("system_prompt_block 场景注入失败", exc_info=True)
+            
             if not identity_parts:
                 identity_parts.append("身份: 待积累（使用中自动发现）")
             
@@ -504,7 +427,7 @@ class NexSandglassProvider(MemoryProvider):
                 if pv.get("failed", 0) > 0:
                     blocks.append(f"⚠️ 画像溯源异常：{pv['failed']}条声明源行已变更")
             except Exception:
-                pass
+                logger.warning("system_prompt_block 画像溯源检查失败", exc_info=True)
 
             # ═══════ 第二层：你在往哪走（极简） ═══════
             layer2 = []
@@ -535,7 +458,7 @@ class NexSandglassProvider(MemoryProvider):
                     elif len(decisions) == 2 and decisions[1] in decisions[0]:
                         decisions = [decisions[0]]
             except Exception:
-                pass
+                logger.warning("system_prompt_block 最近决策读取失败", exc_info=True)
             if decisions:
                 layer2.append(f"📋 最近：{'；'.join(decisions)}")
 
@@ -556,7 +479,7 @@ class NexSandglassProvider(MemoryProvider):
                     if line.strip():
                         layer2.append(line.strip())
             except Exception:
-                pass
+                logger.warning("system_prompt_block 情绪偏移提示失败", exc_info=True)
 
             # 矛盾检测
             try:
@@ -571,29 +494,6 @@ class NexSandglassProvider(MemoryProvider):
 
 
             blocks.append("\n".join(layer2))
-
-            # ═══════ V2.10.51: 最近对话——10轮用户消息注入 ═══════
-            try:
-                import sqlite3 as _sq
-                state_db = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~/.local/share")), "hermes", "state.db")
-                if os.path.exists(state_db):
-                    _db = _sq.connect(state_db)
-                    _rows = _db.execute("""
-                        SELECT content FROM messages 
-                        WHERE role='user' AND content NOT LIKE '{%' AND content NOT LIKE '[{%' AND length(content) > 2
-                        ORDER BY id DESC LIMIT 10
-                    """).fetchall()
-                    _db.close()
-                    if _rows:
-                        _lines = [r[0][:80].replace('\n',' ').strip() for r in reversed(_rows)]
-                        # 去重相邻重复
-                        _dedup = []
-                        for l in _lines:
-                            if not _dedup or l != _dedup[-1]:
-                                _dedup.append(l)
-                        blocks.append("【最近对话】\n" + "\n".join(f"  {l}" for l in _dedup))
-            except Exception:
-                pass
 
             # ═══════ 第三层：你怎么变成这样 ═══════
             try:
@@ -617,35 +517,12 @@ class NexSandglassProvider(MemoryProvider):
                 if tp:
                     tasks = [t['task'][:80] for t in tp[:3]]
             except Exception:
-                pass
+                logger.warning("system_prompt_block 待办读取失败", exc_info=True)
 
-            # 铁律
-            rules = []
-            try:
-                from discipline import iron_rules_with_counts, iron_rule_inject_bump
-                raw_rules = iron_rules_with_counts(3)
-                if raw_rules:
-                    if any(c > 0 for _, c in raw_rules):
-                        rules = [f"{r} ×{c}" for r, c in raw_rules]
-                    else:
-                        rules = [r for r, _ in raw_rules]
-                    # V2.9.9: 会话级去重bump — 每条规则每session+1
-                    for r, _ in raw_rules:
-                        iron_rule_inject_bump(r)
-            except Exception:
-                pass
-
-            if tasks or rules:
-                header = "【还没做完】"
-                if tasks:
-                    layer4.append(header)
-                    layer4.append("待办：")
-                    layer4.extend(f"  {i+1}. {t}" for i, t in enumerate(tasks))
-                if rules:
-                    if not tasks:
-                        layer4.append(header)
-                    layer4.append("铁律：")
-                    layer4.extend(f"  {i+1}. {r}" for i, r in enumerate(rules))
+            if tasks:
+                layer4.append("【还没做完】")
+                layer4.append("待办：")
+                layer4.extend(f"  {i+1}. {t}" for i, t in enumerate(tasks))
                 blocks.append("\n".join(layer4))
 
             # ═══════ 管道洞察（V2.9.11） ═══════
@@ -654,67 +531,118 @@ class NexSandglassProvider(MemoryProvider):
                 syn = _synthesize_3d(trigger="inject")
                 if syn and syn.get("pipe_insights"):
                     blocks.append(f"🔍 {syn['pipe_insights']}")
-            except Exception as e:
+            except Exception:
+                logger.warning("system_prompt_block 管道洞察注入失败", exc_info=True)
 
-                _pipe_warn("pipe", e)
             # ═══════ 尾部 ═══════
-            # V2.10.19: 管道降级报告——LLM可见
-            degraded = self._degraded_report()
-            if degraded:
-                blocks.insert(0, degraded)
-            
             blocks.append(f"沙漏: {total}条 | 阶段: {stage}")
 
-            result = "\n\n".join(blocks).strip()
-            if not result:
-                logger.debug("system_prompt_block: 无可注入数据")
-            return result
+            content = "\n\n".join(blocks).strip()
         except Exception:
             logger.warning("system_prompt_block 整体失败", exc_info=True)
-            return "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
+            content = "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
+        # V2.20.3: 内容hash缓存——hash相同→复用上次字符串（字节级稳定）；
+        # 缓存任何异常→照常返回本次生成内容（异常兜底，不吞注入）
+        try:
+            digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            with self._lock:
+                if digest == self._inject_cached_hash:
+                    return self._inject_cached_text
+                self._inject_cached_hash = digest
+                self._inject_cached_text = content
+        except Exception:
+            logger.warning("system_prompt_block hash缓存写入失败", exc_info=True)
+        # V2.20.x: 只在真正组装出新 system prompt 后 bump 一次 inject_count；
+        # hash 命中会提前 return，因此缓存命中不会自增，读取路径更不会 bump。
+        try:
+            for r in injected_rules:
+                iron_rule_inject_bump(r)
+        except Exception:
+            logger.warning("铁律注入计数递增失败", exc_info=True)
+        return content
 
     def prefetch(self, query: str, **kwargs) -> str:
-        """V2.10.55: 极简轮次注入 — 搜索引导+记忆预览。去重system_prompt_block已覆盖内容。
+        """V2.9.34: 两段式轮次注入 — 搜索上下文+状态快照。~60t。激励LLM主动搜索。
+        V2.20.3: 同query 3轮内重复→跳过重算，复用上次快照（字节级稳定）。
         V2.20.5: 签名兼容 Hermes — 接受 session_id 等关键字参数。"""
         try:
-            blocks = []
+            nq = self._normalize_query(query)
+            self._last_rule_context = str(query or "")
+            if nq:
+                with self._lock:
+                    if any(self._query_similar(nq, hq) for hq in self._prefetch_query_history):
+                        return self._prefetch_last_text  # V2.20.3: 3轮内重复→跳过重算
+            parts = []
+            
+            # ═══ 块A: 搜索上下文 (~25t) ═══
             hints = getattr(self, '_prefetch_hints', [])
-            
-            # ═══ 块1: 搜索引导 ═══
-            guide = []
             if hints:
-                guide.append(f"搜索: {' / '.join(hints[:3])}")
-            try:
-                from scene_l3 import scene_current
-                sc = scene_current()
-                if sc: guide.append(f"📍 {'·'.join(sc[:2])}")
-            except Exception: pass
-            if guide: blocks.append(" | ".join(guide))
+                ctx = f"🔍 {' / '.join(hints[:3])}"
+                try:
+                    from scene_l3 import scene_current
+                    sc = scene_current()
+                    if sc: ctx += f" | 📍 {sc[0]}"
+                except Exception:
+                    logger.warning("prefetch 场景注入失败", exc_info=True)
+                parts.append(ctx)
             
-            # ═══ 块2: 记忆预览 — 带精搜引导 ═══
+            # ═══ 块B: 状态快照 (~35t) ═══
+            from sandglass_think import comprehensive_offset, _emotional_entropy, _synthesize_3d
+            off = comprehensive_offset()
+            ent = _emotional_entropy()
+            mood = "平稳" if ent < 0.5 else ("波动" if ent < 1.0 else "高熵")
+            dirs = {"frugal": "省钱", "spend": "愿投", "drift": "放弃"}
+            off_d = dirs.get(off.get('direction',''), '平稳')
+            syn = _synthesize_3d(trigger="prefetch")
+            pi = syn.get("pipe_insights", "")
+            tangle = ""
+            if "纠结:" in pi: tangle = " 纠结:" + pi.split("纠结:")[1].split("|")[0].strip()
+            lines = [f"状态: {off_d}({off.get('offset',0):+d}%) | {mood}{tangle}"]
+            # 铁律：红牌全量 + 普通按触发词；不再硬截 25 字
             try:
-                from search_router import SearchRouter
-                sr = SearchRouter()
-                search_q = " ".join(hints[:3]) if hints and len(hints) > 1 else query
-                results = sr.search(search_q, limit=3)
-                if results:
-                    mem_lines = []
-                    for i, (ln, ts, text) in enumerate(results[:3]):
-                        prefix = "✓" if i == 0 else "·"
-                        t = text[:70].replace("\n", " ")
-                        mem_lines.append(f"  {prefix} [{ts[:10]}] {t}")
-                    blocks.append("📋 记忆预览:\n" + "\n".join(mem_lines) + "\n  → sandglass_search 可扩展更多")
-            except Exception: pass
+                from discipline import iron_rule_layers
+                layers = iron_rule_layers(context=(query or ""))
+                rule_lines = []
+                rule_lines.extend(
+                    f"[red] {item['text']} ×{item['score']}"
+                    for item in layers["red"]
+                )
+                rule_lines.extend(
+                    f"[normal] {item['text']} ×{item['score']} [触发:{item['triggered_by']}]"
+                    for item in layers["normal"]
+                )
+                if rule_lines:
+                    lines.append("铁律：" + " ".join(rule_lines))
+            except Exception:
+                logger.warning("prefetch 铁律注入失败", exc_info=True)
+            # 洞察精简（只取标签+告警）
+            if pi:
+                snippets = [s.strip() for s in pi.split("|") if s.strip()]
+                key = [s[:50] for s in snippets if any(k in s for k in ["标签:", "告警:"])]
+                if key: lines.append(" | ".join(key[:2]))
+            parts.append("\n".join(lines))
             
-            result = "\n\n".join(blocks)
-            return result[:250]  # 硬截断 335→250
+            result = "\n".join(parts)
+            result = result[:500]  # ~60t 硬截断
+            if nq:
+                with self._lock:
+                    self._prefetch_query_history.append(nq)
+                    self._prefetch_last_text = result
+            return result
         except Exception:
             return ""
 
     def queue_prefetch(self, query: str, **kwargs) -> None:
         """后台预热——语义扩展+标签提取。激励LLM主动调sandglass_search。
+        V2.20.3: 同query 3轮内重复→跳过，保留上次 hints，避免每轮重复扩展。
         V2.20.5: 签名兼容 Hermes — 接受 session_id 等关键字参数。"""
         try:
+            nq = self._normalize_query(query)
+            self._last_rule_context = str(query or "")
+            if nq:
+                with self._lock:
+                    if any(self._query_similar(nq, hq) for hq in self._queue_prefetch_query_history):
+                        return  # V2.20.3: 3轮内重复→跳过（保留上次 _prefetch_hints）
             from sandglass_think import _infer_expand_with_context, search_filter
             sf = search_filter(query)
             ctx = sf or {}
@@ -727,83 +655,26 @@ class NexSandglassProvider(MemoryProvider):
                 ctx.get("decision_bias", "")
             )
             self._prefetch_hints = expanded[1:5] if expanded and len(expanded) > 1 else []
+            if nq:
+                with self._lock:
+                    self._queue_prefetch_query_history.append(nq)
         except Exception:
             self._prefetch_hints = []
 
     def sync_turn(self, user_msg: str, assistant_msg: str, **kwargs) -> None:
-        """每轮对话后落沙。V2.20.5: 同时消费 Hermes 传入的 messages 历史消息。"""
+        """每轮对话后落沙。"""
         try:
             from sandglass_log import log_message
-
-            logged_texts = set()
-
-            def _log_once(text, sender):
-                # 与当前 user_msg/assistant_msg 及历史消息列表去重，避免重复落沙
-                normalized = str(text or "").strip()
-                if not normalized or normalized in logged_texts:
-                    return
-                logged_texts.add(normalized)
-                log_message(text, sender)
-
             if user_msg:
-                _log_once(user_msg, "user")
+                log_message(user_msg, "user")
             if assistant_msg:
-                _log_once(assistant_msg, "agent")
-
-            # Hermes 契约兼容：若传入 messages 列表，则把其中的 user/assistant
-            # 角色消息也落沙；结构不明时打印结构并保守忽略。
-            messages = kwargs.get("messages")
-            if isinstance(messages, list):
-                for item in messages:
-                    if not isinstance(item, dict):
-                        print(f"[sync_turn] unknown message item structure: {type(item).__name__}: {item!r}")
-                        continue
-                    role = item.get("role")
-                    content = item.get("content")
-                    if role in ("user", "human"):
-                        sender = "user"
-                    elif role in ("assistant", "ai", "agent"):
-                        sender = "agent"
-                    else:
-                        continue
-                    if isinstance(content, str):
-                        _log_once(content, sender)
-                    else:
-                        print(f"[sync_turn] unknown content structure for role={role!r}: {type(content).__name__}: {content!r}")
-            elif messages is not None:
-                print(f"[sync_turn] unknown messages structure: {type(messages).__name__}: {messages!r}")
-
+                log_message(assistant_msg, "agent")
+            self._last_rule_context = " ".join([
+                part for part in (str(user_msg or ""), str(assistant_msg or "")) if part
+            ])
             self._turn_count += 1
         except Exception:
-            pass
-
-    def post_setup(self, hermes_home: str, config: dict) -> None:
-        """V2.10.26: 自动检测沙漏目录——零配置一键激活。"""
-        nb = os.environ.get("NEXSANDBASE_HOME") or ""
-        # 自动搜索已有沙漏数据
-        search_paths = [nb] if nb else []
-        # config.yaml 中用户自定义路径
-        cfg_home = config.get("memory", {}).get("nexsandglass", {}).get("home")
-        if cfg_home and cfg_home not in search_paths:
-            search_paths.append(cfg_home)
-        search_paths.append(os.path.join(os.path.expanduser("~"), ".neurobase"))
-        found = None
-        for p in search_paths:
-            if p and os.path.exists(os.path.join(p, "sandglass.txt")):
-                found = p; break
-        if not found:
-            found = os.path.join(os.path.expanduser("~"), ".neurobase")
-        os.environ["NEXSANDBASE_HOME"] = found
-        config.setdefault("memory", {})["nexsandglass"] = {"home": found}
-        config["memory"]["provider"] = "nexsandglass"
-        print(f"\n  ✓ NexSandglass V{__version__} 已激活")
-        print(f"  沙漏目录：{found}")
-        try:
-            from sandglass_vault import count
-            total = count()
-            print(f"  沙漏记录：{total}条")
-        except Exception: pass
-        print(f"  重启后开始记录。\n")
+            logger.warning("sync_turn 落沙失败", exc_info=True)
 
     def shutdown(self) -> None:
         """清理。"""
@@ -862,8 +733,20 @@ class NexSandglassProvider(MemoryProvider):
             return tool_error(f"fact_feedback error: {e}")
 
     def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
-        """会话结束——落沙 + 偏移检查 + V2.9.9.1情绪摘要。"""
+        """会话结束——落沙 + 偏移检查 + V2.9.9.1情绪摘要。V2.20.3: 顺带重置阶段一缓存。"""
         try:
+            # V2.20.3: 会话结束→重置阶段一缓存，防串会话（失败不影响落沙）
+            try:
+                with self._lock:
+                    self._reset_stage1_cache()
+            except Exception:
+                logger.debug("on_session_end 重置阶段一缓存失败（非致命）", exc_info=True)
+            # V2.20.x: 会话结束重置铁律注入去重，下一会话可重新统计 inject_count
+            try:
+                from discipline import iron_rule_session_reset
+                iron_rule_session_reset()
+            except Exception:
+                logger.debug("on_session_end 重置铁律注入去重失败（非致命）", exc_info=True)
             # 落最后一轮对话
             for msg in messages[-5:]:
                 role = msg.get("role", "user")
@@ -881,6 +764,7 @@ class NexSandglassProvider(MemoryProvider):
             # V2.9.9.1: 情绪会话摘要
             try:
                 from emotion_vocab import detect as emotion_detect
+                from sandglass_paths import _NB
                 mood_counts = {}
                 for msg in messages:
                     if msg.get("role") == "user":
@@ -899,10 +783,20 @@ class NexSandglassProvider(MemoryProvider):
                     with open(emo_path, "a", encoding="utf-8") as f:
                         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
             except Exception:
-                pass
+                logger.warning("on_session_end 情绪摘要失败", exc_info=True)
 
         except Exception:
-            pass
+            logger.warning("on_session_end 失败", exc_info=True)
+
+    def on_session_switch(self, new_session_id: str, **kwargs) -> None:
+        """V2.20.3: 会话切换（/new /reset /resume /branch /压缩）→ 重置阶段一缓存。"""
+        try:
+            with self._lock:
+                if new_session_id:
+                    self._session_id = new_session_id
+                self._reset_stage1_cache()
+        except Exception:
+            logger.debug("on_session_switch 重置阶段一缓存失败（非致命）", exc_info=True)
 
     # ═══════ 工具暴露 ═══════
 
@@ -959,20 +853,13 @@ class NexSandglassProvider(MemoryProvider):
     # ═══════ 可选钩子 ═══════
 
     def on_memory_write(self, action: str, target: str, content: str, metadata: dict = None) -> None:
-        """镜像内置记忆写入——过滤低价值噪声后落沙。"""
-        # 过滤内置记忆噪声
-        noise_patterns = [
-            "Self-audit:", "verify format", "not substring",
-            "MEMORY.md is", "USER.md is"
-        ]
-        if any(p.lower() in content.lower() for p in noise_patterns):
-            return  # 不落沙，防止污染
+        """镜像内置记忆写入——同步落沙。"""
         try:
             from sandglass_log import log_message
             text = f"[{action}] {target}: {content[:200]}"
             log_message(text, "memory_write")
         except Exception:
-            pass
+            logger.warning("on_memory_write 落沙失败", exc_info=True)
 
     def on_pre_compress(self, messages: List[Dict[str, Any]]) -> Optional[str]:
         """上下文压缩前提取关键记忆。"""
@@ -985,7 +872,7 @@ class NexSandglassProvider(MemoryProvider):
                     results = vs(last, limit=3)
                     return "\n".join(txt[:200] for _, _, txt in results)
         except Exception:
-            pass
+            logger.warning("on_pre_compress 提取失败", exc_info=True)
         return None
 
 

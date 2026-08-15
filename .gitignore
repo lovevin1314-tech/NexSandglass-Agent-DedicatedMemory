@@ -4,6 +4,8 @@ __pycache__/
 *.rej
 *.orig
 *.zip
+*.bak
+*.bak-*
 
 # 禁止上传真实数据
 sandglass.txt
