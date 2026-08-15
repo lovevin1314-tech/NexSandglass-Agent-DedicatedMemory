@@ -57,10 +57,21 @@ def sense():
     with open(_SANDGLASS, encoding="utf-8") as f:
         lines = deque(f, maxlen=need)
     start = total - len(lines) + 1
+    # 断点1：铁律提取闭环——复用本次已读新行，零额外IO、被动触发
+    try:
+        from discipline import iron_rule_extract_and_store as _extract_iron_rules
+    except Exception:
+        _extract_iron_rules = None
     for j, line in enumerate(lines, start):
-        text = line.split(" | ", 2)[-1] if " | " in line else line
+        parts = line.split(" | ", 2)
+        text = parts[-1] if len(parts) == 3 else line
         for token in _tokenize(text):
             db.execute("INSERT OR IGNORE INTO idx(word, line_num) VALUES(?,?)", (token, j))
+        if _extract_iron_rules is not None and len(parts) == 3 and parts[1] == "user":
+            try:
+                _extract_iron_rules(text, j)
+            except Exception:
+                pass
     db.commit()
     global _synced_to; _synced_to = total
 def search(word):
