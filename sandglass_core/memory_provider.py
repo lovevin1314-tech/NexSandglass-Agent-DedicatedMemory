@@ -292,7 +292,7 @@ class NexSandglassProvider(MemoryProvider):
             try:
                 from sandglass_paths import __version__ as _ver
             except Exception:
-                _ver = "2.20.5"
+                _ver = "2.20.6"
             logger.info(f"NexSandglass V{_ver} 就绪")
 
     def system_prompt_block(self) -> str:
