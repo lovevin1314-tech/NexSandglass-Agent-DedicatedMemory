@@ -113,6 +113,24 @@ def weave_insight(topic: str) -> dict:
         result["synthesis_enhanced"] = result["synthesis"]
     return result
 
+
+def weave_thread_fill(topic: str = "", limit: int = 12) -> dict:
+    """织线补漏：从沙子检索结果中调用本地模型补织正则漏掉的三元组。
+
+    这是 V3.1.0 丢失物#1 的入口；模型不可用/失败时自动返回 `engine=rule`，
+    不做任何写入。写入走 `weave_llm.weave_missing_triples` → `wthread_add`。
+    """
+    from sandglass_vault import search as vs
+    from weave_llm import weave_missing_triples
+    from weavethread import wthread_query
+
+    sands = vs(topic, limit=max(1, int(limit))) if topic else []
+    if not sands:
+        from sandglass_vault import recent
+        sands = recent(max(1, int(limit)))
+    existing = wthread_query(limit=500)
+    return weave_missing_triples(sands, existing)
+
 @_fail_open({})
 def weave_contradiction() -> dict:
     """织布：检测三大支柱之间的自相矛盾。

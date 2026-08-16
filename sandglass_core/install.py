@@ -2,7 +2,7 @@
 """NexSandglass V2.9.9 — 一键安装+验证 (Python stdlib, 零依赖)"""
 import os, sys, shutil
 
-VERSION = "3.0.0"
+VERSION = "3.1.0"
 NB = os.path.join(os.path.expanduser("~"), ".neurobase")
 HERMES = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~/.local/share")), "hermes")
 

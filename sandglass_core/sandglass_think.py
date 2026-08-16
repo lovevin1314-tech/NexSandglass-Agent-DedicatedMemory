@@ -1392,11 +1392,58 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
             "emotional_state": f"情绪熵{ent:.2f}({mood})",
             "decision_pattern": f'{comp["direction"]}倾向({comp["offset"]:+d}%), 样本{comp["sample"]}条',
             "reminder_tone": "数据汇报" if mood == "平稳" else "安静陪伴",
+            "reminder_example": "",
             "pipe_insights": " | ".join(pipe_insights) if pipe_insights else "管道待积累",
             "source": "3D 管道合成",
             "timestamp": datetime.now().isoformat(),
             "offset": comp,
+            "synthesis_engine": "rule",
+            "synthesis_model": "",
+            "synthesis_fallback_reason": "llm_disabled",
         }
+
+        # V3.1.0 丢失物#2：模型可用时用 Qwen 织立体像；失败/不可用完全回落本地聚合。
+        try:
+            from weave_llm import synthesize_3d as _llm_synthesize_3d
+            weave_thread = ""
+            try:
+                from weavethread import wthread_to_weave
+                thread_view = wthread_to_weave("user")
+                if isinstance(thread_view, dict):
+                    weave_thread = str(thread_view.get("summary") or "")
+            except Exception as e:
+                _pipe_warn("sandglass_think_L1402", e)
+
+            llm_context = {
+                "persona_type": data["persona_type"],
+                "emotional_state": data["emotional_state"],
+                "decision_pattern": data["decision_pattern"],
+                "offset_direction": comp.get("direction", "neutral"),
+                "offset_value": int(comp.get("offset", 0) or 0),
+                "reminder_tone": data["reminder_tone"],
+                "reminder_example": data.get("reminder_example", ""),
+                "weave_thread": weave_thread,
+                "pipe_insights": data.get("pipe_insights", ""),
+            }
+            llm_result = _llm_synthesize_3d(llm_context)
+            if isinstance(llm_result, dict):
+                data["synthesis_engine"] = str(llm_result.get("engine", "rule"))
+                data["synthesis_model"] = str(llm_result.get("model", ""))
+                data["synthesis_fallback_reason"] = str(llm_result.get("fallback_reason", ""))
+                data["synthesis_latency_ms"] = int(llm_result.get("latency_ms") or 0)
+                if llm_result.get("engine") == "llm":
+                    if llm_result.get("persona_type"):
+                        data["persona_type"] = str(llm_result["persona_type"]).strip()[:60]
+                    if llm_result.get("reminder_tone"):
+                        data["reminder_tone"] = str(llm_result["reminder_tone"]).strip()
+                    if llm_result.get("reminder_example"):
+                        data["reminder_example"] = str(llm_result["reminder_example"]).strip()[:200]
+                    data["source"] = "3D 模型合成"
+        except Exception as e:
+            _pipe_warn("sandglass_think_L1431", e)
+            data["synthesis_engine"] = "rule"
+            data["synthesis_fallback_reason"] = f"{type(e).__name__}:{str(e)[:100]}"
+
         _save_annotation(data, trigger or "local")
         return data
     except Exception:

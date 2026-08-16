@@ -1,4 +1,4 @@
-# NexSandglass V3.0.0 架构简报 — 供审查者参考
+# NexSandglass V3.1.0 架构简报 — 供审查者参考
 
 ## 五层架构
 ```
@@ -40,6 +40,12 @@ LLM调用前 ← system_prompt_block() ← 四层注入(58+150t)
 5. 本地优先: 无API也能跑
 6. 织布机中枢: 所有注入数据必须经织布机加工
 7. 红线: 模型产出永不写回 L0 原始沙（sandglass.txt 哈希实测校验）
+
+## v3.1.0 改动范围
+- `sandglass_think._synthesize_3d`：复用 `weave_llm` 本地小模型合成 `persona_type` / `reminder_tone` / `reminder_example`；模型失败回落原 22 行本地聚合
+- `weave_llm.synthesize_3d`：四支柱极简 prompt，JSON 失败降级为文本，四选一语气归一化
+- `weave_llm.weave_missing_triples`：从沙子检索结果补织三元组，实体原文校验 + 行号定位 + 可疑丢弃，经 `wthread_add` 写 L2 织线表
+- `weave_l3.weave_thread_fill`：织线补漏程序化入口
 
 ## v3.0.0 改动范围
 - weave_llm.py: 可插拔模型织印象（GGUF/端点/Ollama 三后端，失败回落规则，不写 L0）

@@ -1,0 +1,91 @@
+{
+  "environment": {
+    "temp_home": "/tmp/nexsandglass-v31-tests-4jmcbh7s",
+    "corpus_size": 20,
+    "model_gguf_found": true,
+    "real_model_usable": false,
+    "real_model_block_reason": "llama_context failed: sandbox Metal command queue unavailable"
+  },
+  "integrity": {
+    "l0_before": "6e683b090cd67a0a1bb845cd07679a91d57335173189095127c54f52530cfe13",
+    "l0_after_rule": "6e683b090cd67a0a1bb845cd07679a91d57335173189095127c54f52530cfe13",
+    "l0_after_mock3d": "6e683b090cd67a0a1bb845cd07679a91d57335173189095127c54f52530cfe13",
+    "l0_after_mock_fill": "6e683b090cd67a0a1bb845cd07679a91d57335173189095127c54f52530cfe13",
+    "l0_after_fallback3d": "6e683b090cd67a0a1bb845cd07679a91d57335173189095127c54f52530cfe13",
+    "l0_after_fallback_fill": "6e683b090cd67a0a1bb845cd07679a91d57335173189095127c54f52530cfe13",
+    "l0_unchanged": true
+  },
+  "task_a": {
+    "rule": {
+      "persona_type": "本地优先工具控",
+      "reminder_tone": "数据汇报",
+      "reminder_example": "",
+      "source": "3D 管道合成",
+      "engine": "rule",
+      "fallback_reason": "llm_disabled",
+      "persona_chars": 7,
+      "example_chars": 0,
+      "example_sentences": 0
+    },
+    "model": {
+      "persona_type": "本地优先、买断制偏好的精简工具使用者",
+      "reminder_tone": "行动式",
+      "reminder_example": "今天先把 Figma 的版本整理一下，别再同时开三个编辑器。",
+      "source": "3D 模型合成",
+      "engine": "llm",
+      "model": "mock-qwen-0.5b",
+      "fallback_reason": "",
+      "persona_chars": 18,
+      "example_chars": 30,
+      "example_sentences": 1
+    },
+    "fallback": {
+      "engine": "rule",
+      "fallback_reason": "URLError:<urlopen error [Errno 61] Connection refused>",
+      "source": "3D 管道合成",
+      "example_nonempty": false
+    },
+    "tone_diversity_rule": 1,
+    "tone_diversity_model": 1
+  },
+  "task_b": {
+    "regex_count": 10,
+    "model_fill": {
+      "engine": "llm",
+      "model": "mock-qwen-0.5b",
+      "triples": [
+        {
+          "subject": "Figma",
+          "relation": "用途",
+          "object": "界面设计",
+          "source_line": 1
+        },
+        {
+          "subject": "Lightroom",
+          "relation": "用途",
+          "object": "照片",
+          "source_line": 2
+        }
+      ],
+      "candidates": 3,
+      "added": 2,
+      "discarded_hallucination": 1,
+      "discarded_invalid": 0,
+      "fallback_reason": "",
+      "latency_ms": 0
+    },
+    "after_fill_count": 12,
+    "increase": 2,
+    "fallback": {
+      "engine": "rule",
+      "model": "",
+      "triples": [],
+      "candidates": 0,
+      "added": 0,
+      "discarded_hallucination": 0,
+      "discarded_invalid": 0,
+      "fallback_reason": "URLError:<urlopen error [Errno 61] Connection refused>",
+      "latency_ms": 0
+    }
+  }
+}

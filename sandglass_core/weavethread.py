@@ -1,7 +1,8 @@
 """
-NexSandglass 织线——织布机的线材 — V2.9.3-dev
+NexSandglass 织线——织布机的线材 — V3.1.0
 三元组提取 + SQLite 存储 + 图谱查询
-零 LLM，纯正则，存 shadow_sand.db 的 wthread_triples 表
+正则为主，存 shadow_sand.db 的 wthread_triples 表；
+LLM 补漏三元组通过 wthread_add 写同一张 L2 表，不写 L0。
 """
 import re, sqlite3, os
 from datetime import datetime, timezone

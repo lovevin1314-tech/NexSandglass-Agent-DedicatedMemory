@@ -2,7 +2,7 @@
 
 > **`pip install nexsandglass`** · 纯本地 · 零依赖 · 零 API Key
 
-[![PyPI](https://img.shields.io/badge/PyPI-3.0.0-blue)](https://pypi.org/project/nexsandglass/)
+[![PyPI](https://img.shields.io/badge/PyPI-3.1.0-blue)](https://pypi.org/project/nexsandglass/)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
@@ -217,6 +217,13 @@ python hermes_to_sandglass.py  # 一行命令导入 Hermes 历史记忆
 ```
 
 ## 版本历程
+
+### V3.1.0 (2026-08-17) · 补回立体像合成 + 织线补漏
+- `_synthesize_3d` 复用 `weave_llm` 本地小模型：模型可用时语义化画像、四选一提醒语气、贴合场景提醒示例；失败自动回落原 22 行本地聚合
+- 新增 `weave_missing_triples`：从沙子检索结果补织正则漏掉的关系三元组，经实体原文校验后通过 `wthread_add` 写 L2 织线表，宁缺毋滥
+- 新增 `weave_l3.weave_thread_fill` 程序化入口，测试/外部任务可直接触发织线补漏
+- 架构红线保持：模型产出不写 L0、模型不可用自动回落、原合成/正则织线逻辑保留
+- 版本号统一对齐 3.1.0
 
 ### V3.0.0 (2026-08-17) · 织布机接入本地小模型（织印象）
 - 新增 `weave_llm.py`：可插拔模型织印象模块——支持 GGUF（llama.cpp）/ OpenAI 兼容端点 / Ollama 三种后端
