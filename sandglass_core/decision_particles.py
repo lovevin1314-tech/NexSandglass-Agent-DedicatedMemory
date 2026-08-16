@@ -40,7 +40,7 @@ _DIRECTION_MAP = {
 # 本地标签（baseline）
 # ═══════════════════════════════════════════════
 
-# 自进化词库缓存（安全审查员TOCTOU修复: Lock + 元组原子赋值）
+# 自进化词库缓存（并发TOCTOU修复: Lock + 元组原子赋值）
 import threading
 _VOCAB_CACHE = None
 _VOCAB_CACHE_MTIME = 0

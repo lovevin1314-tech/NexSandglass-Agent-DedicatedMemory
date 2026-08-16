@@ -11,7 +11,7 @@ L3 思维: sandglass_think(枢纽) → persona_l3/offset_l3/emotion_l3/scene_l3/
 注入:   memory_provider → system_prompt_block(四层问答式·58+150t)
 ```
 
-## 关键依赖图 (依赖图审查员已验证)
+## 关键依赖图 (已验证)
 ```
 sandglass_think ← 被14个文件依赖(核心枢纽)
   ├── persona_l3  ← sandglass_think/sandglass_mcp/emotion_l3/offset_l3/scene_l3
