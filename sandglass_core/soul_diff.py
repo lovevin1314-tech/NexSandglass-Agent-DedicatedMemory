@@ -42,6 +42,7 @@ def export_soul(output: str = "") -> str:
             "sample": off.get("sample", 0),
         }
     except Exception:
+        logger.warning(f"export_soul: 静默异常", exc_info=True)
         pass
 
     # 决策粒子（最近50条）

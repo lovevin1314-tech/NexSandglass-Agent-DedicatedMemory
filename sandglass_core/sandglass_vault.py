@@ -47,6 +47,7 @@ def _startup_autoheal() -> dict:
             if os.path.getmtime(_HEAL_MARKER) >= os.path.getmtime(_SANDGLASS):
                 return {"action": "skip", "reason": "already healed"}
         except Exception:
+            logger.warning(f"_startup_autoheal: 静默异常", exc_info=True)
             pass
     orphan_count = 0
     with open(_SANDGLASS, "r", encoding="utf-8") as f:
@@ -61,6 +62,7 @@ def _startup_autoheal() -> dict:
             with open(_HEAL_MARKER, "w") as f:
                 f.write(datetime.now().isoformat())
         except Exception:
+            logger.warning(f"_startup_autoheal: 静默异常", exc_info=True)
             pass
         return {"action": "skip", "reason": f"only {orphan_count} orphans"}
     try:
@@ -214,6 +216,7 @@ def _sync_index() -> dict:
                     _idx_cache = None  # 文件被修改过，清缓存
                     return {}  # 返回空，让调用方重建
             except Exception:
+                logger.warning(f"_sync_index: 静默异常", exc_info=True)
                 pass  # mtime 不可用，沿用缓存
             if _idx_cache is not None:
                 cached_max = 0
@@ -311,12 +314,14 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
         return results
     except Exception:
         # 感知链路失败 → 降级到投石问路索引（恢复基准版的 fallback 能力）
+        logger.warning(f"search: 局部导入失败: import sys, os", exc_info=True)
         try:
             from sandglass_vault import idx_search
             idx = idx_search(query, limit)
             if idx:
                 return idx
         except Exception:
+            logger.warning(f"search: 静默异常", exc_info=True)
             pass
         return []
 
@@ -394,7 +399,9 @@ def _mmap_search(query: str, limit: int, month: str, stage_filter: bool = False)
                 stages = stage_list()
                 if len(stages) >= 2:
                     scan_months.append(stages[-2].get("name", current))
-            except Exception: pass
+            except Exception:
+                logger.warning(f"_mmap_search: 静默异常", exc_info=True)
+                pass
         with open(_SANDGLASS, "rb") as f:
             with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                 line_start = 0; line_num = 0
@@ -410,6 +417,7 @@ def _mmap_search(query: str, limit: int, month: str, stage_filter: bool = False)
                             if limit > 0 and len(results) >= limit: break
                     line_start = line_end + 1
     except Exception:
+        logger.warning(f"_mmap_search: 静默异常", exc_info=True)
         pass
     return results
 
@@ -479,6 +487,7 @@ def sandglass_import(source_path: str, source_format: str = "sandglass") -> dict
             from perception_neuron import sense as perc_sense
             perc_sense()
         except Exception:
+            logger.warning(f"sandglass_import: 静默异常", exc_info=True)
             pass
 
         # 合并
@@ -551,6 +560,7 @@ def _import_sandglass(source_path: str) -> tuple:
                     existing_ts.add(ts)
                     imported += 1
             except Exception:
+                logger.warning(f"_import_sandglass: 局部导入失败: import sandglass_log", exc_info=True)
                 skipped += 1
     
     return imported, skipped
@@ -593,6 +603,7 @@ def _import_json_convo(source_path: str, fmt: str) -> tuple:
             sandglass_log.log_message(text, sender)
             imported += 1
         except Exception:
+            logger.warning(f"_import_json_convo: 局部导入失败: import sandglass_log", exc_info=True)
             skipped += 1
     
     return imported, skipped
@@ -612,6 +623,7 @@ def _import_plain(source_path: str) -> tuple:
                 sandglass_log.log_message(line, "user")
                 imported += 1
             except Exception:
+                logger.warning(f"_import_plain: 局部导入失败: import sandglass_log", exc_info=True)
                 skipped += 1
     return imported, skipped
 
@@ -716,11 +728,13 @@ def repair_sandglass(dry_run: bool = False) -> dict:
         from perception_neuron import sense as perc_sense
         perc_sense()
     except Exception:
+        logger.warning(f"repair_sandglass: 静默异常", exc_info=True)
         pass
     try:
         from cognition_neuron import sense as cog_sense
         cog_sense()
     except Exception:
+        logger.warning(f"repair_sandglass: 静默异常", exc_info=True)
         pass
     # V3: 清涟漪索引缓存
     try:
@@ -732,6 +746,7 @@ def repair_sandglass(dry_run: bool = False) -> dict:
                 _sql.connect(_dbp).execute("DELETE FROM facts")
                 _sql.connect(_dbp).execute("DELETE FROM triples")
     except Exception:
+        logger.warning(f"repair_sandglass: 静默异常", exc_info=True)
         pass
     
     # 清理索引缓存

@@ -8,6 +8,8 @@ NexSandglass 情绪词库 — 七大情绪分类
 import json, os, re
 
 from sandglass_paths import _NB
+import logging
+logger = logging.getLogger(__name__)
 _VOCAB_FILE = os.path.join(_NB, "emotion_vocab.json")
 
 # ── 七大情绪分类 ──
@@ -87,6 +89,7 @@ def load_vocab() -> dict:
                         vocab[mood][key] = sorted(existing)
             return vocab
         except Exception:
+            logger.warning(f"load_vocab: 静默异常", exc_info=True)
             pass
 
     vocab = {mood: {k: v for k, v in data.items()} for mood, data in _BUILTIN.items()}

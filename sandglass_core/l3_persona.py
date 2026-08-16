@@ -44,6 +44,7 @@ def persona_project(direction: str, offset: int) -> dict:
                         elif rec.get("sentiment") == "负面":
                             wind_direction -= rec.get("spread_weight", 0.8)
                     except Exception:
+                        logger.warning(f"persona_project: 静默异常", exc_info=True)
                         pass
         from sandglass_think import _sentiment_wind
         wind_direction += _sentiment_wind()

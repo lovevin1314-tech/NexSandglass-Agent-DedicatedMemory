@@ -280,6 +280,7 @@ class NexSandglassProvider(MemoryProvider):
                                     from shadow_sand import extract_tags
                                     entities = extract_tags(text)
                                 except Exception:
+                                    logger.warning(f"initialize: 局部导入失败: from shadow_sand import extract_tags", exc_info=True)
                                     ENTITY_RE = re.compile(r'(?:[A-Z][a-z]{2,}(?:[A-Z][a-z]{2,})+|[A-Z]{2,}|[A-Z][a-z]+(?:[ -][A-Z][a-z]+)*|[\u4e00-\u9fff]{2,6})')
                                     entities = [m.group().strip() for m in ENTITY_RE.finditer(text) if len(m.group().strip()) > 1]
                                 if entities:
@@ -292,8 +293,98 @@ class NexSandglassProvider(MemoryProvider):
             try:
                 from sandglass_paths import __version__ as _ver
             except Exception:
+                logger.warning(f"initialize: 局部导入失败: from sandglass_paths import __version__ as _ver", exc_info=True)
                 _ver = "2.20.6"
             logger.info(f"NexSandglass V{_ver} 就绪")
+
+    def _build_explicit_memory_block(self) -> tuple[str, set[str]]:
+        """冲突6：显式记忆块——回溯 _SANDGLASS 最近 200 行中的 memory_write。
+
+        只取 `[action] target: content` 可解析行；按 (action, target, content)
+        去重并保留最近 10 条；content 截断约 60 字符。返回 (块文本, seen_facts)。
+        """
+        try:
+            from sandglass_paths import _SANDGLASS
+            if not os.path.exists(_SANDGLASS):
+                return "", set()
+            with open(_SANDGLASS, "r", encoding="utf-8", errors="replace") as f:
+                tail = collections.deque(f, maxlen=200)
+            parsed = []
+            for line in tail:
+                if " | memory_write | " not in line:
+                    continue
+                parts = line.split("|", 2)
+                if len(parts) < 3:
+                    continue
+                payload = parts[2].strip()
+                m = re.match(r'^\[([^\]]+)\]\s*(.*?)\s*[:：]\s*(.*)$', payload)
+                if not m:
+                    continue
+                action = m.group(1).strip()
+                target = m.group(2).strip()
+                content = m.group(3).strip()
+                if not content:
+                    continue
+                parsed.append((action, target, content))
+            seen = set()
+            ordered = []
+            for action, target, content in reversed(parsed):
+                key = (action, target, content)
+                if key in seen:
+                    continue
+                seen.add(key)
+                ordered.append((action, target, content))
+            ordered.reverse()
+            ordered = ordered[-10:]
+            if not ordered:
+                return "", set()
+            lines = []
+            facts = set()
+            for idx, (action, target, content) in enumerate(ordered, 1):
+                short = content[:60]
+                lines.append(f"  {idx}. [{action}] {target or '?'}: {short}")
+                if target:
+                    facts.add(target)
+                facts.add(short)
+            return "\n".join(lines), facts
+        except Exception:
+            logger.warning("_build_explicit_memory_block 失败", exc_info=True)
+            return "", set()
+
+    def _build_entity_block(self, seen_facts: set, token_budget: int = None) -> str:
+        """冲突6：高信实体块——过织布机加工层，关联场景上下文。
+
+        数字/单字/已见实体过滤保留在 weave_l3.weave_entities_with_context；
+        token_budget 用于三块合计 ≤250 token 的预算截断。
+        """
+        try:
+            from weave_l3 import weave_entities_with_context
+            lines = weave_entities_with_context(
+                limit=5, seen_facts=seen_facts, max_tokens=token_budget
+            )
+            for line in lines:
+                name = line.split(" (场景:", 1)[0].strip()
+                if name:
+                    seen_facts.add(name)
+            return "\n".join(lines)
+        except Exception:
+            logger.warning("_build_entity_block 失败", exc_info=True)
+            return ""
+
+    def _build_fact_tag_block(self, seen_facts: set, token_budget: int = None) -> str:
+        """冲突6：事实标签块——过织布机加工层，关联来源上下文。
+
+        与显式记忆/高信实体共用 seen_facts 去重；token_budget 用于三块合计预算截断。
+        """
+        try:
+            from weave_l3 import weave_fact_categories_with_context
+            lines = weave_fact_categories_with_context(
+                limit=5, seen_facts=seen_facts, max_tokens=token_budget
+            )
+            return "\n".join(lines)
+        except Exception:
+            logger.warning("_build_fact_tag_block 失败", exc_info=True)
+            return ""
 
     def system_prompt_block(self) -> str:
         """V2.9.8: 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完
@@ -350,6 +441,42 @@ class NexSandglassProvider(MemoryProvider):
                     ]
             except Exception:
                 logger.debug("铁律双层注入失败", exc_info=True)
+
+            # ═══════ 冲突6：显式记忆/高信实体/事实标签（纪律后、你是谁前） ═══════
+            # 三个块共用 seen_facts，失败各自降级，不影响基础注入。
+            seen_facts: set = set()
+            try:
+                explicit_block, explicit_facts = self._build_explicit_memory_block()
+                seen_facts.update(explicit_facts)
+                if explicit_block:
+                    blocks.append(f"【显式记忆】\n{explicit_block}")
+            except Exception:
+                logger.warning("system_prompt_block 显式记忆块失败", exc_info=True)
+
+            # 三块正文合计 ≤250 token：先按显式块实际成本给高信实体/事实标签分配预算。
+            try:
+                from discipline import _estimate_tokens
+                remaining = max(0, 250 - _estimate_tokens(explicit_block))
+                entity_budget = max(0, int(remaining * 0.55))
+            except Exception:
+                def _estimate_tokens(text: str) -> int:
+                    return len(str(text or ""))
+                remaining = 250
+                entity_budget = 120
+            try:
+                entity_block = self._build_entity_block(seen_facts, token_budget=entity_budget)
+                if entity_block:
+                    blocks.append(f"【高信实体】\n{entity_block}")
+            except Exception:
+                logger.warning("system_prompt_block 高信实体块失败", exc_info=True)
+            try:
+                entity_cost = _estimate_tokens(entity_block) if "entity_block" in locals() else 0
+                fact_budget = max(0, remaining - entity_cost)
+                fact_tag_block = self._build_fact_tag_block(seen_facts, token_budget=fact_budget)
+                if fact_tag_block:
+                    blocks.append(f"【事实标签】\n{fact_tag_block}")
+            except Exception:
+                logger.warning("system_prompt_block 事实标签块失败", exc_info=True)
 
             # ═══════ 第一层：你是谁 V2.9.9.10 数据点 ═══════
             identity_parts = []
@@ -722,6 +849,7 @@ class NexSandglassProvider(MemoryProvider):
 
             return tool_error(f"Unknown fact_store action: {action}")
         except Exception as e:
+            logger.warning(f"_handle_fact_store: 局部导入失败: from sandglass_vault import search as vault_search", exc_info=True)
             return tool_error(f"fact_store error: {e}")
 
     def _handle_fact_feedback(self, args: dict) -> str:
@@ -730,6 +858,7 @@ class NexSandglassProvider(MemoryProvider):
             result = shadow_feedback(args["line_num"], args.get("helpful", True))
             return json.dumps(result, ensure_ascii=False)
         except Exception as e:
+            logger.warning(f"_handle_fact_feedback: 局部导入失败: from shadow_sand import shadow_feedback", exc_info=True)
             return tool_error(f"fact_feedback error: {e}")
 
     def on_session_end(self, messages: List[Dict[str, Any]]) -> None:

@@ -256,6 +256,7 @@ def pulse(user_message: str = "") -> str:
             from emotion_vocab import detect as _ed
             det = _ed(user_message)
         except ImportError:
+            logger.warning(f"pulse: 局部导入失败: from emotion_vocab import detect as _ed", exc_info=True)
             det = {"mood": "", "emitter": "自我", "priority": "低"}
         has_reminder = any("提醒" in s for s in signals)
         priority = det.get("priority", "低")

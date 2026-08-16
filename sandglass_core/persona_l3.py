@@ -151,6 +151,7 @@ def _data_driven_refresh(existing: str, first_line: int, last_line: int, total: 
         db.close()
         tops = [(t, c) for t, c in tags.most_common(5) if c >= 2]
     except Exception:
+        logger.warning(f"_data_driven_refresh: 静默异常", exc_info=True)
         pass
     
     # 2. 偏移率
@@ -236,6 +237,7 @@ def _pipe_build(first_line: int, last_line: int, total: int) -> str:
             if t.lower() in tool_tags:
                 tool_hints.append(tool_tags[t.lower()])
     except Exception:
+        logger.warning(f"_pipe_build: 静默异常", exc_info=True)
         pass
     
     # 2. 偏移率
@@ -255,6 +257,7 @@ def _pipe_build(first_line: int, last_line: int, total: int) -> str:
                 if "→" in last:
                     dp_chain = last.split("→")[-1].strip()[:60]
     except Exception:
+        logger.warning(f"_pipe_build: 静默异常", exc_info=True)
         pass
     
     # 4. 场景
@@ -264,6 +267,7 @@ def _pipe_build(first_line: int, last_line: int, total: int) -> str:
         sc = scene_current()
         if sc: scenes_text = "、".join(sc[:3])
     except Exception:
+        logger.warning(f"_pipe_build: 静默异常", exc_info=True)
         pass
     
     # ── 组装 persona.md ──
@@ -372,6 +376,7 @@ def _sync_five_facets(first_line: int = 0, last_line: int = 0, total: int = 0):
         with open(ff_path, "w", encoding="utf-8") as f:
             json.dump(ff, f, ensure_ascii=False, indent=2)
     except Exception:
+        logger.warning(f"_sync_five_facets: 静默异常", exc_info=True)
         pass
 
 
@@ -534,6 +539,7 @@ def _local_persona_extract() -> str:
         with open(ml, "a", encoding="utf-8") as f:
             f.write(metrics + "\n")
     except Exception:
+        logger.warning(f"_local_persona_extract: 静默异常", exc_info=True)
         pass
 
     return "\n".join(lines) if results else "数据不足"
@@ -690,6 +696,7 @@ def persona_project(direction: str, offset: int) -> dict:
         wg = weave_graph(f"{reverse} 方案", max_hops=2)
         causal_hint = wg.get("insight", "") if wg else ""
     except Exception:
+        logger.warning(f"persona_project: 局部导入失败: from sandglass_think import weave_graph", exc_info=True)
         causal_hint = ""
 
     shadow = f"影子灵魂——如果当初选择{reverse}（偏移{offset:+d}%）:\n"

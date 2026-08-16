@@ -9,6 +9,8 @@ import os
 from sandglass_paths import _NB
 import sys
 from datetime import datetime
+import logging
+logger = logging.getLogger(__name__)
 
 _VAULT = _NB
 _SANDGLASS = os.path.join(_VAULT, "sandglass.txt")
@@ -53,7 +55,9 @@ def night_watch() -> str:
     if os.path.exists(_LAST_COUNT):
         with open(_LAST_COUNT, "r") as f:
             try: prev_lines = int(f.read().strip())
-            except Exception: pass
+            except Exception:
+                logger.warning(f"night_watch: 静默异常", exc_info=True)
+                pass
         lost = prev_lines - current_lines
         if lost > 0:
             alerts.append(f"🔴 L0 告急！沙漏从 {prev_lines} 条降到 {current_lines} 条（疑似 compaction 吞了 {lost} 条沙子）。L1 沙漏未受影响，但会话层（L0）可能丢失了对话。")
@@ -124,6 +128,7 @@ def night_watch() -> str:
         hits = len(search("test", limit=1))
         ok.append(f"✅ 第二层可用（{total}条沙子，搜索正常）")
     except Exception as e:
+        logger.warning(f"night_watch: 局部导入失败: from sandglass_vault import count, search", exc_info=True)
         alerts.append(f"🔴 第二层异常：{e}")
 
     # ── 第3层：画像健康 ──
@@ -136,6 +141,7 @@ def night_watch() -> str:
         import sandglass_think
         ok.append("✅ 第三层可用")
     except Exception as e:
+        logger.warning(f"night_watch: 局部导入失败: import sandglass_think", exc_info=True)
         alerts.append(f"🔴 第三层异常：{e}")
 
     # ── 汇总 ──

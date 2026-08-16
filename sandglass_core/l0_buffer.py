@@ -12,6 +12,8 @@ NexSandglass — L0 短期记忆缓冲区
 import os, json
 from datetime import datetime
 from sandglass_paths import _NB
+import logging
+logger = logging.getLogger(__name__)
 
 L0_PATH = os.path.join(_NB, "l0_buffer.jsonl")
 L0_MAX = 5  # 最多保留5轮
@@ -41,6 +43,7 @@ def l0_remember(text: str, speaker: str = "user") -> None:
             from offset_l3 import offset_check
             offset_check(oldest["text"][:300], user_persisted=False)
         except Exception:
+            logger.warning(f"l0_remember: 静默异常", exc_info=True)
             pass
 
         # 只保留最近 L0_MAX 条
@@ -62,6 +65,7 @@ def l0_context() -> str:
             e = json.loads(line.strip())
             parts.append(f"[{e.get('speaker','?')}] {e.get('text','')[:200]}")
         except Exception:
+            logger.warning(f"l0_context: 静默异常", exc_info=True)
             pass
     return "## L0 短期记忆\n" + "\n".join(parts)
 

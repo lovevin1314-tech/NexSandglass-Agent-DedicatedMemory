@@ -1,6 +1,8 @@
 """脑干高速路 — 独立于L1/L2/L3。过滤·去重·搜索·守沙人。"""
 import sqlite3, os
 from sandglass_paths import _NB
+import logging
+logger = logging.getLogger(__name__)
 _PERCEPTION_DB = os.path.join(_NB, "perception.db")
 _COGNITION_DB = os.path.join(_NB, "cognition.db")
 _SANDGLASS = os.path.join(_NB, "sandglass.txt")
@@ -79,5 +81,6 @@ def startup_check():
         from perception_neuron import search
         from cognition_neuron import triples_by_line
     except Exception as e:
+        logger.warning(f"startup_check: 局部导入失败: from memory_neuron import put", exc_info=True)
         ok.append(f"神经元import失败: {e}")
     return len(ok) == 0, ok

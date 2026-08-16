@@ -303,6 +303,7 @@ def novel_scene_detect() -> dict:
             comp = comprehensive_offset()
             drift_trigger = abs(comp.get("offset", 0)) >= 30
         except Exception:
+            logger.warning(f"novel_scene_detect: 静默异常", exc_info=True)
             pass
 
     parts = []
@@ -334,6 +335,7 @@ def _log_scene_timeline(scenes: list) -> None:
                     last = json.loads(lines[-1].strip())
                     last_scenes = set(last.get("scenes", []))
                 except Exception:
+                    logger.warning(f"_log_scene_timeline: 静默异常", exc_info=True)
                     pass
     cur = set(scenes)
     if cur == last_scenes:

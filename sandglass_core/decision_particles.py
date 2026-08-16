@@ -75,6 +75,7 @@ def _tag_local(choice: str) -> str:
                         tags.append(t)
                         seen.add(t)
     except Exception:
+        logger.warning(f"_tag_local: 静默异常", exc_info=True)
         pass
     return ",".join(tags) if tags else ""
 
@@ -267,6 +268,7 @@ def _learn(tags: str, choice: str = "") -> None:
                     for line in lines[-200:]:
                         existing.add(line.strip())
             except Exception:
+                logger.warning(f"_learn: 静默异常", exc_info=True)
                 pass
         truly_new = [t for t in new_tags if t not in existing]
         if truly_new:
@@ -303,6 +305,7 @@ def _enrich_choice_desc(question: str, choice: str) -> str:
                 if "| frugal" in last: return f"选了{choice} — 成本导向"
                 if "| spend" in last: return f"选了{choice} — 效率优先"
     except Exception:
+        logger.warning(f"_enrich_choice_desc: 静默异常", exc_info=True)
         pass
     return choice
 
@@ -322,6 +325,7 @@ def _tag(question: str, choice: str) -> str:
         if infer_tags:
             emit_metric('tag_infer', latency_ms=int((time.time()-t0)*1000))
     except Exception:
+        logger.warning(f"_tag: 静默异常", exc_info=True)
         pass
 
     if infer_tags:
@@ -475,6 +479,7 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
         if det.get('mood'):
             emotion_tag = det['mood']
     except ImportError:
+        logger.warning(f"log: 局部导入失败: from emotion_vocab import detect as emotion_detect", exc_info=True)
         pass  # emotion_vocab 模块未安装
     except Exception:
         logger.debug('情绪检测失败', exc_info=True)

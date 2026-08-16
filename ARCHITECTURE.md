@@ -1,4 +1,4 @@
-# NexSandglass V2.20.5 架构简报 — 供审查者参考
+# NexSandglass V2.20.6 架构简报 — 供审查者参考
 
 ## 五层架构
 ```

@@ -4,6 +4,8 @@ import os, sys, sqlite3, json, glob
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sandglass_log import log_message
+import logging
+logger = logging.getLogger(__name__)
 
 total = 0
 
@@ -39,7 +41,8 @@ for db_path in HOLO_PATHS:
         db = sqlite3.connect(db_path)
         try:
             rows = db.execute("SELECT role, content FROM memories WHERE content IS NOT NULL AND content != '' ORDER BY id").fetchall()
-        except:
+        except Exception:
+            logger.warning(f"module: 静默异常", exc_info=True)
             rows = db.execute("SELECT 'user', text FROM entries WHERE text IS NOT NULL AND text != ''").fetchall()
         db.close()
         holo_count = 0

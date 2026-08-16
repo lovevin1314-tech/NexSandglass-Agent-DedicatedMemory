@@ -9,6 +9,8 @@ import sqlite3, os, re, threading
 from collections import defaultdict
 
 from sandglass_paths import _NB
+import logging
+logger = logging.getLogger(__name__)
 
 _SHADOW_DB = os.path.join(_NB, "shadow_sand.db")
 
@@ -193,6 +195,7 @@ def _sandglass_lines() -> list:
         with open(_SANDGLASS, 'r', encoding='utf-8', errors='replace') as f:
             return f.readlines()
     except Exception:
+        logger.warning(f"_sandglass_lines: 局部导入失败: from sandglass_paths import _SANDGLASS", exc_info=True)
         return []
 
 
@@ -246,6 +249,7 @@ def _close_conn():
         try:
             c.close()
         except Exception:
+            logger.warning(f"_close_conn: 静默异常", exc_info=True)
             pass
 
 def _db_inode() -> int:
@@ -363,6 +367,7 @@ def shadow_top_tags(limit: int = 2000) -> list:
                     if ok:
                         out.append(norm)
         except Exception:
+            logger.warning(f"shadow_top_tags: 静默异常", exc_info=True)
             pass
         return out
     except Exception:
@@ -380,6 +385,44 @@ def shadow_top_entities(limit: int = 5) -> list:
             (limit,)
         ).fetchall()
     except Exception:
+        return []
+
+
+def shadow_top_fact_categories(limit: int = 5) -> list:
+    """fact_tags 分类明细——冲突6 system_prompt 事实标签块用。
+
+    行号门控：只取 line_num <= 当前沙漏物理行数（越界历史残留直接出局）；
+    内容特征：排除 system/tool/cron 注入块特征行；
+    质量闸：每个 tag 走 _tag_quality；category 排除 general/exam_general/空/未分类。
+    ORDER BY line_num DESC——最近分类优先；返回 [(category, tags), ...]。
+    """
+    try:
+        cur_lines = _sandglass_line_count()
+        if cur_lines <= 0:
+            return []
+        rows = _get_conn().execute(
+            "SELECT line_num, category, tags FROM fact_tags "
+            "WHERE category NOT IN ('general','exam_general','','未分类') "
+            "AND tags != '' AND tags != '未分类' "
+            "AND line_num > 0 AND line_num <= ? "
+            "ORDER BY line_num DESC LIMIT ?",
+            (cur_lines, limit)
+        ).fetchall()
+        lines = _sandglass_lines()
+        out = []
+        for ln, category, tags in rows:
+            if 0 < ln <= len(lines) and _is_system_tool_content(lines[ln - 1]):
+                continue  # system/tool 源注入块——不进入事实标签明细
+            good = []
+            for t in tags.split(","):
+                ok, norm = _tag_quality(t)
+                if ok:
+                    good.append(norm)
+            if good:
+                out.append((category.strip() or "未分类", ",".join(good)))
+        return out
+    except Exception:
+        logger.warning(f"shadow_top_fact_categories: 静默异常", exc_info=True)
         return []
 
 
@@ -408,6 +451,7 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
         from sandglass_think import scene_mode
         if scene_mode() == 'exam': category = 'exam_' + category
     except Exception:
+        logger.warning(f"shadow_index: 静默异常", exc_info=True)
         pass
     db = _get_conn()
     # V2.9.9.8: 行号由调用方传入，不自计数（防止与sandglass物理行号偏移）
@@ -470,6 +514,7 @@ def shadow_index_archive(text: str, category: str = "general") -> None:
         )
         _maybe_commit()
     except Exception:
+        logger.warning(f"shadow_index_archive: 静默异常", exc_info=True)
         pass
 
 

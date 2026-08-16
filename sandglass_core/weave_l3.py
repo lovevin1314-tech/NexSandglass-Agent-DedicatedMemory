@@ -65,6 +65,7 @@ def weave_insight(topic: str) -> dict:
             if thread.get("summary"):
                 result["thread_view"] = thread["summary"]
     except Exception:
+        logger.warning(f"weave_insight: 静默异常", exc_info=True)
         pass
 
     # 织：四条线合成
@@ -113,6 +114,7 @@ def weave_contradiction() -> dict:
     try:
         from scene_l3 import scene_dominance
     except ImportError:
+        logger.warning(f"weave_contradiction: 局部导入失败: from scene_l3 import scene_dominance", exc_info=True)
         from sandglass_think import scene_dominance
     dom = scene_dominance()
     if dom.get("shift"):
@@ -128,11 +130,13 @@ def weave_contradiction() -> dict:
     try:
         from sandglass_think import decision_stability
     except ImportError:
+        logger.warning(f"weave_contradiction: 局部导入失败: from sandglass_think import decision_stability", exc_info=True)
         decision_stability = lambda: {"overall": {"volatility": 0}}
     stab = decision_stability()
     try:
         from scene_l3 import stage_switch_prediction
     except ImportError:
+        logger.warning(f"weave_contradiction: 局部导入失败: from scene_l3 import stage_switch_prediction", exc_info=True)
         stage_switch_prediction = lambda: {"predicted": False}
     pred = stage_switch_prediction()
     if stab["overall"]["volatility"] >= 40 and not pred.get("predicted"):
@@ -146,6 +150,7 @@ def weave_contradiction() -> dict:
     try:
         from sandglass_think import _latest_annotation
     except ImportError:
+        logger.warning(f"weave_contradiction: 局部导入失败: from sandglass_think import _latest_annotation", exc_info=True)
         _latest_annotation = lambda: {}
     three_d = _latest_annotation()
     if three_d and three_d.get("persona_type"):
@@ -301,6 +306,7 @@ def weave_graph(question: str, max_hops: int = 3) -> dict:
             "insight": "；".join(insight_parts) if insight_parts else "暂无因果链",
         }
     except Exception:
+        logger.warning(f"weave_graph: 局部导入失败: from sandglass_sqlite import _get_db", exc_info=True)
         return {"question": question, "chains": [], "root_causes": [], "total_hops": 0,
                 "insight": "织布机因果图暂不可用（需要 sandglass_sqlite FTS5 索引）"}
 
@@ -347,6 +353,7 @@ def weave_output(query: str = "", limit: int = 5) -> dict:
             result["scene_context"] = " · ".join(scenes[:3])
             result["keywords"].extend(scenes[:3])
     except Exception:
+        logger.warning(f"weave_output: 静默异常", exc_info=True)
         pass
     
     # 4. 偏移率方向
@@ -362,6 +369,7 @@ def weave_output(query: str = "", limit: int = 5) -> dict:
         elif direction == "drift":
             result["offset_guide"] = f"放弃倾向({offset_val:+d}%) — 可能厌倦或想换方向"
     except Exception:
+        logger.warning(f"weave_output: 静默异常", exc_info=True)
         pass
     
     # 5. 情绪温度
@@ -375,12 +383,189 @@ def weave_output(query: str = "", limit: int = 5) -> dict:
         else:
             result["emotion_note"] = "高熵期 — 情绪波动大，谨慎建议"
     except Exception:
+        logger.warning(f"weave_output: 静默异常", exc_info=True)
         pass
     
     # 去重关键词
     result["keywords"] = list(dict.fromkeys(result["keywords"][:10]))
     
     return result
+
+
+def _weave_estimate_tokens(text: str) -> int:
+    """复用 discipline._estimate_tokens；不可用时退化为字符数。"""
+    try:
+        from discipline import _estimate_tokens
+        return int(_estimate_tokens(text or ""))
+    except Exception:
+        return len(str(text or ""))
+
+
+def _weave_source_text(full_line: str) -> str:
+    """取影子沙关联的沙子行正文，去掉 [action] 前缀并压平空白。"""
+    try:
+        from shadow_sand import _content_part
+        text = _content_part(full_line or "").strip()
+    except Exception:
+        text = (full_line or "").strip()
+    text = re.sub(r"^\[[^\]]+\]\s*", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _weave_context_around(text: str, needle: str, radius: int = 8) -> str:
+    """围绕实体/标签截取 ≤2*radius 字上下文，体现跨时间交织而不是裸罗列。"""
+    text = re.sub(r"\s+", " ", (text or "").strip())
+    if not text:
+        return "近期沙子"
+    if not needle:
+        return text[: radius * 2]
+    idx = text.find(needle)
+    if idx < 0:
+        return text[: radius * 2]
+    start = max(0, idx - radius)
+    end = min(len(text), idx + len(needle) + radius)
+    return text[start:end].strip() or "近期沙子"
+
+
+def _weave_entity_context(name: str, line_nums: str, lines: list, radius: int = 8) -> str:
+    """为实体寻找其所在沙行，返回实体附近的上下文片段。"""
+    fallback = ""
+    try:
+        from shadow_sand import _is_system_tool_content
+        for raw in str(line_nums or "").split(","):
+            raw = raw.strip()
+            if not raw.isdigit():
+                continue
+            idx = int(raw) - 1
+            if idx < 0 or idx >= len(lines):
+                continue
+            full = lines[idx]
+            if _is_system_tool_content(full):
+                continue
+            text = _weave_source_text(full)
+            if not fallback and text:
+                fallback = _weave_context_around(text, "", radius)
+            if name and name in text:
+                return _weave_context_around(text, name, radius)
+    except Exception:
+        logger.warning("_weave_entity_context 失败", exc_info=True)
+    return fallback or "近期沙子"
+
+
+def _weave_fact_source_context(category: str, tag: str, radius: int = 8) -> str:
+    """为事实标签回找其来源沙行，返回标签附近的上下文片段。"""
+    try:
+        from shadow_sand import _get_conn, _sandglass_lines, _is_system_tool_content, _tag_quality, extract_tags
+        lines = _sandglass_lines()
+        if not lines:
+            return "近期沙子"
+        rows = _get_conn().execute(
+            "SELECT line_num, tags FROM fact_tags "
+            "WHERE category = ? AND tags != '' AND tags != '未分类' "
+            "AND line_num > 0 AND line_num <= ? "
+            "ORDER BY line_num DESC LIMIT 200",
+            (category, len(lines)),
+        ).fetchall()
+        for ln, tags in rows:
+            if 0 < ln <= len(lines) and _is_system_tool_content(lines[ln - 1]):
+                continue
+            norm_tags = []
+            for t in (tags or "").split(","):
+                ok, norm = _tag_quality(t)
+                if ok:
+                    norm_tags.append(norm)
+            if tag not in norm_tags:
+                continue
+            text = _weave_source_text(lines[ln - 1])
+            if tag in extract_tags(text, limit=100):
+                return _weave_context_around(text, tag, radius)
+            if text:
+                return _weave_context_around(text, "", radius)
+    except Exception:
+        logger.warning("_weave_fact_source_context 失败", exc_info=True)
+    return "近期沙子"
+
+
+def weave_entities_with_context(limit: int = 5, seen_facts: set = None, max_tokens: int = None, radius: int = 8) -> list:
+    """织布机加工层：高信实体 + 场景上下文。
+
+    读 shadow_top_entities 结果，为每个实体关联其所在沙子行的附近上下文。
+    输出如 `  黑咖啡 (场景: 主人: 喜欢黑咖啡)`，体现实体与场景的关系，
+    而不是简单罗列实体名。
+    """
+    try:
+        from shadow_sand import shadow_top_entities, _sandglass_lines
+        rows = shadow_top_entities(limit=max(20, int(limit) * 4))
+        lines = _sandglass_lines()
+        seen = set(seen_facts or [])
+        out = []
+        used = 0
+        for row in rows:
+            if len(out) >= int(limit):
+                break
+            if not row or len(row) < 2:
+                continue
+            name = str(row[0]).strip()
+            if not name or name.isdigit() or len(name) < 2 or name in seen:
+                continue
+            ctx = _weave_entity_context(name, row[1], lines, radius)
+            line = f"  {name} (场景: {ctx})"
+            cost = _weave_estimate_tokens(line)
+            if max_tokens is not None:
+                if out and used + cost > int(max_tokens):
+                    break
+                if cost > int(max_tokens):
+                    continue
+            out.append(line)
+            seen.add(name)
+            used += cost
+        return out
+    except Exception:
+        logger.warning("weave_entities_with_context 失败", exc_info=True)
+        return []
+
+
+def weave_fact_categories_with_context(limit: int = 5, seen_facts: set = None, max_tokens: int = None, radius: int = 8) -> list:
+    """织布机加工层：事实标签 + 来源上下文。
+
+    读 shadow_top_fact_categories 结果，为每条分类标签回找来源沙行，
+    输出 `  [偏好] 深色模式 (来源: 主人: 偏好深色模式)`。
+    """
+    try:
+        from shadow_sand import shadow_top_fact_categories
+        rows = shadow_top_fact_categories(limit=max(10, int(limit) * 2))
+        seen = set(seen_facts or [])
+        out = []
+        used = 0
+        total = 0
+        for category, tags in rows:
+            if total >= int(limit):
+                break
+            category = str(category or "").strip()
+            for raw in str(tags or "").split(","):
+                if total >= int(limit):
+                    break
+                tag = raw.strip()
+                if not tag or tag in seen:
+                    continue
+                ctx = _weave_fact_source_context(category, tag, radius)
+                line = f"  [{category}] {tag} (来源: {ctx})"
+                cost = _weave_estimate_tokens(line)
+                if max_tokens is not None:
+                    if out and used + cost > int(max_tokens):
+                        break
+                    if cost > int(max_tokens):
+                        continue
+                out.append(line)
+                seen.add(tag)
+                used += cost
+                total += 1
+                if total >= int(limit):
+                    break
+        return out
+    except Exception:
+        logger.warning("weave_fact_categories_with_context 失败", exc_info=True)
+        return []
 
 
 def weave_search_filter(query: str = "") -> str:

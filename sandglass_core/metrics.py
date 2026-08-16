@@ -3,6 +3,8 @@
 import json, os, time
 from datetime import datetime
 from sandglass_paths import _NB
+import logging
+logger = logging.getLogger(__name__)
 
 _METRICS = os.path.join(_NB, 'metrics.jsonl')
 _lock = __import__('threading').Lock()
@@ -15,6 +17,7 @@ def emit_metric(event: str, **kwargs):
             with open(_METRICS, 'a', encoding='utf-8') as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + '\n')
     except Exception:
+        logger.warning(f"emit_metric: 静默异常", exc_info=True)
         pass
 
 def vocab_hit_rate(hours: int = 24) -> dict:
@@ -35,6 +38,7 @@ def vocab_hit_rate(hours: int = 24) -> dict:
                 elif e['event'] == 'tag_result' and e.get('local_hit'):
                     local_hits += 1
             except Exception:
+                logger.warning(f"vocab_hit_rate: 静默异常", exc_info=True)
                 pass
     total = infer_calls + local_hits
     return {

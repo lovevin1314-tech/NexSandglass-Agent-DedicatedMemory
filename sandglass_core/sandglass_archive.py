@@ -6,6 +6,8 @@ NexSandglass V2.1.1 — 冷热分层存储
 import os, re, shutil
 from sandglass_paths import _NB
 from datetime import datetime, timedelta
+import logging
+logger = logging.getLogger(__name__)
 
 _VAULT = _NB
 _ARCHIVE = os.path.join(_VAULT, "archive")
@@ -107,6 +109,7 @@ def cold_migration(dry_run: bool = False) -> dict:
             from sandglass_vault import rebuild_index
             rebuild_index()
         except Exception:
+            logger.warning(f"cold_migration: 静默异常", exc_info=True)
             pass
 
     return {"moved": moved, "dropped": dropped, "kept": kept}

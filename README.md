@@ -186,6 +186,11 @@ python hermes_to_sandglass.py  # 一行命令导入 Hermes 历史记忆
 
 ## 版本历程
 
+### V2.20.x (2026-08) · Mac 魔改 + 铁律因子熔炼
+- V2.20.1: V3 架构里程碑——版本号统一升级，涟漪架构落地
+- V2.20.5: sync_turn 消费 messages + 缓存重置修复 + 全量脱敏（移除 persona 残留）+ build/dist 移出跟踪
+- V2.20.6: 铁律因子修复熔炼——核心下沉 sandglass_core 唯一 Provider、双层铁律注入（红牌常驻+普通触发）、token 预算纯本地估算（中文1字≈1token）、实体/标签注入（显式记忆/高信实体/事实标签三块）、单5 静默失效清理 128 处、生产红牌标记
+
 ### V2.10 (2026-06) · PyPI 发布 + 双向注入
 PyPI 发布 `pip install nexsandglass`。三块式轮次注入(150t)+四层问答式会话注入(186t)，DB 自省增量启动，沙子自愈，Porter Stemmer，psychology_hint 15种模式，local_distill 管道蒸馏，enrich_choice 模板引擎。
 

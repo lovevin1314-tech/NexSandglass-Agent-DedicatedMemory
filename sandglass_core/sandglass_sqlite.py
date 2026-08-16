@@ -9,6 +9,8 @@ V1.4.4：sandglass.txt不动，SQLite分词FTS5平行加速。
 import os, re, sqlite3, threading
 
 from sandglass_paths import _NB
+import logging
+logger = logging.getLogger(__name__)
 _DB = os.path.join(_NB, "sandglass.db")
 _lock = threading.Lock()
 _last_sync_mtime = 0  # 记录上次同步时的 sandglass.txt 修改时间
@@ -67,6 +69,7 @@ def sync_all() -> int:
             conn.commit()
             return len(rows)
     except Exception:
+        logger.warning(f"sync_all: 局部导入失败: from sandglass_vault import _SANDGLASS, _parse_line", exc_info=True)
         return -1
 
 
@@ -101,6 +104,7 @@ def sync_incremental() -> int:
                 conn.commit()
             return added
     except Exception:
+        logger.warning(f"sync_incremental: 局部导入失败: from sandglass_vault import _SANDGLASS, _parse_line", exc_info=True)
         return 0
 
 

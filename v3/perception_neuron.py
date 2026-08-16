@@ -1,6 +1,8 @@
 """感知神经元 — Bigram索引,词→行号。sqlite3+re零依赖。"""
 import sqlite3, os, re
 from sandglass_paths import _NB
+import logging
+logger = logging.getLogger(__name__)
 _DB = os.path.join(_NB, "perception.db")
 _SANDGLASS = os.path.join(_NB, "sandglass.txt")
 _CN = re.compile(r'[\u4e00-\u9fff]+')
@@ -61,6 +63,7 @@ def sense():
     try:
         from discipline import iron_rule_extract_and_store as _extract_iron_rules
     except Exception:
+        logger.warning(f"sense: 局部导入失败: from discipline import iron_rule_extract_and_store as _extract_iron_rules", exc_info=True)
         _extract_iron_rules = None
     for j, line in enumerate(lines, start):
         parts = line.split(" | ", 2)
@@ -71,6 +74,7 @@ def sense():
             try:
                 _extract_iron_rules(text, j)
             except Exception:
+                logger.warning(f"sense: 静默异常", exc_info=True)
                 pass
     db.commit()
     global _synced_to; _synced_to = total

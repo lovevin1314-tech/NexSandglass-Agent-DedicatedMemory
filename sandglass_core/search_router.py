@@ -19,6 +19,7 @@ def _pipe_warn(name, e):
     logging.getLogger(__name__).warning(f"管道 [{name}] 降级: {e}")
 from l3_search_core import simhash as _l3_simhash
 from sandglass_vault import _query_tokens
+logger = logging.getLogger(__name__)
 
 # V2.9.9.8: 语义信号缓存
 _tagged_cache = None
@@ -120,6 +121,7 @@ class ShadowSearch:
             from shadow_sand import shadow_search
             return shadow_search(query, limit)
         except Exception:
+            logger.warning(f"search: 局部导入失败: from shadow_sand import shadow_search", exc_info=True)
             return []
 
 
@@ -130,6 +132,7 @@ class Fts5Search:
             sync_incremental()
             return fts5_search(query, limit)
         except Exception:
+            logger.warning(f"search: 局部导入失败: from sandglass_sqlite import search as fts5_search, sync_incremental", exc_info=True)
             return []
 
 
@@ -149,6 +152,7 @@ class IdxSearch:
                     rebuild_index()
                     idx = _sync_index()
                 except Exception:
+                    logger.warning(f"search: 局部导入失败: from sandglass_vault import rebuild_index", exc_info=True)
                     return []
             if not idx: return []
             tokens = _query_tokens(query)
@@ -168,6 +172,7 @@ class IdxSearch:
             results.sort(key=lambda x: x[3], reverse=True)
             return [(r[0], r[1], r[2]) for r in results[:limit]]
         except Exception:
+            logger.warning(f"search: 局部导入失败: from sandglass_vault import _sync_index, _query_tokens", exc_info=True)
             return []
 
 
@@ -204,6 +209,7 @@ class TfidfSearch:
             scored.sort(key=lambda x: x[0], reverse=True)
             return [(ln, ts, text) for _, ln, ts, text in scored[:limit]]
         except Exception:
+            logger.warning(f"search: 局部导入失败: from sandglass_vault import _query_tokens", exc_info=True)
             return []
 
 
@@ -234,7 +240,9 @@ class MmapFallback:
                             elif has_tokens and any(tk in text.lower() for tk in tokens):
                                 if len(results_token) < limit:
                                     results_token.append((ln, ts, text[:300]))
-                        except: pass
+                        except Exception:
+                            logger.warning(f"search: 静默异常", exc_info=True)
+                            pass
             if not results and results_token:
                 results = results_token[:limit]
             if results:
@@ -246,6 +254,7 @@ class MmapFallback:
                     return [(r[0], r[1], r[2]) for r in ranked[:limit]]
             return results[:limit]
         except Exception:
+            logger.warning(f"search: 局部导入失败: from sandglass_vault import _query_tokens", exc_info=True)
             return []
 
 
@@ -272,6 +281,7 @@ class ArchiveSearch:
             return [(1_000_000 + i, ts, text)
                     for i, (ts, (text, _)) in enumerate(scored[:limit])]
         except Exception:
+            logger.warning(f"search: 局部导入失败: from sandglass_archive import search_archive", exc_info=True)
             return []
 
 
@@ -304,7 +314,9 @@ class SearchRouter:
             try:
                 from shadow_sand import shadow_retrieval_bump
                 shadow_retrieval_bump([ln for _, ln in shadow_hits[:limit]])
-            except: pass
+            except Exception:
+                logger.warning(f"search: 静默异常", exc_info=True)
+                pass
         all_candidates = []
         seen = set()
         for hits in [fts5_hits, idx_hits, tfidf_hits, archive_hits]:

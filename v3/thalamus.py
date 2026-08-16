@@ -2,6 +2,8 @@
 import os
 from sandglass_paths import _NB
 from brainstem import recent as bs_recent, total as bs_total, triples as bs_triples
+import logging
+logger = logging.getLogger(__name__)
 
 def _fmt_line(k, v, limit=40):
     v = v[:limit]
@@ -33,6 +35,7 @@ def mirror_dynamic():
                 tip = {"开心":"","焦虑":"—安静陪着","愤怒":"—不催","悲伤":"—不打扰"}.get(mood,"")
                 lines.append(f"🎭 {mood}{tip}")
         except Exception:
+            logger.warning(f"mirror_dynamic: 静默异常", exc_info=True)
             pass
         # 偏移率
         try:
@@ -44,8 +47,10 @@ def mirror_dynamic():
                 dn = {"frugal":"省钱","spend":"愿投","drift":"放弃"}.get(d,d)
                 lines.append(f"📊 偏移: {dn}+{o}%")
         except Exception:
+            logger.warning(f"mirror_dynamic: 静默异常", exc_info=True)
             pass
     except Exception:
+        logger.warning(f"mirror_dynamic: 静默异常", exc_info=True)
         pass
     return "\n".join(lines) if lines else ""
 

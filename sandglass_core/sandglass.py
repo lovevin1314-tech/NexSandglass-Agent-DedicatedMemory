@@ -38,6 +38,7 @@ def _on_message(event, **_kw) -> None:
             with open(_ERRFLAG, "w") as f:
                 f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         except Exception:
+            logger.warning(f"_on_message: 静默异常", exc_info=True)
             pass
 
 

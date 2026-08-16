@@ -218,7 +218,9 @@ def comprehensive_offset(scene: str = "") -> dict:
         try:
             _weave_guard = True
             weave_contradiction()
-        except Exception: pass
+        except Exception:
+            logger.warning(f"comprehensive_offset: 静默异常", exc_info=True)
+            pass
         finally:
             _weave_guard = False
     return result
@@ -275,6 +277,7 @@ def psychology_hint() -> str:
         
         return hint
     except Exception:
+        logger.warning(f"psychology_hint: 局部导入失败: from sandglass_think import _emotional_entropy", exc_info=True)
         return ""
 
 
@@ -448,6 +451,7 @@ def _log_decision(decision_text: str, offset_result: dict) -> None:
                                 "decision": decision_text[:200],
                                 "snapshot": snapshot}, ensure_ascii=False) + "\n")
     except Exception:
+        logger.warning(f"_log_decision: 静默异常", exc_info=True)
         pass
 
 

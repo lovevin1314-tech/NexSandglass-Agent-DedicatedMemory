@@ -104,6 +104,7 @@ def _load_simhash_cache():
             with open(_SIMHASH_CACHE_FILE, "rb") as f:
                 _simhash_cache = dict(_json.load(f))
     except Exception:
+        logger.warning(f"_load_simhash_cache: 静默异常", exc_info=True)
         pass
 
 def _save_simhash_cache():
@@ -113,6 +114,7 @@ def _save_simhash_cache():
         with open(_SIMHASH_CACHE_FILE, "wb") as f:
             _json.dump(_simhash_cache, f)
     except Exception:
+        logger.warning(f"_save_simhash_cache: 静默异常", exc_info=True)
         pass
 
 # 启动加载
@@ -382,6 +384,7 @@ def _synonym_expand(query: str) -> list:
                         keywords.append(syn)
                         seen.add(syn.lower())
     except Exception:
+        logger.warning(f"_synonym_expand: 静默异常", exc_info=True)
         pass
     # 情绪词库互积累——先注入情绪词到同义词表，再查情绪词库
     _feed_emotion_to_synonyms()
@@ -396,6 +399,7 @@ def _synonym_expand(query: str) -> list:
                         keywords.append(w)
                         seen.add(w.lower())
     except ImportError:
+        logger.warning(f"_synonym_expand: 局部导入失败: from emotion_vocab import load_vocab", exc_info=True)
         pass  # emotion_vocab 模块未安装
     except Exception:
         logger.debug("情绪词库扩展失败", exc_info=True)
@@ -415,6 +419,7 @@ def _synonym_expand(query: str) -> list:
                 if len(keywords) >= 6:
                     break
         except Exception:
+            logger.warning(f"_synonym_expand: 静默异常", exc_info=True)
             pass
     return keywords
 
@@ -584,6 +589,8 @@ def _feed_emotion_to_synonyms():
             for line in f:
                 try:
                     e = json.loads(line)
+                    if not isinstance(e, dict):
+                        continue
                     w = e.get("word", "")
                     if w and len(w) >= 2:
                         emotion_words[w] = emotion_words.get(w, 0) + 1
@@ -608,6 +615,7 @@ def _feed_emotion_to_synonyms():
         if top:
             logging.getLogger(__name__).info(f"情绪→同义词桥注入{len(top)}词")
     except Exception:
+        logger.warning(f"_feed_emotion_to_synonyms: 静默异常", exc_info=True)
         pass
 
 

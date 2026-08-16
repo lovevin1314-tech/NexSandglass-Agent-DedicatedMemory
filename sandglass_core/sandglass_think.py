@@ -116,6 +116,7 @@ def full_sanity() -> dict:
         report["layers"]["L0"] = "✅ Hermes alive"
         report["passed"] += 1
     except Exception:
+        logger.warning(f"full_sanity: 局部导入失败: import hermes_constants", exc_info=True)
         report["layers"]["L0"] = "⚠️ Hermes not detected (standalone mode)"
     report["total"] += 1
 
@@ -127,6 +128,7 @@ def full_sanity() -> dict:
         report["details"]["L1_nightwatch"] = nw[:200]
         if "沙漏存在" in nw: report["passed"] += 1
     except Exception as e:
+        logger.warning(f"full_sanity: 局部导入失败: from nightwatch import night_watch", exc_info=True)
         report["layers"]["L1"] = f"❌ {e}"
     report["total"] += 1
 
@@ -140,6 +142,7 @@ def full_sanity() -> dict:
         report["details"]["L2_sands"] = total
         if l2_ok: report["passed"] += 1
     except Exception as e:
+        logger.warning(f"full_sanity: 局部导入失败: from sandglass_vault import count, search", exc_info=True)
         report["layers"]["L2"] = f"❌ {e}"
     report["total"] += 1
 
@@ -150,56 +153,79 @@ def full_sanity() -> dict:
         checks = {}
         try:
             checks["情绪熵"] = "✅" if _emotional_entropy() >= 0 else "?"
-        except: checks["情绪熵"] = "❌"
+        except Exception:
+            logger.warning(f"full_sanity: 静默异常", exc_info=True)
+            checks["情绪熵"] = "❌"
         try:
             o = comprehensive_offset()
             checks["偏移率"] = f"✅ {o['offset']:+d}% ({o['sample']}条)"
-        except: checks["偏移率"] = "❌"
+        except Exception:
+            logger.warning(f"full_sanity: 静默异常", exc_info=True)
+            checks["偏移率"] = "❌"
         try:
             from sandglass_think import weave_contradiction
             w = weave_contradiction()
             checks["织布机"] = f"✅ {len(w.get('conflicts',[]))}处矛盾"
-        except: checks["织布机"] = "❌"
+        except Exception:
+            logger.warning(f"full_sanity: 静默异常", exc_info=True)
+            checks["织布机"] = "❌"
         try:
             s = stage_list()
             checks["阶段"] = f"✅ {len(s)}阶段"
-        except: checks["阶段"] = "❌"
+        except Exception:
+            logger.warning(f"full_sanity: 静默异常", exc_info=True)
+            checks["阶段"] = "❌"
         try:
             sf = search_filter("test")
             checks["搜索"] = "✅" if sf.get("keywords") else "⚠️"
-        except: checks["搜索"] = "❌"
+        except Exception:
+            logger.warning(f"full_sanity: 静默异常", exc_info=True)
+            checks["搜索"] = "❌"
         try:
             from decision_particles import _detect_chain
             c = _detect_chain("选A还是B")
             checks["决策粒子"] = "✅" if isinstance(c, list) else "⚠️"
-        except: checks["决策粒子"] = "❌"
+        except Exception:
+            logger.warning(f"full_sanity: 静默异常", exc_info=True)
+            checks["决策粒子"] = "❌"
         try:
             ssm = scene_stage_matrix()
             checks["场景矩阵"] = f'✅ {len(ssm.get("stages",[]))}阶段×{len(ssm.get("scenes",[]))}场景'
-        except: checks["场景矩阵"] = "❌"
+        except Exception:
+            logger.warning(f"full_sanity: 静默异常", exc_info=True)
+            checks["场景矩阵"] = "❌"
         try:
             sv = scene_stage_cross_validate()
             n_refined = sum(1 for f in sv.get("findings", []) if f.get("refined"))
             checks["场景-阶段交叉验证"] = f"✅ {n_refined}处需细化" if n_refined else "✅ 一致"
-        except: checks["场景-阶段交叉验证"] = "❌"
+        except Exception:
+            logger.warning(f"full_sanity: 静默异常", exc_info=True)
+            checks["场景-阶段交叉验证"] = "❌"
         try:
             em = entropy_mirror("最近决策")
             checks["熵镜"] = "✅" if em.get("found_mirror") or "无匹配" in str(em) else "✅"
-        except: checks["熵镜"] = "❌"
+        except Exception:
+            logger.warning(f"full_sanity: 静默异常", exc_info=True)
+            checks["熵镜"] = "❌"
         try:
             eg = entropy_ghost("如果选另一个选项呢")
             checks["幽灵决策"] = "✅" if isinstance(eg, dict) else "⚠️"
-        except: checks["幽灵决策"] = "❌"
+        except Exception:
+            logger.warning(f"full_sanity: 静默异常", exc_info=True)
+            checks["幽灵决策"] = "❌"
         try:
             fb = _metrics_feedback()
             checks["度量反馈"] = "✅" if isinstance(fb, dict) else "⚠️"
-        except: checks["度量反馈"] = "❌"
+        except Exception:
+            logger.warning(f"full_sanity: 静默异常", exc_info=True)
+            checks["度量反馈"] = "❌"
 
         l3_ok = all("✅" in v for v in checks.values())
         report["layers"]["L3"] = "✅ 全接口通过" if l3_ok else "⚠️ 部分接口异常"
         report["details"]["L3_checks"] = checks
         if l3_ok: report["passed"] += 1
     except Exception as e:
+        logger.warning(f"full_sanity: 局部导入失败: from functools import lru_cache", exc_info=True)
         report["layers"]["L3"] = f"❌ {e}"
     report["total"] += 1
 
@@ -504,7 +530,9 @@ def simhash_rerank(query: str, candidates: list) -> dict:
             if dist <= 55:
                 scores[ln] = max(0, (55 - dist) / 55 * 0.5)
         return scores
-    except Exception: return {}
+    except Exception:
+        logger.warning(f"simhash_rerank: 局部导入失败: from l3_search_core import simhash, _hamming", exc_info=True)
+        return {}
 
 def dynamic_expand(hit_line: int, query_tokens: set, all_lines: list, max_ctx: int = 15, threshold: float = 0.2):
     """沙子密度衰减扩窗：遇到密度断崖就停"""
@@ -527,6 +555,7 @@ def search_semantic(query: str, limit: int = 10) -> list:
         expanded = filt.get("keywords", [query])
         expanded_query = " ".join(expanded[:8])
     except Exception:
+        logger.warning(f"search_semantic: 静默异常", exc_info=True)
         pass
 
     results = []
@@ -535,6 +564,7 @@ def search_semantic(query: str, limit: int = 10) -> list:
         router = SearchRouter()
         results = router.search(expanded_query, limit)
     except Exception:
+        logger.warning(f"search_semantic: 静默异常", exc_info=True)
         pass
 
     if not results:
@@ -543,12 +573,14 @@ def search_semantic(query: str, limit: int = 10) -> list:
             from l3_search_core import _tfidf_search
             results = _tfidf_search(query, limit)
         except Exception:
+            logger.warning(f"search_semantic: 静默异常", exc_info=True)
             pass
     if not results:
         try:
             from sandglass_vault import search as vs
             results = vs(query, limit)
         except Exception:
+            logger.warning(f"search_semantic: 局部导入失败: from sandglass_vault import search as vs", exc_info=True)
             return []
 
     # V2.8.7: 标注密度元数据 — 每条结果附带 sand:0.XX 标签
@@ -643,6 +675,7 @@ def search_filter(query: str) -> dict:
         if cross.get("evolution"):
             result["stage_context"] = cross["evolution"]
     except Exception:
+        logger.warning(f"search_filter: 静默异常", exc_info=True)
         pass
 
     # ── 决策粒子权重注入（主人说的：记忆库学得好→拿着决策粒子和偏移率去强化搜索滤镜）──
@@ -661,6 +694,7 @@ def search_filter(query: str) -> dict:
                 result["decision_weight_boost"] = top
                 result["decision_bias"] = f"近期决策倾向：{'、'.join(top)}"
     except Exception:
+        logger.warning(f"search_filter: 静默异常", exc_info=True)
         pass
 
     # V2.9.9: 偏移引导 — 根据画像自动偏置搜索方向
@@ -670,6 +704,7 @@ def search_filter(query: str) -> dict:
             prefix = f"偏移趋向:{guide['bias']};"
             result["decision_bias"] = prefix + result.get("decision_bias", "")
     except Exception:
+        logger.warning(f"search_filter: 静默异常", exc_info=True)
         pass
 
     # ── 影子沙注入（脱口而出层的实体标签 → 搜索权重）──
@@ -713,6 +748,7 @@ def search_filter(query: str) -> dict:
             if sh or entities:
                 result["shadow_context"] = f"影子沙命中{len(sh)}条, 实体{len(entities)}个"
     except Exception:
+        logger.warning(f"search_filter: 静默异常", exc_info=True)
         pass
 
     # ── 决策粒子全量数据扩展（吃决策历史推断搜索意图）──
@@ -725,6 +761,7 @@ def search_filter(query: str) -> dict:
             if lines:
                 dp_context = "## 近期决策\n" + "".join(lines)
         except Exception:
+            logger.warning(f"search_filter: 静默异常", exc_info=True)
             pass
 
     # ── 时间范围感知 ──
@@ -745,6 +782,7 @@ def search_filter(query: str) -> dict:
         if comp["sample"] >= 2:
             offset_dir = comp["direction"]
     except Exception:
+        logger.warning(f"search_filter: 静默异常", exc_info=True)
         pass
 
     # ── 四维扩展（有 API Key 时）──
@@ -931,6 +969,7 @@ def local_distill(period: str = "daily") -> str:
         
         return "\n".join(lines)
     except Exception:
+        logger.warning(f"local_distill: 局部导入失败: from sandglass_vault import count", exc_info=True)
         return ""
 
 
@@ -965,6 +1004,7 @@ def stage_brief() -> str:
             d = direction_cn.get(comp["direction"], comp["direction"])
             lines.append(f"\n📊 偏移率: {comp['offset']:+d}%（{d}），{comp['sample']}次决策")
     except Exception:
+        logger.warning(f"stage_brief: 静默异常", exc_info=True)
         pass
 
     # 场景-阶段矩阵热力图摘要
@@ -974,6 +1014,7 @@ def stage_brief() -> str:
             lines.append(f"\n🎭 场景分布: {len(ssm['stages'])}阶段 × {len(ssm['scenes'])}场景")
             lines.append(f"   {ssm['insight']}")
     except Exception:
+        logger.warning(f"stage_brief: 静默异常", exc_info=True)
         pass
 
     # 高权重标签
@@ -985,6 +1026,7 @@ def stage_brief() -> str:
             if top:
                 lines.append(f"\n🔑 高权重标签: {', '.join(top)}")
     except Exception:
+        logger.warning(f"stage_brief: 静默异常", exc_info=True)
         pass
 
     # 最近 3 条决策
@@ -1000,6 +1042,7 @@ def stage_brief() -> str:
                     if len(parts) >= 4:
                         lines.append(f"  {parts[0][:10]} {parts[1][:30]} → {parts[2][:30]} ({parts[3]})")
     except Exception:
+        logger.warning(f"stage_brief: 静默异常", exc_info=True)
         pass
 
     lines.append(f"\n沙漏: {total}条")
@@ -1008,6 +1051,7 @@ def stage_brief() -> str:
     try:
         lines.append(f"\n{entropy_chart()}")
     except Exception:
+        logger.warning(f"stage_brief: 静默异常", exc_info=True)
         pass
 
     # 新场景发现 → 频率巩固触发器
@@ -1026,6 +1070,7 @@ def stage_brief() -> str:
                 if f.get("refined"):
                     lines.append(f"\n🔍 阶段验证: {f.get('stage','?')}需细化")
     except Exception:
+        logger.warning(f"stage_brief: 静默异常", exc_info=True)
         pass
 
     # 自动蒸馏----每50条新沙子触发一次
@@ -1038,10 +1083,13 @@ def stage_brief() -> str:
         if since >= 200:
             lines.append(f"\n🔄 管道洞察（+{since}条新对话）")
             try: lines.append(local_distill("daily"))
-            except Exception: pass
+            except Exception:
+                logger.warning(f"stage_brief: 静默异常", exc_info=True)
+                pass
             with open(last_distill, "w") as f:
                 f.write(str(total))
     except Exception:
+        logger.warning(f"stage_brief: 静默异常", exc_info=True)
         pass
 
 
@@ -1129,6 +1177,7 @@ def _should_synthesize() -> tuple[bool, str]:
         from sandglass_vault import count as sv_count
         current = sv_count()
     except Exception:
+        logger.warning(f"_should_synthesize: 局部导入失败: from sandglass_vault import count as sv_count", exc_info=True)
         return False, ""
 
     # 没有注解 → 首次生成
@@ -1156,6 +1205,7 @@ def _should_synthesize() -> tuple[bool, str]:
         if log:
             current_stage_name = log[-1].get("stage", "")
     except Exception:
+        logger.warning(f"_should_synthesize: 静默异常", exc_info=True)
         pass
     if current_stage_name and current_stage_name != last.get("stage", ""):
         return True, f"stage_switch:{last.get('stage','?')}→{current_stage_name}"
@@ -1166,6 +1216,7 @@ def _should_synthesize() -> tuple[bool, str]:
         if abs(comp["offset"]) >= _STAGE_THRESHOLD:
             return True, f"offset_threshold:{comp['offset']:+.0f}%"
     except Exception:
+        logger.warning(f"_should_synthesize: 静默异常", exc_info=True)
         pass
 
     # ③ 沙子 +100
@@ -1187,6 +1238,7 @@ def _save_annotation(data: dict, trigger: str) -> None:
             if log:
                 current_stage = log[-1].get("stage", "?")
         except Exception:
+            logger.warning(f"_save_annotation: 静默异常", exc_info=True)
             pass
 
         annotation = {
@@ -1206,6 +1258,7 @@ def _save_annotation(data: dict, trigger: str) -> None:
         with open(_3D_ANNOTATIONS, "a", encoding="utf-8") as f:
             f.write(json.dumps(annotation, ensure_ascii=False) + "\n")
     except Exception:
+        logger.warning(f"_save_annotation: 静默异常", exc_info=True)
         pass
 
 def _latest_annotation() -> dict:

@@ -21,6 +21,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from shadow_sand import (  # noqa: E402
     set_shadow_path, shadow_index, shadow_top_tags, extract_tags, _get_conn,
 )
+import logging
+logger = logging.getLogger(__name__)
 
 PASS, FAIL = [], []
 
@@ -149,6 +151,7 @@ def main():
         else:
             check("provider 关注行生成", False, "未找到 关注: 行")
     except Exception as e:
+        logger.warning(f"main: 局部导入失败: from memory_provider import NexSandglassProvider", exc_info=True)
         check("provider 注入链路", False, f"{type(e).__name__}: {e}")
 
     print(f"\n结果: {len(PASS)}/{len(PASS) + len(FAIL)} 通过")
