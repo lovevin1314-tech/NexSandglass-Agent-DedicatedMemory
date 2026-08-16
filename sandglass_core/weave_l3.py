@@ -27,7 +27,8 @@ except ImportError:
 @_fail_open({})
 def weave_insight(topic: str) -> dict:
     """织布：给定一个话题，从四个支柱分别取线，织成合成洞察。
-    返回 {persona_view, offset_view, search_view, thread_view, synthesis}"""
+    返回 {persona_view, offset_view, search_view, thread_view, synthesis,
+         impression, impression_engine, synthesis_enhanced}"""
     result = {}
 
     # 蒸馏的线：这个话题在画像里怎么说的
@@ -80,6 +81,36 @@ def weave_insight(topic: str) -> dict:
         synthesis.append("织线：" + result["thread_view"][:100])
 
     result["synthesis"] = "；".join(synthesis) if synthesis else "数据不足，无法合成"
+
+    # V2.20.7 模型织印象（可选增强）。原 synthesis 永不替换；
+    # 模型失败时由 weave_llm 自动回落纯规则，且不写回 sandglass.txt / L0。
+    try:
+        from weave_llm import weave_impression
+        llm = weave_impression(topic, result)
+        if isinstance(llm, dict):
+            result["impression"] = llm.get("impression", "")
+            result["impression_engine"] = llm.get("engine", "rule")
+            result["impression_model"] = llm.get("model", "")
+            result["impression_entities"] = list(llm.get("key_entities") or [])
+            result["impression_relations"] = list(llm.get("relations") or [])
+            result["impression_structured"] = bool(llm.get("structured", False))
+            result["impression_latency_ms"] = int(llm.get("latency_ms") or 0)
+            result["impression_fallback_reason"] = str(llm.get("fallback_reason") or "")
+            if llm.get("engine") == "llm" and llm.get("impression"):
+                result["synthesis_enhanced"] = llm.get("impression", "")
+            else:
+                result["synthesis_enhanced"] = result["synthesis"]
+    except Exception:
+        logger.warning("weave_insight: 模型织印象不可用，保留纯规则", exc_info=True)
+        result["impression"] = ""
+        result["impression_engine"] = "rule"
+        result["impression_model"] = ""
+        result["impression_entities"] = []
+        result["impression_relations"] = []
+        result["impression_structured"] = False
+        result["impression_latency_ms"] = 0
+        result["impression_fallback_reason"] = "weave_llm_unavailable"
+        result["synthesis_enhanced"] = result["synthesis"]
     return result
 
 @_fail_open({})
@@ -313,7 +344,8 @@ def weave_graph(question: str, max_hops: int = 3) -> dict:
 def weave_output(query: str = "", limit: int = 5) -> dict:
     """V2.9.5: 织布机统一输出 → 搜索滤镜素材。
     整合因果链 + 矛盾检测 + 场景感知 + 偏移率 + 情绪，
-    返回 {insight, contradictions, causal, scene_context, offset_guide, emotion_note}
+    返回 {insight, contradictions, causal, scene_context, offset_guide, emotion_note,
+         impression, impression_engine, impression_model}
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -326,14 +358,23 @@ def weave_output(query: str = "", limit: int = 5) -> dict:
         "offset_guide": "",
         "emotion_note": "",
         "keywords": [],
+        "impression": "",
+        "impression_engine": "rule",
+        "impression_model": "",
     }
     
     # 1. 因果洞察
     try:
         if query:
             insight = weave_insight(query)
-            if insight and insight.get("synthesis"):
-                result["insight"] = insight["synthesis"][:300]
+            if insight and (insight.get("synthesis_enhanced") or insight.get("synthesis")):
+                # 模型可用时优先使用 synthesis_enhanced；不可用时该字段等于原 synthesis，
+                # 因此默认行为与旧版一致。
+                result["insight"] = (insight.get("synthesis_enhanced") or insight.get("synthesis"))[:300]
+            if insight:
+                result["impression"] = str(insight.get("impression") or "")[:300]
+                result["impression_engine"] = insight.get("impression_engine", "rule")
+                result["impression_model"] = insight.get("impression_model", "")
     except Exception:
         logger.warning("织布机因果洞察失败", exc_info=True)
     

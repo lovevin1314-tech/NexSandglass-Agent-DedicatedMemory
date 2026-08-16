@@ -7,7 +7,7 @@ if __name__ == "__main__":
     # ['main.py','gateway','run']）并抛 SystemExit 杀死整个网关进程。
     setup(
         name="nexsandglass",
-        version="2.20.6",
+        version="3.0.0",
         description="沙漏记忆系统 — 纯本地零依赖L3思考层",
         long_description=open("README.md", encoding="utf-8").read(),
         long_description_content_type="text/markdown",

@@ -11,7 +11,7 @@ def _resolve_nb() -> str:
     return cfg
 
 _NB = _resolve_nb()
-__version__ = "2.20.6"
+__version__ = "3.0.0"
 
 _REQUIRED_DIRS = [_NB, os.path.join(_NB, "persona"), os.path.join(_NB, "archive")]
 

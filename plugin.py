@@ -1,4 +1,4 @@
-"""NeuroBase Sandglass Plugin — 消息落沙 + 记忆提供者。V2.20.5"""
+"""NeuroBase Sandglass Plugin — 消息落沙 + 记忆提供者。V3.0.0"""
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "sandglass_core"))
 

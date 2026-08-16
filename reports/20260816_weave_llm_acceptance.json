@@ -1,0 +1,760 @@
+{
+  "environment": {
+    "sandbox": "Darwin",
+    "temp_home": "/tmp/nexsandglass-tests-ieb1hin9",
+    "corpus_size": 24,
+    "topics": [
+      "Notion",
+      "黑咖啡",
+      "本地模型",
+      "织布机",
+      "深色模式",
+      "命令行",
+      "llama.cpp",
+      "模型织布"
+    ],
+    "model_gguf_found": false,
+    "model_download_available": false
+  },
+  "integrity": {
+    "l0_before": "e49e790d576a5fa457452c55208ec1149b752a3ff61eb40440130759d52a61a4",
+    "l0_after_rule": "e49e790d576a5fa457452c55208ec1149b752a3ff61eb40440130759d52a61a4",
+    "l0_after_mock": "e49e790d576a5fa457452c55208ec1149b752a3ff61eb40440130759d52a61a4",
+    "l0_after_fallback": "e49e790d576a5fa457452c55208ec1149b752a3ff61eb40440130759d52a61a4",
+    "l0_unchanged": true
+  },
+  "rule_metrics": {
+    "engine": "rule",
+    "cases": 8,
+    "avg_latency_ms": 0.12,
+    "avg_entities": 8.0,
+    "avg_relations": 5.62,
+    "avg_sentences": 3.25,
+    "avg_sentence_chars": 27.82,
+    "avg_structure_score": 5.0,
+    "rss_delta_mb": 0
+  },
+  "mock_metrics": {
+    "engine": "mock_local_model_branch",
+    "cases": 8,
+    "avg_latency_ms": 0.0,
+    "avg_entities": 5.0,
+    "avg_relations": 3.12,
+    "avg_sentences": 2.12,
+    "avg_sentence_chars": 47.58,
+    "avg_structure_score": 6.0,
+    "rss_delta_mb": 0
+  },
+  "rule_rows": [
+    {
+      "topic": "Notion",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「Notion」的记忆开始浮现。关键节点：Notion、Obsidian、user、咖啡、来一杯。已织出的联结：Notion→替代→Obsidian；user→使用→Notion。",
+      "entities": [
+        "Notion",
+        "Obsidian",
+        "user",
+        "咖啡",
+        "来一杯",
+        "我决定用",
+        "替代",
+        "做知识库"
+      ],
+      "relations": [
+        {
+          "subject": "Notion",
+          "relation": "替代",
+          "object": "Obsidian"
+        },
+        {
+          "subject": "user",
+          "relation": "使用",
+          "object": "Notion"
+        }
+      ],
+      "engine": "rule",
+      "latency_ms": 1,
+      "readability_sentences": 3,
+      "avg_sentence_chars": 30.67,
+      "structure_score": 5
+    },
+    {
+      "topic": "黑咖啡",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「黑咖啡」的记忆开始浮现。关键节点：user、黑咖啡、咖啡、来一杯、我决定用。已织出的联结：user→偏好→黑咖啡。",
+      "entities": [
+        "user",
+        "黑咖啡",
+        "咖啡",
+        "来一杯",
+        "我决定用",
+        "替代",
+        "做知识库",
+        "迁到"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "黑咖啡"
+        }
+      ],
+      "engine": "rule",
+      "latency_ms": 0,
+      "readability_sentences": 3,
+      "avg_sentence_chars": 20.0,
+      "structure_score": 5
+    },
+    {
+      "topic": "本地模型",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「本地模型」的记忆开始浮现。关键节点：本地模型、user、强制订阅的软件、买断制、命令行。已织出的联结：user→反感→强制订阅的软件；user→偏好→买断制；user→偏好→命令行；user→安装→llama。",
+      "entities": [
+        "本地模型",
+        "user",
+        "强制订阅的软件",
+        "买断制",
+        "命令行",
+        "llama",
+        "Vim",
+        "VS"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "反感",
+          "object": "强制订阅的软件"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "买断制"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "命令行"
+        },
+        {
+          "subject": "user",
+          "relation": "安装",
+          "object": "llama"
+        },
+        {
+          "subject": "Vim",
+          "relation": "对比",
+          "object": "VS"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "深色模式"
+        },
+        {
+          "subject": "user",
+          "relation": "放弃",
+          "object": "需要联网的工具"
+        },
+        {
+          "subject": "Notion",
+          "relation": "替代",
+          "object": "Obsidian"
+        },
+        {
+          "subject": "user",
+          "relation": "使用",
+          "object": "Notion"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "黑咖啡"
+        }
+      ],
+      "engine": "rule",
+      "latency_ms": 0,
+      "readability_sentences": 3,
+      "avg_sentence_chars": 36.0,
+      "structure_score": 5
+    },
+    {
+      "topic": "织布机",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「织布机」的记忆开始浮现。关键节点：织布机、user、强制订阅的软件、买断制、命令行。已织出的联结：user→反感→强制订阅的软件；user→偏好→买断制；user→偏好→命令行；user→安装→llama。",
+      "entities": [
+        "织布机",
+        "user",
+        "强制订阅的软件",
+        "买断制",
+        "命令行",
+        "llama",
+        "Vim",
+        "VS"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "反感",
+          "object": "强制订阅的软件"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "买断制"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "命令行"
+        },
+        {
+          "subject": "user",
+          "relation": "安装",
+          "object": "llama"
+        },
+        {
+          "subject": "Vim",
+          "relation": "对比",
+          "object": "VS"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "深色模式"
+        },
+        {
+          "subject": "user",
+          "relation": "放弃",
+          "object": "需要联网的工具"
+        },
+        {
+          "subject": "Notion",
+          "relation": "替代",
+          "object": "Obsidian"
+        },
+        {
+          "subject": "user",
+          "relation": "使用",
+          "object": "Notion"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "黑咖啡"
+        }
+      ],
+      "engine": "rule",
+      "latency_ms": 0,
+      "readability_sentences": 3,
+      "avg_sentence_chars": 35.33,
+      "structure_score": 5
+    },
+    {
+      "topic": "深色模式",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「深色模式」的记忆开始浮现。关键节点：user、深色模式、咖啡、来一杯、我决定用。已织出的联结：user→偏好→深色模式。",
+      "entities": [
+        "user",
+        "深色模式",
+        "咖啡",
+        "来一杯",
+        "我决定用",
+        "替代",
+        "做知识库",
+        "迁到"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "深色模式"
+        }
+      ],
+      "engine": "rule",
+      "latency_ms": 0,
+      "readability_sentences": 3,
+      "avg_sentence_chars": 21.0,
+      "structure_score": 5
+    },
+    {
+      "topic": "命令行",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「命令行」的记忆开始浮现。关键节点：user、命令行、咖啡、来一杯、我决定用。已织出的联结：user→偏好→命令行。",
+      "entities": [
+        "user",
+        "命令行",
+        "咖啡",
+        "来一杯",
+        "我决定用",
+        "替代",
+        "做知识库",
+        "迁到"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "命令行"
+        }
+      ],
+      "engine": "rule",
+      "latency_ms": 0,
+      "readability_sentences": 3,
+      "avg_sentence_chars": 20.0,
+      "structure_score": 5
+    },
+    {
+      "topic": "llama.cpp",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「llama.cpp」的记忆开始浮现。关键节点：llama.cpp、user、强制订阅的软件、买断制、命令行。已织出的联结：user→反感→强制订阅的软件；user→偏好→买断制；user→偏好→命令行；user→安装→llama。",
+      "entities": [
+        "llama.cpp",
+        "user",
+        "强制订阅的软件",
+        "买断制",
+        "命令行",
+        "llama",
+        "Vim",
+        "VS"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "反感",
+          "object": "强制订阅的软件"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "买断制"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "命令行"
+        },
+        {
+          "subject": "user",
+          "relation": "安装",
+          "object": "llama"
+        },
+        {
+          "subject": "Vim",
+          "relation": "对比",
+          "object": "VS"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "深色模式"
+        },
+        {
+          "subject": "user",
+          "relation": "放弃",
+          "object": "需要联网的工具"
+        },
+        {
+          "subject": "Notion",
+          "relation": "替代",
+          "object": "Obsidian"
+        },
+        {
+          "subject": "user",
+          "relation": "使用",
+          "object": "Notion"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "黑咖啡"
+        }
+      ],
+      "engine": "rule",
+      "latency_ms": 0,
+      "readability_sentences": 5,
+      "avg_sentence_chars": 23.6,
+      "structure_score": 5
+    },
+    {
+      "topic": "模型织布",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「模型织布」的记忆开始浮现。关键节点：模型织布、user、强制订阅的软件、买断制、命令行。已织出的联结：user→反感→强制订阅的软件；user→偏好→买断制；user→偏好→命令行；user→安装→llama。",
+      "entities": [
+        "模型织布",
+        "user",
+        "强制订阅的软件",
+        "买断制",
+        "命令行",
+        "llama",
+        "Vim",
+        "VS"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "反感",
+          "object": "强制订阅的软件"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "买断制"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "命令行"
+        },
+        {
+          "subject": "user",
+          "relation": "安装",
+          "object": "llama"
+        },
+        {
+          "subject": "Vim",
+          "relation": "对比",
+          "object": "VS"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "深色模式"
+        },
+        {
+          "subject": "user",
+          "relation": "放弃",
+          "object": "需要联网的工具"
+        },
+        {
+          "subject": "Notion",
+          "relation": "替代",
+          "object": "Obsidian"
+        },
+        {
+          "subject": "user",
+          "relation": "使用",
+          "object": "Notion"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "黑咖啡"
+        }
+      ],
+      "engine": "rule",
+      "latency_ms": 0,
+      "readability_sentences": 3,
+      "avg_sentence_chars": 36.0,
+      "structure_score": 5
+    }
+  ],
+  "mock_rows": [
+    {
+      "topic": "Notion",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「Notion」的记忆浮现出来：这些线索不是孤立的点，而是绕着本地工具偏好慢慢聚合。像午后写代码时屏幕暗下来，Notion 和终端窗口并排亮着，那种“本地优先、买断制、命令行”的感觉从沙子里浮起来。",
+      "entities": [
+        "咖啡",
+        "来一杯",
+        "我决定用",
+        "替代",
+        "做知识库"
+      ],
+      "relations": [
+        {
+          "subject": "Notion",
+          "relation": "替代",
+          "object": "Obsidian"
+        },
+        {
+          "subject": "user",
+          "relation": "使用",
+          "object": "Notion"
+        }
+      ],
+      "engine": "llm",
+      "latency_ms": 0,
+      "readability_sentences": 2,
+      "avg_sentence_chars": 50.5,
+      "structure_score": 6
+    },
+    {
+      "topic": "黑咖啡",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「黑咖啡」的记忆浮现出来：这些线索不是孤立的点，而是绕着本地工具偏好慢慢聚合。像午后写代码时屏幕暗下来，Notion 和终端窗口并排亮着，那种“本地优先、买断制、命令行”的感觉从沙子里浮起来。",
+      "entities": [
+        "咖啡",
+        "来一杯",
+        "我决定用",
+        "替代",
+        "做知识库"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "黑咖啡"
+        }
+      ],
+      "engine": "llm",
+      "latency_ms": 0,
+      "readability_sentences": 2,
+      "avg_sentence_chars": 49.0,
+      "structure_score": 6
+    },
+    {
+      "topic": "本地模型",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「本地模型」的记忆浮现出来：这些线索不是孤立的点，而是绕着本地工具偏好慢慢聚合。像午后写代码时屏幕暗下来，Notion 和终端窗口并排亮着，那种“本地优先、买断制、命令行”的感觉从沙子里浮起来。",
+      "entities": [
+        "咖啡",
+        "来一杯",
+        "我决定用",
+        "替代",
+        "做知识库"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "反感",
+          "object": "强制订阅的软件"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "买断制"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "命令行"
+        },
+        {
+          "subject": "user",
+          "relation": "安装",
+          "object": "llama"
+        },
+        {
+          "subject": "Vim",
+          "relation": "对比",
+          "object": "VS"
+        }
+      ],
+      "engine": "llm",
+      "latency_ms": 0,
+      "readability_sentences": 2,
+      "avg_sentence_chars": 49.5,
+      "structure_score": 6
+    },
+    {
+      "topic": "织布机",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「织布机」的记忆浮现出来：这些线索不是孤立的点，而是绕着本地工具偏好慢慢聚合。像午后写代码时屏幕暗下来，Notion 和终端窗口并排亮着，那种“本地优先、买断制、命令行”的感觉从沙子里浮起来。",
+      "entities": [
+        "咖啡",
+        "来一杯",
+        "我决定用",
+        "替代",
+        "做知识库"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "反感",
+          "object": "强制订阅的软件"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "买断制"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "命令行"
+        },
+        {
+          "subject": "user",
+          "relation": "安装",
+          "object": "llama"
+        },
+        {
+          "subject": "Vim",
+          "relation": "对比",
+          "object": "VS"
+        }
+      ],
+      "engine": "llm",
+      "latency_ms": 0,
+      "readability_sentences": 2,
+      "avg_sentence_chars": 49.0,
+      "structure_score": 6
+    },
+    {
+      "topic": "深色模式",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「深色模式」的记忆浮现出来：这些线索不是孤立的点，而是绕着本地工具偏好慢慢聚合。像午后写代码时屏幕暗下来，Notion 和终端窗口并排亮着，那种“本地优先、买断制、命令行”的感觉从沙子里浮起来。",
+      "entities": [
+        "咖啡",
+        "来一杯",
+        "我决定用",
+        "替代",
+        "做知识库"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "深色模式"
+        }
+      ],
+      "engine": "llm",
+      "latency_ms": 0,
+      "readability_sentences": 2,
+      "avg_sentence_chars": 49.5,
+      "structure_score": 6
+    },
+    {
+      "topic": "命令行",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「命令行」的记忆浮现出来：这些线索不是孤立的点，而是绕着本地工具偏好慢慢聚合。像午后写代码时屏幕暗下来，Notion 和终端窗口并排亮着，那种“本地优先、买断制、命令行”的感觉从沙子里浮起来。",
+      "entities": [
+        "咖啡",
+        "来一杯",
+        "我决定用",
+        "替代",
+        "做知识库"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "命令行"
+        }
+      ],
+      "engine": "llm",
+      "latency_ms": 0,
+      "readability_sentences": 2,
+      "avg_sentence_chars": 49.0,
+      "structure_score": 6
+    },
+    {
+      "topic": "llama.cpp",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「llama.cpp」的记忆浮现出来：这些线索不是孤立的点，而是绕着本地工具偏好慢慢聚合。像午后写代码时屏幕暗下来，Notion 和终端窗口并排亮着，那种“本地优先、买断制、命令行”的感觉从沙子里浮起来。",
+      "entities": [
+        "咖啡",
+        "来一杯",
+        "我决定用",
+        "替代",
+        "做知识库"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "反感",
+          "object": "强制订阅的软件"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "买断制"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "命令行"
+        },
+        {
+          "subject": "user",
+          "relation": "安装",
+          "object": "llama"
+        },
+        {
+          "subject": "Vim",
+          "relation": "对比",
+          "object": "VS"
+        }
+      ],
+      "engine": "llm",
+      "latency_ms": 0,
+      "readability_sentences": 3,
+      "avg_sentence_chars": 34.67,
+      "structure_score": 6
+    },
+    {
+      "topic": "模型织布",
+      "synthesis": "画像说：画像不存在",
+      "impression": "关于「模型织布」的记忆浮现出来：这些线索不是孤立的点，而是绕着本地工具偏好慢慢聚合。像午后写代码时屏幕暗下来，Notion 和终端窗口并排亮着，那种“本地优先、买断制、命令行”的感觉从沙子里浮起来。",
+      "entities": [
+        "咖啡",
+        "来一杯",
+        "我决定用",
+        "替代",
+        "做知识库"
+      ],
+      "relations": [
+        {
+          "subject": "user",
+          "relation": "反感",
+          "object": "强制订阅的软件"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "买断制"
+        },
+        {
+          "subject": "user",
+          "relation": "偏好",
+          "object": "命令行"
+        },
+        {
+          "subject": "user",
+          "relation": "安装",
+          "object": "llama"
+        },
+        {
+          "subject": "Vim",
+          "relation": "对比",
+          "object": "VS"
+        }
+      ],
+      "engine": "llm",
+      "latency_ms": 0,
+      "readability_sentences": 2,
+      "avg_sentence_chars": 49.5,
+      "structure_score": 6
+    }
+  ],
+  "fallback_rows": [
+    {
+      "topic": "Notion",
+      "engine": "rule",
+      "fallback_reason": "URLError:<urlopen error [Errno 1] Operation not permitted>",
+      "latency_ms": 0,
+      "impression_ok": true
+    },
+    {
+      "topic": "黑咖啡",
+      "engine": "rule",
+      "fallback_reason": "URLError:<urlopen error [Errno 1] Operation not permitted>",
+      "latency_ms": 0,
+      "impression_ok": true
+    },
+    {
+      "topic": "本地模型",
+      "engine": "rule",
+      "fallback_reason": "URLError:<urlopen error [Errno 1] Operation not permitted>",
+      "latency_ms": 0,
+      "impression_ok": true
+    },
+    {
+      "topic": "织布机",
+      "engine": "rule",
+      "fallback_reason": "URLError:<urlopen error [Errno 1] Operation not permitted>",
+      "latency_ms": 0,
+      "impression_ok": true
+    }
+  ]
+}
