@@ -218,7 +218,7 @@ def extract_tags(text: str, limit: int = 10) -> list:
         name = m.group(1) or m.group(2) or m.group(3) or m.group(4) or m.group(5) or ""
         # 阶段B 残片闸：纯中文4字组若右侧紧邻汉字（长句被2-4字组切碎）或
         # 以口语代词/时间词开头（'你是刘浩'/'你说什么'/'今天很忙'/'你没看到'）→ 剔除；
-        # 保留 代码审查员。 这类独立实体
+        # 保留 '王小明' 这类独立四字人名实体
         if (len(name) == 4 and re.fullmatch(r'[\u4e00-\u9fff]{4}', name)
                 and ((m.end() < len(text) and '\u4e00' <= text[m.end()] <= '\u9fff')
                      or name.startswith(_TAG_FRAGMENT_4_PREFIXES))):
