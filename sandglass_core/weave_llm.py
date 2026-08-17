@@ -505,12 +505,19 @@ def _build_3d_prompt(context: Dict[str, Any]) -> str:
 
 
 def _clean_line_prefix(text: str) -> str:
-    """清理模型输出行首的"第一行：/画像描述：/提醒内容："等标签前缀。"""
+    """清理模型输出行首的"第一行：/画像描述：/提醒内容："等标签前缀。
+
+    循环清理直到稳定——模型可能嵌套输出（"第一行：画像描述：xxx"）。
+    """
     import re as _re
-    return _re.sub(
-        r"^(第一行|第二行|第三行|画像描述|画像|语气|提醒内容|提醒示例|提醒)[:：、\s]*",
-        "", str(text or "").strip(),
-    )
+    result = str(text or "").strip()
+    pattern = _re.compile(r"^(第一行|第二行|第三行|画像描述|画像|语气|提醒内容|提醒示例|提醒)[:：、\s]*")
+    while True:
+        cleaned = pattern.sub("", result).strip()
+        if cleaned == result:
+            break
+        result = cleaned
+    return result
 
 
 def synthesize_3d(
@@ -738,8 +745,9 @@ def weave_missing_triples(
                 if "-" not in ln:
                     continue
                 parts = [p.strip() for p in ln.split("-", 2)]
-                if len(parts) >= 2 and parts[0] and parts[2] if len(parts) >= 3 else False:
-                    candidates.append({"subject": parts[0], "relation": parts[1], "object": parts[2] if len(parts) > 2 else ""})
+                # V3.1 bugfix: 原三元表达式返回 str 非 bool 且难读——改清晰布尔判断。
+                if len(parts) >= 3 and parts[0] and parts[1] and parts[2]:
+                    candidates.append({"subject": parts[0], "relation": parts[1], "object": parts[2]})
             base["fallback_reason"] = "" if candidates else "model_invalid_json"
             if not candidates:
                 return base
