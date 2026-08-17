@@ -39,7 +39,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # 版本号由主人最终确认，熔炼迭代禁止自行 bump。
-__version__ = "3.1.0"
+__version__ = "3.1.1"
 
 # ══════════════════════════════════════════════════════════
 # 工具方法——把 sandglass 函数暴露给 Hermes 模型调用
@@ -294,7 +294,7 @@ class NexSandglassProvider(MemoryProvider):
                 from sandglass_paths import __version__ as _ver
             except Exception:
                 logger.warning(f"initialize: 局部导入失败: from sandglass_paths import __version__ as _ver", exc_info=True)
-                _ver = "3.1.0"
+                _ver = "3.1.1"
             logger.info(f"NexSandglass V{_ver} 就绪")
 
     def _build_explicit_memory_block(self) -> tuple[str, set[str]]:
