@@ -14,7 +14,9 @@ agent_bootstrap.py — NexSandglass 全平台自举 V2.10.47
   通用 MCP         → ~/.mcp.json（兜底）
 """
 
-import os, sys, json
+import os, sys, json, logging, tempfile
+
+logger = logging.getLogger(__name__)
 
 VERSION = "3.1.1"
 
@@ -82,7 +84,8 @@ def _inject_json(config_path: str, key: str, entry_name: str, entry: dict) -> bo
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f) or {}
-        except (json.JSONDecodeError, Exception):
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("读取配置失败，等待下次自举重试：%s（%s）", config_path, e)
             return False
 
     if key not in config:
@@ -92,8 +95,16 @@ def _inject_json(config_path: str, key: str, entry_name: str, entry: dict) -> bo
 
     config[key][entry_name] = entry
     os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    with open(config_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=os.path.dirname(config_path), delete=False
+    )
+    try:
+        with tmp:
+            json.dump(config, tmp, indent=2, ensure_ascii=False)
+        os.replace(tmp.name, config_path)
+    finally:
+        if os.path.exists(tmp.name):
+            os.unlink(tmp.name)
     return True
 
 

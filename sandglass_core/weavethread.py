@@ -60,6 +60,10 @@ def _ensure_table():
     conn.execute("CREATE INDEX IF NOT EXISTS idx_wthread_subject ON wthread_triples(subject)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_wthread_relation ON wthread_triples(relation)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_wthread_object ON wthread_triples(object)")
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_wthread_triples_dedup
+        ON wthread_triples(subject, relation, object)
+    """)
     conn.commit()
     conn.close()
 
@@ -106,18 +110,13 @@ def wthread_store(text: str, line_num: int = 0, subject: str = "user") -> int:
     for subj, rel, obj in triples:
         if subj == "subject":
             subj = subject
-        # 去重检查
-        exists = conn.execute(
-            "SELECT id FROM wthread_triples WHERE subject=? AND relation=? AND object=?",
-            (subj, rel, obj)
-        ).fetchone()
-        if exists:
-            continue
-        conn.execute(
-            "INSERT INTO wthread_triples (subject, relation, object, source_line, created_at) VALUES (?,?,?,?,?)",
+        # 唯一索引兜底并发去重；重复时 OR IGNORE 跳过（rowcount=0）
+        cursor = conn.execute(
+            "INSERT OR IGNORE INTO wthread_triples (subject, relation, object, source_line, created_at) VALUES (?,?,?,?,?)",
             (subj, rel, obj, line_num, now)
         )
-        count += 1
+        if cursor.rowcount > 0:
+            count += 1
     conn.commit()
     conn.close()
     return count

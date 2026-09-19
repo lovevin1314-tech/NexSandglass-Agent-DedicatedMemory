@@ -440,7 +440,7 @@ class NexSandglassProvider(MemoryProvider):
                         for item in layers["red"] + layers["normal"]
                     ]
             except Exception:
-                logger.debug("铁律双层注入失败", exc_info=True)
+                logger.warning("铁律双层注入失败", exc_info=True)
 
             # ═══════ 冲突6：显式记忆/高信实体/事实标签（纪律后、你是谁前） ═══════
             # 三个块共用 seen_facts，失败各自降级，不影响基础注入。

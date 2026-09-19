@@ -4,9 +4,11 @@ NexSandglass 系统心跳 (Heartbeat)
 每10分钟呼吸一次：检查沙漏健康、待办任务、当前环境。
 零依赖跨平台：Windows tasklist / Mac ps -ax / Linux ps -aux
 """
-import os, json, platform, subprocess
+import os, json, platform, subprocess, logging, tempfile
 from datetime import datetime
 from sandglass_paths import _NB
+
+logger = logging.getLogger(__name__)
 
 _HEARTBEAT_LOG = os.path.join(_NB, "heartbeat.log")
 
@@ -47,11 +49,18 @@ def tick() -> dict:
     try:
         system = platform.system()
         if system == "Windows":
-            apps = subprocess.run(["tasklist"], capture_output=True, text=True).stdout
+            apps = subprocess.run(["tasklist"], capture_output=True, text=True, timeout=10).stdout
         elif system == "Darwin":
-            apps = subprocess.run(["ps","-ax"], capture_output=True, text=True).stdout
+            apps = subprocess.run(["ps","-ax"], capture_output=True, text=True, timeout=10).stdout
         else:
-            apps = subprocess.run(["ps","aux"], capture_output=True, text=True).stdout
+            apps = subprocess.run(["ps","aux"], capture_output=True, text=True, timeout=10).stdout
+    except subprocess.TimeoutExpired as e:
+        # 场景检测不允许拖住 tick 线程；超时视作没有检测到应用
+        logger.warning("场景检测超时（%s 秒），按无应用处理", e.timeout or 10)
+        status["env"] = "空闲"
+    except Exception:
+        status["env"] = "未知"
+    else:
 
         if any(w in apps.lower() for w in ["code.exe", "devenv", "pycharm", "intellij"]):
             status["env"] = "开发"
@@ -59,16 +68,22 @@ def tick() -> dict:
             status["env"] = "浏览"
         else:
             status["env"] = "空闲"
-    except Exception:
-        status["env"] = "未知"
 
     # 5. 写心跳日志（超过1MB自动轮转保留最后1000行）
     os.makedirs(os.path.dirname(_HEARTBEAT_LOG), exist_ok=True)
     if os.path.exists(_HEARTBEAT_LOG) and os.path.getsize(_HEARTBEAT_LOG) > 1_000_000:
         with open(_HEARTBEAT_LOG, "r", encoding="utf-8") as f:
             lines = f.readlines()[-1000:]
-        with open(_HEARTBEAT_LOG, "w", encoding="utf-8") as f:
-            f.writelines(lines)
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=os.path.dirname(_HEARTBEAT_LOG), delete=False
+        )
+        try:
+            with tmp:
+                tmp.writelines(lines)
+            os.replace(tmp.name, _HEARTBEAT_LOG)
+        finally:
+            if os.path.exists(tmp.name):
+                os.unlink(tmp.name)
     with open(_HEARTBEAT_LOG, "a", encoding="utf-8") as f:
         f.write(json.dumps(status, ensure_ascii=False) + "\n")
 

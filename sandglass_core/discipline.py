@@ -2,13 +2,17 @@
 NexSandglass L3 — 铁律因子 (V2.9.6: 权重计数)
 从 sandglass_think.py 拆分。
 """
-import os, json, re
+import os, json, re, tempfile, threading
 from datetime import datetime
 from collections import Counter
+import logging
+
+logger = logging.getLogger(__name__)
 
 from sandglass_paths import _NB
 _IRON_RULES = os.path.join(_NB, "iron_rules.txt")
 _RULE_COUNTS = os.path.join(_NB, "persona", "rule_counts.json")
+_RULE_COUNT_LOCK = threading.Lock()  # 只保护计数文件的读-改-写段
 _CANDIDATE_PREFIX = "[candidate] "
 _RED_PREFIX = "[red] "
 _NORMAL_PREFIX = "[normal] "
@@ -48,8 +52,18 @@ def _load_counts() -> dict:
     """
     if not os.path.exists(_RULE_COUNTS):
         return {}
-    with open(_RULE_COUNTS, "r", encoding="utf-8") as f:
-        raw = json.load(f)
+    try:
+        with open(_RULE_COUNTS, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except json.JSONDecodeError:
+        # 损坏文件留档，计数从空值重建，避免铁律静默失效。
+        backup_path = (
+            f"{_RULE_COUNTS}.corrupted-"
+            f"{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}"
+        )
+        os.replace(_RULE_COUNTS, backup_path)
+        logger.warning("规则计数文件损坏，已留档并重建：%s", backup_path)
+        return {}
     if not isinstance(raw, dict):
         return {}
 
@@ -63,8 +77,17 @@ def _load_counts() -> dict:
 def _save_counts(counts: dict):
     """保存规则计数"""
     os.makedirs(os.path.dirname(_RULE_COUNTS), exist_ok=True)
-    with open(_RULE_COUNTS, "w", encoding="utf-8") as f:
-        json.dump(counts, f, ensure_ascii=False)
+    # 原子写：先写同目录临时文件，避免崩溃截断正式文件。
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=os.path.dirname(_RULE_COUNTS), delete=False
+    )
+    try:
+        with tmp:
+            json.dump(counts, tmp, ensure_ascii=False)
+        os.replace(tmp.name, _RULE_COUNTS)
+    finally:
+        if os.path.exists(tmp.name):
+            os.unlink(tmp.name)
 
 
 def _now_iso() -> str:
@@ -432,15 +455,16 @@ def iron_rule_bump(rule_text: str, field: str = "remind_count", source_line=None
     for info in infos:
         text = info["text"]
         if text.lower() in rule_text.lower() or rule_text.lower() in text.lower():
-            counts = _load_counts()
-            key = _find_count_key(counts, info) or text
-            entry = _normalize_count_entry(counts.get(key))
-            entry[field] = _count_int(entry, field) + 1
-            if source_line is not None:
-                entry["last_source_line"] = int(source_line)
-            entry["updated_at"] = _now_iso()
-            counts[key] = entry
-            _save_counts(counts)
+            with _RULE_COUNT_LOCK:
+                counts = _load_counts()
+                key = _find_count_key(counts, info) or text
+                entry = _normalize_count_entry(counts.get(key))
+                entry[field] = _count_int(entry, field) + 1
+                if source_line is not None:
+                    entry["last_source_line"] = int(source_line)
+                entry["updated_at"] = _now_iso()
+                counts[key] = entry
+                _save_counts(counts)
             return
 
 
@@ -463,14 +487,17 @@ def iron_rule_inject_bump(rule_text: str):
     for info in infos:
         text = info["text"]
         if text.lower() in rule_text.lower() or rule_text.lower() in text.lower():
-            _injected_this_session.add(key)
-            counts = _load_counts()
-            key = _find_count_key(counts, info) or text
-            entry = _normalize_count_entry(counts.get(key))
-            entry["inject_count"] = _count_int(entry, "inject_count") + 1
-            entry["updated_at"] = _now_iso()
-            counts[key] = entry
-            _save_counts(counts)
+            with _RULE_COUNT_LOCK:
+                if key in _injected_this_session:
+                    return
+                _injected_this_session.add(key)
+                counts = _load_counts()
+                key = _find_count_key(counts, info) or text
+                entry = _normalize_count_entry(counts.get(key))
+                entry["inject_count"] = _count_int(entry, "inject_count") + 1
+                entry["updated_at"] = _now_iso()
+                counts[key] = entry
+                _save_counts(counts)
             return
 
 

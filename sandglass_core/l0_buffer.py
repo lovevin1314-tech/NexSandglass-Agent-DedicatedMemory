@@ -9,7 +9,7 @@ NexSandglass — L0 短期记忆缓冲区
   l0_remember("用户说了一句重要的话")
   context = l0_context()  # 返回最近5轮的上下文
 """
-import os, json
+import os, json, tempfile
 from datetime import datetime
 from sandglass_paths import _NB
 import logging
@@ -44,11 +44,20 @@ def l0_remember(text: str, speaker: str = "user") -> None:
             offset_check(oldest["text"][:300], user_persisted=False)
         except Exception:
             logger.warning(f"l0_remember: 静默异常", exc_info=True)
-            pass
+            # L1蒸馏失败时保留最旧一条，避免驱逐后数据丢失。
+            return
 
-        # 只保留最近 L0_MAX 条
-        with open(L0_PATH, "w", encoding="utf-8") as f:
-            f.writelines(lines[-L0_MAX:])
+        # 原子重写：L1蒸馏成功后才驱逐最旧一条。
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=os.path.dirname(L0_PATH), delete=False
+        )
+        try:
+            with tmp:
+                tmp.writelines(lines[-L0_MAX:])
+            os.replace(tmp.name, L0_PATH)
+        finally:
+            if os.path.exists(tmp.name):
+                os.unlink(tmp.name)
 
 
 def l0_context() -> str:
