@@ -1,4 +1,4 @@
-# metrics.py — NexSandglass 可观测性埋点 (V2.9.9)
+# metrics.py — NexSandglass 可观测性埋点 ()
 # 追加式写入，零依赖，与 sandglass.txt 落沙哲学一致
 import json, os, time
 from datetime import datetime

@@ -1,14 +1,4 @@
-"""
-NexSandglass — L0 短期记忆缓冲区
-=================================
-记录最近5轮对话，不进入倒排索引（不污染搜索）。
-满5轮自动蒸馏最新一轮到L1。
-
-用法:
-  from l0_buffer import l0_remember, l0_context
-  l0_remember("用户说了一句重要的话")
-  context = l0_context()  # 返回最近5轮的上下文
-"""
+"""NexSandglass — L0 短期记忆缓冲区 ================================= 记录最近5轮对话，不进入倒排索引（不污染搜索）。 满5轮自动蒸馏最新一轮到L1。 用法: from l0_buffer import l0_remember, l0_context l0_remember(\"用户说了一句重要的话\") context = l0_context() # 返回最近5轮的上下文"""
 import os, json, tempfile
 from datetime import datetime
 from sandglass_paths import _NB
@@ -16,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 L0_PATH = os.path.join(_NB, "l0_buffer.jsonl")
-L0_MAX = 5  # 最多保留5轮
+L0_MAX = 5  #最多保留5轮
 
 
 def l0_remember(text: str, speaker: str = "user") -> None:

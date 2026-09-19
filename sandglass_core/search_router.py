@@ -1,36 +1,26 @@
-"""
-NexSandglass SearchRouter V2.8.6 — 四路并发搜索架构（统一入口）
-==================================================================
-影子沙 + FTS5 + IDX + TF-IDF 四路并发 → 沙子密度融合(trust+simhash) → mmap兜底
-
-V2.8.6: 统一搜索入口 — search_semantic 委托 SearchRouter
-       density×trust+simhash_bonus 统一公式
-       SimHash 统一为 l3_search_core 128-bit
-       密度计算与IDX/TF-IDF同源(_query_tokens)
-       删除重复 _simhash / _simhash_density_decay
-"""
+"""NexSandglass SearchRouter V2.8.6 — 四路并发搜索架构（统一入口） ================================================================== 影子沙 + FTS5 + IDX + TF-IDF 四路并发 → 沙子密度融合(trust+simhash) → mmap兜底 V2.8.6: 统一搜索入口 — search_semantic 委托 SearchRouter density×trust+simhash_bonus 统一公式 SimHash 统一为 l3_search_core 128-bit 密度计算与IDX/TF-IDF同源(_query_tokens) 删除重复 _simhash / _simhash_density_decay"""
 import os, mmap, re, concurrent.futures, math
 from sandglass_vault import _SANDGLASS, _parse_line
 from sandglass_paths import _NB
+from sandglass_util import db_connect
 import logging
 
-# V2.20.3: 本地 stub——避免循环导入 memory_provider
+# 本地 stub——避免循环导入 memory_provider
 def _pipe_warn(name, e):
     logging.getLogger(__name__).warning(f"管道 [{name}] 降级: {e}")
 from l3_search_core import simhash as _l3_simhash
 from sandglass_vault import _query_tokens
 logger = logging.getLogger(__name__)
 
-# V2.9.9.8: 语义信号缓存
+# 语义信号缓存
 _tagged_cache = None
-_tag_idf = None  # V2.9.9.8: IDF标签稀有度缓存
+_tag_idf = None  #IDF标签稀有度缓存
 
 def _load_tag_idf():
     global _tag_idf
-    import math, sqlite3, os
     db_path = os.path.join(_NB, "shadow_sand.db")
     if not os.path.exists(db_path): return {}
-    db = sqlite3.connect(db_path, check_same_thread=False)
+    db = db_connect(db_path, check_same_thread=False)
     freq = {}
     for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'"):
         for t in r[0].split(','):
@@ -90,7 +80,7 @@ def sand_density(candidates, query_tokens, query) -> list:
         if fp == -1: sim_bonus = 0
         else:
             dist = bin(q_fp ^ fp).count('1')
-            sim_bonus = 0.5 * (1 - dist / 128)  # V2.9.27: 线性映射,d=0→0.5,d=128→0
+            sim_bonus = 0.5 * (1 - dist / 128)  #线性映射,d=0→0.5,d=128→0
         final = ratio * trust + sim_bonus
         scored.append((final, item))
     scored.sort(key=lambda x: x[0], reverse=True)
@@ -259,9 +249,7 @@ class MmapFallback:
 
 
 class ArchiveSearch:
-    """冷沙搜索（第六路）——接 sandglass_archive.search_archive 已有管道（播种不提取）。
-    触发：热沙结果不足，或查询含时间线索（去年/6月/2026-06 等指向已归档月份）。
-    冷沙行号是文件内行号，多文件冲突 → 标识/去重用 ts（全局唯一），行号加偏移防与热沙撞号。"""
+    """冷沙搜索（第六路）——接 sandglass_archive.search_archive 已有管道（播种不提取）。 触发：热沙结果不足，或查询含时间线索（去年/6月/2026-06 等指向已归档月份）。 冷沙行号是文件内行号，多文件冲突 → 标识/去重用 ts（全局唯一），行号加偏移防与热沙撞号。"""
 
     def search(self, query: str, limit: int = 30) -> list:
         try:
@@ -269,7 +257,7 @@ class ArchiveSearch:
             tokens = _query_tokens(query)
             if not tokens:
                 return []
-            hits = {}  # ts -> [text, hit_count]
+            hits = {}  #ts -> [text, hit_count]
             for tok in list(tokens)[:5]:
                 for ln, ts, text in search_archive(tok, max(limit * 4, 40)):
                     if not ts:
@@ -286,10 +274,7 @@ class ArchiveSearch:
 
 
 class SearchRouter:
-    """搜索路由器——四路并发 + 沙子密度融合(density×trust+simhash) + 动态扩窗 + mmap兜底。
-    V2.8.6: 统一为唯一搜索入口。
-    V2.20.3+: 第六路 ArchiveSearch 冷沙兜底（热沙不足/时间线索时触发）。
-    """
+    """搜索路由器——四路并发 + 沙子密度融合(density×trust+simhash) + 动态扩窗 + mmap兜底。 V2.8.6: 统一为唯一搜索入口。 V2.20.3+: 第六路 ArchiveSearch 冷沙兜底（热沙不足/时间线索时触发）。"""
     def __init__(self, shadow=None, fts5=None, idx=None, tfidf=None, mmap_fb=None, archive=None):
         self.shadow = shadow or ShadowSearch()
         self.fts5 = fts5 or Fts5Search()
@@ -304,7 +289,7 @@ class SearchRouter:
             fut_fts5 = ex.submit(self.fts5.search, query, max(limit * 2, 30))
             fut_idx = ex.submit(self.idx.search, query, max(limit * 2, 30))
             fut_tfidf = ex.submit(self.tfidf.search, query, max(limit * 2, 30))
-            fut_archive = ex.submit(self.archive.search, query, max(limit * 2, 30))  # 第六路：冷沙
+            fut_archive = ex.submit(self.archive.search, query, max(limit * 2, 30))  #第六路：冷沙
         shadow_hits = fut_shadow.result() or []
         fts5_hits = fut_fts5.result() or []
         idx_hits = fut_idx.result() or []
@@ -335,7 +320,7 @@ class SearchRouter:
                         seen.add(ln)
                         all_candidates.append((ln, ts, text))
         if all_candidates:
-            # V2.9.19: 中英文停用词过滤 — 防虚词稀释ratio
+            # 中英文停用词过滤 — 防虚词稀释ratio
             lang = _detect_lang(query)
             if lang == "en" or lang == "mixed":
                 EN_STOP = r'\b(first|last|when|time|the|a|an|is|are|was|were|been|being|have|has|had|do|does|did|will|would|can|could|should|may|might|if|then|else|that|this|these|those|it|its|not|but|or|and|for|nor|so|yet|to|of|in|on|at|by|from|with|how|what|where|who|why|her|his|their|our)\b'
@@ -345,7 +330,7 @@ class SearchRouter:
                 query = re.sub(ZH_STOP, '', query).strip()
             tokens = _query_tokens(query)
             ranked = sand_density(all_candidates, tokens, query)
-            # V2.9.9.8: sim_bonus已在sand_density处理
+            # sim_bonus已在sand_density处理
             ranked = dynamic_expand(ranked, tokens, limit)
             return ranked[:limit]
         return self.mmapfallback.search(query, limit)

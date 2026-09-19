@@ -1,26 +1,13 @@
-"""
-agent_bootstrap.py — NexSandglass 全平台自举 V2.10.47
-=====================================================
-安装时自动检测所有 MCP 兼容 Agent，注入沙漏 MCP server。
-每个平台独立幂等：写完 flag 后不再检查，不报错不阻塞。
+"""agent_bootstrap.py — NexSandglass 全平台自举 V2.10.47 ===================================================== 安装时自动检测所有 MCP 兼容 Agent，注入沙漏 MCP server。 每个平台独立幂等：写完 flag 后不再检查，不报错不阻塞。 支持的平台： Claude Code → ~/.claude/settings.json（主）或 ~/.claude.json（备） Codex CLI → ~/.codex/config.toml 或 ~/.codex/settings.json Claude Desktop → 平台相关路径（Win/Mac/Linux） Cursor → ~/.cursor/mcp.json Windsurf → ~/.windsurf/mcp.json Cline (VSCode) → ~/.cline/mcp_settings.json 通用 MCP → ~/.mcp.json（兜底）"""
 
-支持的平台：
-  Claude Code      → ~/.claude/settings.json（主）或 ~/.claude.json（备）
-  Codex CLI        → ~/.codex/config.toml 或 ~/.codex/settings.json  
-  Claude Desktop   → 平台相关路径（Win/Mac/Linux）
-  Cursor           → ~/.cursor/mcp.json
-  Windsurf         → ~/.windsurf/mcp.json
-  Cline (VSCode)   → ~/.cline/mcp_settings.json
-  通用 MCP         → ~/.mcp.json（兜底）
-"""
+import os, sys, json, logging
 
-import os, sys, json, logging, tempfile
+from sandglass_util import read_json, write_json_atomic
 
 logger = logging.getLogger(__name__)
 
 VERSION = "3.1.1"
 
-# ═══ 平台定义 ═══
 # 每个 label 可有多个 path（备选），按优先级排列
 AGENT_GROUPS = [
     {
@@ -81,12 +68,12 @@ def _inject_json(config_path: str, key: str, entry_name: str, entry: dict) -> bo
     """向 JSON 配置文件注入 MCP server 条目。返回 True 表示有改动。"""
     config = {}
     if os.path.exists(config_path):
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = json.load(f) or {}
-        except (json.JSONDecodeError, OSError) as e:
-            logger.warning("读取配置失败，等待下次自举重试：%s（%s）", config_path, e)
+        missing = object()
+        config = read_json(config_path, missing)
+        if config is missing:
+            logger.warning("读取配置失败，等待下次自举重试：%s", config_path)
             return False
+        config = config or {}
 
     if key not in config:
         config[key] = {}
@@ -94,17 +81,7 @@ def _inject_json(config_path: str, key: str, entry_name: str, entry: dict) -> bo
         return False
 
     config[key][entry_name] = entry
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=os.path.dirname(config_path), delete=False
-    )
-    try:
-        with tmp:
-            json.dump(config, tmp, indent=2, ensure_ascii=False)
-        os.replace(tmp.name, config_path)
-    finally:
-        if os.path.exists(tmp.name):
-            os.unlink(tmp.name)
+    write_json_atomic(config_path, config)
     return True
 
 
@@ -127,10 +104,7 @@ def _inject_toml(config_path: str, key: str, entry_name: str, entry: dict) -> bo
 
 
 def _pick_path(paths: list) -> dict:
-    """从多个备选路径中选最佳目标：
-    - 优先选已存在的文件（说明 Agent 已安装，我们只是补配置）
-    - 都不存在 → 选第一个（创建新文件）
-    """
+    """从多个备选路径中选最佳目标： - 优先选已存在的文件（说明 Agent 已安装，我们只是补配置） - 都不存在 → 选第一个（创建新文件）"""
     for p in paths:
         expanded = _expand(p["path"])
         if os.path.exists(expanded):
@@ -143,7 +117,7 @@ def _pick_path(paths: list) -> dict:
 def bootstrap_all(nb: str = None) -> dict:
     """全平台自举。返回 {label: status}"""
     if nb is None:
-        # V2.20.2: 统一路径解析——复用 sandglass_paths.get_nb() 单一真相来源
+        # 统一路径解析——复用 sandglass_paths.get_nb() 单一真相来源
         from sandglass_paths import get_nb
         nb = get_nb()
 
@@ -189,9 +163,8 @@ def bootstrap_all(nb: str = None) -> dict:
     return results
 
 
-# ═══ CLI ═══
 if __name__ == "__main__":
-    # V2.20.2: 统一路径解析——复用 sandglass_paths.get_nb() 单一真相来源
+    # 统一路径解析——复用 sandglass_paths.get_nb() 单一真相来源
     from sandglass_paths import get_nb
     nb = get_nb()
     print(f"NexSandglass V{VERSION} — 全平台 MCP 自举")

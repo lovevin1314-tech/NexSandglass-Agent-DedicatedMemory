@@ -40,17 +40,7 @@ except ImportError:
     _3D_ANNOTATIONS = ""
 
 def entropy_mirror(question: str) -> dict:
-    """
-    熵镜决策——主人面临选择，织布机照见过去的影子。
-    
-    流程：
-    ① 拆问题为关键词 → 搜沙子 → 找匹配的决策粒子
-    ② 搜历史决策模式 → 类似选择时主人怎么做的
-    ③ 读当前偏移率 → 影子现在往哪边倒
-    ④ 输出：过去的数据，不给结论
-    
-    返回 {past_decisions, similar_queries, current_trend, persona_hint}
-    """
+    """熵镜决策——主人面临选择，织布机照见过去的影子。 流程： ① 拆问题为关键词 → 搜沙子 → 找匹配的决策粒子 ② 搜历史决策模式 → 类似选择时主人怎么做的 ③ 读当前偏移率 → 影子现在往哪边倒 ④ 输出：过去的数据，不给结论 返回 {past_decisions, similar_queries, current_trend, persona_hint}"""
     from sandglass_vault import search, count as sv_count
 
     result = {
@@ -103,23 +93,11 @@ def entropy_mirror(question: str) -> dict:
     except Exception as e:
         logger.warning(f"entropy_mirror: 偏移趋势获取失败: {e}")
 
-    # V2.9.9.9+: 纯本地 — 画像提示由本地数据聚合
+    # +: 纯本地 — 画像提示由本地数据聚合
     return result
 
 def entropy_ghost(question: str) -> dict:
-    """
-    幽灵决策——'如果我当时选了另一个选项会怎样？'
-    
-    本地优先（80分）:
-      ① 查历史类似决策的后续因果链（weave_graph）
-      ② 查同标签决策的后续偏移模式
-      ③ 基于历史数据推断
-    
-    3D 增强（+120分）:
-      喂上下文 → 推演虚拟分支
-    
-    不论 2D 还是 3D，都标注'幽灵决策——纯虚拟推演，未修改任何数据'
-    """
+    """幽灵决策——'如果我当时选了另一个选项会怎样？' 本地优先（80分）: ① 查历史类似决策的后续因果链（weave_graph） ② 查同标签决策的后续偏移模式 ③ 基于历史数据推断 3D 增强（+120分）: 喂上下文 → 推演虚拟分支 不论 2D 还是 3D，都标注'幽灵决策——纯虚拟推演，未修改任何数据'"""
     # dp_read unused — 直接读文件替代
 
     result = {
@@ -181,19 +159,11 @@ def entropy_ghost(question: str) -> dict:
                 f"数据不够做因果追溯，但方向可参考。"
             )
 
-    # V2.9.9.9+: 纯本地 — 幽灵推演由因果链+历史模式驱动
+    # +: 纯本地 — 幽灵推演由因果链+历史模式驱动
     return result
 
 def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str:
-    """
-    玻璃提醒——阶段注解 + 2D 兜底。
-
-    - 先读最新 3D 阶段注解 → 直接用（永久保存的）
-    - 触发条件满足 → 重新合成 3D
-    - 无 API Key → 2D 描述方向
-
-    不判对错，不说"该怎样"。
-    """
+    """玻璃提醒——阶段注解 + 2D 兜底。 - 先读最新 3D 阶段注解 → 直接用（永久保存的） - 触发条件满足 → 重新合成 3D - 无 API Key → 2D 描述方向 不判对错，不说\"该怎样\"。"""
     trigger = ""
     if emotion_trigger:
         trigger = "emotion_spike"
@@ -250,10 +220,7 @@ def glass_reminder(user_message: str = "", emotion_trigger: bool = False) -> str
         return ""
 
 def entropy_reminder(user_message: str = "") -> str:
-    """
-    熵提醒——情绪熵驱动提醒语气。
-    高熵 → 陪伴式安静提醒     低熵 → 小二热情提醒
-    """
+    """熵提醒——情绪熵驱动提醒语气。 高熵 → 陪伴式安静提醒 低熵 → 小二热情提醒"""
     entropy = _emotional_entropy()
 
     if entropy > 1.2:
@@ -269,18 +236,7 @@ def entropy_reminder(user_message: str = "") -> str:
     return f"🫧 熵 {entropy}（{tone}）\n> {msg}"
 
 def memo_mode() -> str:
-    """
-    回忆快闪——本地零依赖，一屏看完沙漏记住了什么。
-    
-    2D 离线（80分）:
-      - 画像摘要（persona.md 四层）
-      - 影子可视化（shadow_chart）
-      - 阶段简报（stage_brief）
-      - 最近决策（decision_particles）
-    
-    3D 增强（200分）:
-      - 加一段自然语言总结
-    """
+    """回忆快闪——本地零依赖，一屏看完沙漏记住了什么。 2D 离线（80分）: - 画像摘要（persona.md 四层） - 影子可视化（shadow_chart） - 阶段简报（stage_brief） - 最近决策（decision_particles） 3D 增强（200分）: - 加一段自然语言总结"""
     lines = [f"🧬 沙漏画像记忆 — {datetime.now():%Y-%m-%d %H:%M}", ""]
     
     # 画像
@@ -327,6 +283,6 @@ def memo_mode() -> str:
         lines.append("  （决策粒子尚未生成）")
     lines.append("")
     
-    # V2.9.9.9+: 纯本地 — 记忆展示由画像+影子+阶段+粒子直接拼接
+    # +: 纯本地 — 记忆展示由画像+影子+阶段+粒子直接拼接
 
     return "\n".join(lines)

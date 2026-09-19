@@ -1,11 +1,5 @@
-#!/usr/bin/env python3
-"""
-NexSandglass L3 — 任务追踪模块
-跨会话承诺追踪：task_defer / task_pending / task_done / task_check_trigger
-
-从 sandglass_think.py 提取 (2026-06-11)
-原位置: L1520-1585
-"""
+#!/usr/bin/env python3/usr/bin/env python3
+"""NexSandglass L3 — 任务追踪模块 跨会话承诺追踪：task_defer / task_pending / task_done / task_check_trigger 从 sandglass_think.py 提取 (2026-06-11) 原位置: L1520-1585"""
 
 import os
 from sandglass_paths import _NB
@@ -19,8 +13,7 @@ _TASK_LOG = os.path.join(_PERSONA_DIR, "task-log.jsonl")
 
 
 def task_defer(task: str, trigger: str = "", note: str = "") -> dict:
-    """记下一个延迟任务。trigger = 触发条件描述，如"沙漏系统完成后"。
-    返回 {id, task, trigger, status}"""
+    """记下一个延迟任务。trigger = 触发条件描述，如\"沙漏系统完成后\"。 返回 {id, task, trigger, status}"""
     os.makedirs(os.path.dirname(_TASK_LOG), exist_ok=True)
     task_id = hashlib.md5((task + (trigger or "")).encode()).hexdigest()[:8]
 
@@ -77,8 +70,7 @@ def task_done(task_id: str) -> bool:
 
 
 def task_check_trigger(keyword: str) -> list:
-    """检查是否有任务的触发条件被满足。keyword 匹配 trigger 字段。
-    返回匹配到的 pending 任务列表。"""
+    """检查是否有任务的触发条件被满足。keyword 匹配 trigger 字段。 返回匹配到的 pending 任务列表。"""
     pending = task_pending()
     matched = []
     for t in pending:

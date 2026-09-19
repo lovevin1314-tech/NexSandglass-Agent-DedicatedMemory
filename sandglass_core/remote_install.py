@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3/usr/bin/env python3
 """NexSandglass — 远程一键安装 (curl | python)"""
 import os, sys, subprocess, tempfile, shutil
 

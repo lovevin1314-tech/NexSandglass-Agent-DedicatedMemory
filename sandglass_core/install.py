@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3/usr/bin/env python3
 """NexSandglass V2.9.9 — 一键安装+验证 (Python stdlib, 零依赖)"""
 import os, sys, shutil
 
@@ -6,9 +6,8 @@ VERSION = "3.1.1"
 NB = os.path.join(os.path.expanduser("~"), ".neurobase")
 HERMES = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~/.local/share")), "hermes")
 
-# ═══ 33个核心模块 ═══
 MODULES = [
-    "sandglass_paths.py", "sandglass_vault.py", "sandglass_sqlite.py",
+    "sandglass_paths.py", "sandglass_util.py", "sandglass_vault.py", "sandglass_sqlite.py",
     "sandglass_log.py", "sandglass.py", "sandglass_think.py",
     "sandglass_archive.py", "sandglass_mcp.py", "nexsandglass.py",
     "nightwatch.py", "pulse.py", "heartbeat.py",
@@ -104,7 +103,7 @@ def main():
     except Exception as e:
         print(f"⚠️ 验证失败: {e}")
 
-    # 7. 全平台自举（V2.10.47）
+    # 7. 全平台自举（）
     print()
     print("═" * 40)
     print("全平台 MCP 自举（自动配置各 Agent）...")

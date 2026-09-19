@@ -1,13 +1,9 @@
-"""
-NexSandglass 织线——织布机的线材 — V3.1.1
-三元组提取 + SQLite 存储 + 图谱查询
-正则为主，存 shadow_sand.db 的 wthread_triples 表；
-LLM 补漏三元组通过 wthread_add 写同一张 L2 表，不写 L0。
-"""
+"""NexSandglass 织线——织布机的线材 — V3.1.1 三元组提取 + SQLite 存储 + 图谱查询 正则为主，存 shadow_sand.db 的 wthread_triples 表； LLM 补漏三元组通过 wthread_add 写同一张 L2 表，不写 L0。"""
 import re, sqlite3, os
 from datetime import datetime, timezone
 
 from sandglass_paths import _NB
+from sandglass_util import db_connect
 
 _DB = os.path.join(_NB, "shadow_sand.db")
 
@@ -26,7 +22,7 @@ _EXTRACT_PATTERNS = [
     # 偏好类(中文)
     (r'(?:喜欢|偏好|倾向|偏爱)\s*([\u4e00-\u9fff\w]+)', '偏好'),
     (r'(?:讨厌|不喜欢|反感|烦)\s*([\u4e00-\u9fff\w]+)', '反感'),
-    # V2.9.9.7: 英文决策类
+    # 英文决策类
     (r'(?:decided to|chose|switched to|adopted|started using)\s+(\w[\w\s]{1,40}\w)', 'use'),
     (r'(?:gave up|abandoned|stopped using|quit|dropped)\s+(\w[\w\s]{1,40}\w)', 'abandon'),
     (r'(\w[\w\s]{1,30}\w)\s+(?:is better than|prefer|like more than|over)\s+(\w[\w\s]{1,30}\w)', 'compare'),
@@ -44,8 +40,7 @@ _EXTRACT_PATTERNS = [
 
 def _ensure_table():
     """确保 wthread_triples 表存在"""
-    conn = sqlite3.connect(_DB, timeout=10, check_same_thread=False)
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn = db_connect(_DB, wal=True, timeout=10, check_same_thread=False)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS wthread_triples (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -104,7 +99,7 @@ def wthread_store(text: str, line_num: int = 0, subject: str = "user") -> int:
     if not triples:
         return 0
     
-    conn = sqlite3.connect(_DB, timeout=10, check_same_thread=False)
+    conn = db_connect(_DB, timeout=10, check_same_thread=False)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     count = 0
     for subj, rel, obj in triples:
@@ -123,11 +118,9 @@ def wthread_store(text: str, line_num: int = 0, subject: str = "user") -> int:
 
 
 def wthread_query(entity: str = None, relation: str = None, limit: int = 20) -> list:
-    """查询织线——织布机的线材。可按实体或关系过滤。
-    返回 [{subject, relation, object, source_line, confidence}, ...]
-    """
+    """查询织线——织布机的线材。可按实体或关系过滤。 返回 [{subject, relation, object, source_line, confidence}, ...]"""
     _ensure_table()
-    conn = sqlite3.connect(_DB, timeout=10, check_same_thread=False)
+    conn = db_connect(_DB, timeout=10, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     
     if entity and relation:
@@ -156,9 +149,7 @@ def wthread_query(entity: str = None, relation: str = None, limit: int = 20) -> 
 
 
 def wthread_graph(entity: str, depth: int = 1) -> dict:
-    """以实体为中心展开子图。depth=1 返回直接关系，depth=2 返回二跳。
-    返回 {entity, relations: [{relation, target}], subgraph: {...}}
-    """
+    """以实体为中心展开子图。depth=1 返回直接关系，depth=2 返回二跳。 返回 {entity, relations: [{relation, target}], subgraph: {...}}"""
     direct = wthread_query(entity=entity)
     
     result = {
@@ -167,7 +158,6 @@ def wthread_graph(entity: str, depth: int = 1) -> dict:
         "subgraph": {}
     }
     
-    seen = set()
     for r in direct:
         target = r["object"] if r["subject"] == entity else r["subject"]
         result["relations"].append({
@@ -179,13 +169,11 @@ def wthread_graph(entity: str, depth: int = 1) -> dict:
     if depth >= 2:
         for rel in result["relations"]:
             target = rel["target"]
-            if target not in seen:
-                seen.add(target)
-                sub = wthread_query(entity=target)
-                result["subgraph"][target] = [
-                    {"relation": s["relation"], "target": s["object"] if s["subject"] == target else s["subject"]}
-                    for s in sub[:5]
-                ]
+            sub = wthread_query(entity=target)
+            result["subgraph"][target] = [
+                {"relation": s["relation"], "target": s["object"] if s["subject"] == target else s["subject"]}
+                for s in sub[:5]
+            ]
     
     return result
 
@@ -193,9 +181,8 @@ def wthread_graph(entity: str, depth: int = 1) -> dict:
 def wthread_stats() -> dict:
     """图谱统计"""
     _ensure_table()
-    conn = sqlite3.connect(_DB, timeout=10, check_same_thread=False)
+    conn = db_connect(_DB, timeout=10, check_same_thread=False)
     total = conn.execute("SELECT COUNT(*) FROM wthread_triples").fetchone()[0]
-    entities = conn.execute("SELECT COUNT(DISTINCT subject) + COUNT(DISTINCT object) FROM wthread_triples").fetchone()
     relations = conn.execute("SELECT relation, COUNT(*) as c FROM wthread_triples GROUP BY relation ORDER BY c DESC").fetchall()
     conn.close()
     return {
@@ -204,11 +191,7 @@ def wthread_stats() -> dict:
     }
 
 def wthread_to_weave(entity: str = "user") -> list:
-    """织线→织布机桥接：将结构化三元组转为因果链线索。
-    织布机可用此替代原始沙子扫描，获得更精准的因果关系。
-    
-    返回 [{from, relation, to, direction}, ...]
-    """
+    """织线→织布机桥接：将结构化三元组转为因果链线索。 织布机可用此替代原始沙子扫描，获得更精准的因果关系。 返回 [{from, relation, to, direction}, ...]"""
     triples = wthread_query(entity=entity)
     chains = []
     for t in triples:
@@ -236,20 +219,16 @@ def wthread_to_weave(entity: str = "user") -> list:
 
 
 def wthread_weave(limit: int = 3) -> str:
-    """快捷桥接：返回织布机可注入的因果摘要。
-    用于 session_context 或 system_prompt_block 注入。
-    """
+    """快捷桥接：返回织布机可注入的因果摘要。 用于 session_context 或 system_prompt_block 注入。"""
     result = wthread_to_weave("user")
     lines = ["织线因果:"]
     for rel, targets in result["grouped"].items():
         lines.append(f"  {rel}: " + ", ".join(targets[:limit]))
     return "\n".join(lines)
 def wthread_add(subject: str, relation: str, object: str, source_line: int = 0) -> bool:
-    """LLM 手动补漏——Agent 发现正则漏抓的关系时，通过 MCP 工具补入。
-    返回 True 表示写入成功或已存在。
-    """
+    """LLM 手动补漏——Agent 发现正则漏抓的关系时，通过 MCP 工具补入。 返回 True 表示写入成功或已存在。"""
     _ensure_table()
-    conn = sqlite3.connect(_DB, timeout=10, check_same_thread=False)
+    conn = db_connect(_DB, timeout=10, check_same_thread=False)
     exists = conn.execute(
         "SELECT id FROM wthread_triples WHERE subject=? AND relation=? AND object=?",
         (subject, relation, object)

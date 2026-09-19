@@ -1,16 +1,4 @@
-"""NexSandglass 织布机 — 模型织印象（可插拔，纯本地优先）。
-
-架构红线：
-- 本模块绝不读写 L0 原始沙 `sandglass.txt`，只消费 `weave_l3` 传入的检索视图
-  以及影子沙/织线（`shadow_sand.db` 的 entities / wthread_triples）。
-- 模型不可用、加载失败、返回 JSON 非法、超时等一切异常，均自动回落
-  `rule_impression()`，绝不让沙漏崩溃。
-- 模型选择优先级：
-  1. `NEXSANDBASE_LLM_GGUF` → `llama_cpp` 本地加载 GGUF
-  2. `NEXSANDBASE_LLM_ENDPOINT` → OpenAI 兼容本地服务（llama-server/Ollama/LM Studio）
-  3. `NEXSANDBASE_LLM_OLLAMA_MODEL` → Ollama 原生 `/api/chat`
-  4. 以上都不可用 → `rule_impression()`
-"""
+"""NexSandglass 织布机 — 模型织印象（可插拔，纯本地优先）。 架构红线： - 本模块绝不读写 L0 原始沙 `sandglass.txt`，只消费 `weave_l3` 传入的检索视图 以及影子沙/织线（`shadow_sand.db` 的 entities / wthread_triples）。 - 模型不可用、加载失败、返回 JSON 非法、超时等一切异常，均自动回落 `rule_impression()`，绝不让沙漏崩溃。 - 模型选择优先级： 1. `NEXSANDBASE_LLM_GGUF` → `llama_cpp` 本地加载 GGUF 2. `NEXSANDBASE_LLM_ENDPOINT` → OpenAI 兼容本地服务（llama-server/Ollama/LM Studio） 3. `NEXSANDBASE_LLM_OLLAMA_MODEL` → Ollama 原生 `/api/chat` 4. 以上都不可用 → `rule_impression()`"""
 from __future__ import annotations
 
 import json
@@ -36,7 +24,7 @@ _JSON_TEMPLATE = """话题：{topic}
 {data}
 用 2-4 句中文写关于这个话题的记忆印象，直接写。"""
 
-# V3.1.0：立体像合成。prompt 极简、四支柱人类可读文本、JSON 失败降级文本。
+# 立体像合成。prompt 极简、四支柱人类可读文本、JSON 失败降级文本。
 _SYSTEM_PROMPT_3D = (
     "你是沙漏记忆系统的立体像织布机。只根据给定资料合成，"
     "不编造资料里没有的内容。直接输出三行，不要 JSON，不要解释。"
@@ -53,7 +41,7 @@ _3D_PROMPT_TEMPLATE = """根据以下资料判断：1) 主人的画像描述 2) 
 
 不要重复资料原文，写新的。"""
 
-# V3.1.0：织线补漏。主体/客体必须来自资料原文，关系必须克制。
+# 织线补漏。主体/客体必须来自资料原文，关系必须克制。
 _SYSTEM_PROMPT_TRIPLES = (
     "你是沙漏织线补漏器。只从给定原文中提取正则漏掉的关系三元组。"
     "主体和客体必须是原文中出现的文字；没有把握就输出空列表；每行一条：主体-关系-客体，不要 JSON，不要解释。"
@@ -301,7 +289,7 @@ def build_context(topic: str, weave_view: Optional[Dict[str, Any]] = None) -> Di
 
 
 def _prompt(topic: str, context: Dict[str, Any]) -> str:
-    # 调优 v2（2026-08-16 实测）：必须传人类可读文本，JSON 结构会让 0.5B 输出百科幻觉。
+    # 必须传人类可读文本，JSON 结构会让 0.5B 输出百科幻觉。
     parts: List[str] = []
     persona = context.get("persona") or []
     if persona:
@@ -329,6 +317,17 @@ def _prompt(topic: str, context: Dict[str, Any]) -> str:
     return _JSON_TEMPLATE.format(topic=topic, data=data[:3500])
 
 
+def _http_chat(url: str, payload: Dict[str, Any], timeout: float) -> Dict[str, Any]:
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
 def _chat_endpoint(
     config: Dict[str, Any],
     topic: str,
@@ -353,15 +352,8 @@ def _chat_endpoint(
         "max_tokens": int(os.environ.get("NEXSANDBASE_LLM_MAX_TOKENS", "256")),
         "stream": False,
     }
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
     timeout = float(os.environ.get("NEXSANDBASE_LLM_TIMEOUT", "30"))
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+    data = _http_chat(url, payload, timeout)
     return str(data["choices"][0]["message"]["content"])
 
 
@@ -374,7 +366,7 @@ def _chat_gguf(
 ) -> str:
     global _llama_model, _llama_model_key
     try:
-        import llama_cpp  # type: ignore
+        import llama_cpp  #type: ignore
     except Exception as exc:
         raise RuntimeError("llama_cpp 未安装") from exc
 
@@ -425,15 +417,8 @@ def _chat_ollama(
         "stream": False,
         "options": {"temperature": 0.2},
     }
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
     timeout = float(os.environ.get("NEXSANDBASE_LLM_TIMEOUT", "30"))
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+    data = _http_chat(url, payload, timeout)
     return str(data["message"]["content"])
 
 
@@ -505,10 +490,7 @@ def _build_3d_prompt(context: Dict[str, Any]) -> str:
 
 
 def _clean_line_prefix(text: str) -> str:
-    """清理模型输出行首的"第一行：/画像描述：/提醒内容："等标签前缀。
-
-    循环清理直到稳定——模型可能嵌套输出（"第一行：画像描述：xxx"）。
-    """
+    """清理模型输出行首的\"第一行：/画像描述：/提醒内容：\"等标签前缀。 循环清理直到稳定——模型可能嵌套输出（\"第一行：画像描述：xxx\"）。"""
     import re as _re
     result = str(text or "").strip()
     pattern = _re.compile(r"^(第一行|第二行|第三行|画像描述|画像|语气|提醒内容|提醒示例|提醒)[:：、\s]*")
@@ -526,10 +508,7 @@ def synthesize_3d(
     allow_llm: Optional[bool] = None,
     force_llm: bool = False,
 ) -> Dict[str, Any]:
-    """立体像合成：有本地模型时增强画像/提醒语气/提醒示例，否则返回本地聚合字段。
-
-    本函数不写 L0；只有调用方决定是否把返回字段写入 `3d_annotations.jsonl`。
-    """
+    """立体像合成：有本地模型时增强画像/提醒语气/提醒示例，否则返回本地聚合字段。 本函数不写 L0；只有调用方决定是否把返回字段写入 `3d_annotations.jsonl`。"""
     context = context or {}
     local = {
         "engine": "rule",
@@ -566,7 +545,6 @@ def synthesize_3d(
         latency_ms = int((time.perf_counter() - start) * 1000)
         raw = _extract_json_object(raw_text)
         if raw is None:
-            # V3.1 调优：极简三行输出解析（画像/语气/提醒），JSON 失败时的兜底。
             lines = [ln.strip() for ln in raw_text.strip().splitlines() if ln.strip()]
             raw = {}
             if lines:
@@ -691,14 +669,7 @@ def weave_missing_triples(
     allow_llm: Optional[bool] = None,
     force_llm: bool = False,
 ) -> Dict[str, Any]:
-    """从沙子检索结果中补织缺失关系三元组。
-
-    防幻觉门控：
-    - subject/object 必须逐字出现在资料原文中；
-    - source_line 必须能定位到同时包含 subject 和 object 的原文行；
-    - 重复三元组和可疑关系直接丢弃。
-    写入仍走 `weavethread.wthread_add`（L2 织线表），绝不写 L0。
-    """
+    """从沙子检索结果中补织缺失关系三元组。 防幻觉门控： - subject/object 必须逐字出现在资料原文中； - source_line 必须能定位到同时包含 subject 和 object 的原文行； - 重复三元组和可疑关系直接丢弃。 写入仍走 `weavethread.wthread_add`（L2 织线表），绝不写 L0。"""
     rows = _normalise_material_rows(materials)
     existing = _existing_triple_set(existing_triples)
     base = {
@@ -737,7 +708,6 @@ def weave_missing_triples(
         base["latency_ms"] = latency_ms
         raw = _extract_json_object(raw_text)
         if raw is None:
-            # V3.1 调优：极简行输出解析（每行：主体-关系-客体），JSON 失败时的兜底。
             lines = [ln.strip() for ln in raw_text.strip().splitlines() if ln.strip()]
             candidates = []
             for ln in lines[:40]:
@@ -745,7 +715,6 @@ def weave_missing_triples(
                 if "-" not in ln:
                     continue
                 parts = [p.strip() for p in ln.split("-", 2)]
-                # V3.1 bugfix: 原三元表达式返回 str 非 bool 且难读——改清晰布尔判断。
                 if len(parts) >= 3 and parts[0] and parts[1] and parts[2]:
                     candidates.append({"subject": parts[0], "relation": parts[1], "object": parts[2]})
             base["fallback_reason"] = "" if candidates else "model_invalid_json"
@@ -839,13 +808,9 @@ def weave_impression(
     allow_llm: Optional[bool] = None,
     force_llm: bool = False,
 ) -> Dict[str, Any]:
-    """织印象入口。
-
-    返回 dict，调用方只把返回值放进 weave_insight 结果，本函数不写任何数据文件。
-    `allow_llm=None` 时遵循环境开关；`allow_llm=True` 可让测试显式走模型分支。
-    """
+    """织印象入口。 返回 dict，调用方只把返回值放进 weave_insight 结果，本函数不写任何数据文件。 `allow_llm=None` 时遵循环境开关；`allow_llm=True` 可让测试显式走模型分支。"""
     context = build_context(topic, weave_view)
-    # V3.0.0 防幻觉：检索视图无资料时模型会编百科（实测），直接回落规则。
+    # 防幻觉：检索视图无资料时模型会编百科（实测），直接回落规则。
     has_material = bool(
         context.get("sands") or context.get("persona")
         or context.get("triples") or context.get("search")
@@ -866,8 +831,7 @@ def weave_impression(
         latency_ms = int((time.perf_counter() - start) * 1000)
         raw = _extract_json_object(raw_text)
         if raw is None:
-            # 调优 v2（2026-08-16 实测）：0.5B 适合直接输出文本印象。
-            # JSON 解析失败时把全文当印象，而不是回落规则。
+            # 0.5B 适合直接输出文本印象；JSON 解析失败时把全文当印象，而不是回落规则。
             raw = {"impression": raw_text.strip()}
         result = _normalise_llm_result(topic, raw, config.get("model", DEFAULT_MODEL_NAME), latency_ms)
         result["model"] = config.get("model", DEFAULT_MODEL_NAME)

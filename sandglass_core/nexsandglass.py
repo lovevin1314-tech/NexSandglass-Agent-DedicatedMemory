@@ -1,15 +1,5 @@
-#!/usr/bin/env python3
-"""
-NexSandglass TTY Wrapper — 任何终端 Agent 自动落沙
-===================================================
-用法：python nexsandglass.py wrap [agent-command]
-      python nexsandglass.py wrap claude
-      python nexsandglass.py wrap codex
-      python nexsandglass.py wrap opencode
-
-自动监听 stdin/stdout，Agent 的每句话都会落到沙漏。
-不依赖 Hermes，不依赖 MCP，不改 Agent 代码。
-"""
+#!/usr/bin/env python3/usr/bin/env python3
+"""NexSandglass TTY Wrapper — 任何终端 Agent 自动落沙 =================================================== 用法：python nexsandglass.py wrap [agent-command] python nexsandglass.py wrap claude python nexsandglass.py wrap codex python nexsandglass.py wrap opencode 自动监听 stdin/stdout，Agent 的每句话都会落到沙漏。 不依赖 Hermes，不依赖 MCP，不改 Agent 代码。"""
 
 import os
 import sys

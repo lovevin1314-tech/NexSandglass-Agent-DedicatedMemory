@@ -1,14 +1,9 @@
-"""
-NexSandglass — 影子沙 (Shadow Sand)
-=====================================
-轻量SQLite投影层。不碰沙子原文，只存索引元数据。
-投石问路之前先查影子沙——脱口而出级速度。
-零依赖：sqlite3是Python stdlib。
-"""
-import sqlite3, os, re, threading
+"""NexSandglass — 影子沙 (Shadow Sand) ===================================== 轻量SQLite投影层。不碰沙子原文，只存索引元数据。 投石问路之前先查影子沙——脱口而出级速度。 零依赖：sqlite3是Python stdlib。"""
+import os, re, threading
 from collections import defaultdict
 
 from sandglass_paths import _NB
+from sandglass_util import db_connect
 import logging
 logger = logging.getLogger(__name__)
 
@@ -62,16 +57,15 @@ _TAG_FRAGMENT_4_PREFIXES = (
 )
 
 _ENTITY_RE = re.compile(
-    r'\b([A-Z][a-z]{1,}(?:\s+[A-Z][a-z]+)*)\b|'     # 英文单/多词(Caroline, New York)
-    r'\b([A-Z]{2,})\b|'                                # 全大写(LGBTQ, API)
-    r'"([^"]+)"|'                                       # 双引号
-    r"'([^']+)'|"                                       # 单引号
-    r'([\u4e00-\u9fff]{2,4})'                         # 中文2-4字
+    r'\b([A-Z][a-z]{1,}(?:\s+[A-Z][a-z]+)*)\b|'     #英文单/多词(Caroline, New York)
+    r'\b([A-Z]{2,})\b|'                                #全大写(LGBTQ, API)
+    r'"([^"]+)"|'                                       #双引号
+    r"'([^']+)'|"                                       #单引号
+    r'([\u4e00-\u9fff]{2,4})'                         #中文2-4字
 )
 
-# ═══════════════════ V2.20.4 fact_tags 质量闸 ═══════════════════
 # 背景：fact_tags 21,401 行是 6/17 单日 17,185 行写入的历史残留（旧全文regex提取），
-# 行号 95.4% 越界；V2.20.2 修复后注入首次生效把垃圾顶进【你是谁】关注行。
+# 行号 95.4% 越界； 修复后注入首次生效把垃圾顶进【你是谁】关注行。
 # 以下 注入三道闸 + 行号门控 + 内容特征过滤 按 Hermes 八步分析判定实施（2026-08-13）。
 
 # 中文停用词——复用 search_router.py ZH_STOP + scene_l3.py STOPWORDS 词表，
@@ -95,25 +89,25 @@ _TAG_STOPWORDS = frozenset({
     '你在', '你给', '你们', '我们', '他们',
 })
 
-# 别名归一化表——V2.20.4 已知错误样本（来源: 八步分析 fact_tags 垃圾标签清单）。
+# 别名归一化表—— 已知错误样本（来源: 八步分析 fact_tags 垃圾标签清单）。
 # 值为规范标签；None 表示直接剔除。
 _TAG_ALIASES = {
-    '张三': '测试用户',      # 语音识别错字 → 正确人名
-    '我在呢亲': '亲爱的',     # 口头问候残片 → 问候类（随后被停用词剔除）
+    '张三': '测试用户',      #语音识别错字 → 正确人名
+    '我在呢亲': '亲爱的',     #口头问候残片 → 问候类（随后被停用词剔除）
     '爱的': '亲爱的',
     '亲爱的说': '亲爱的',
-    '亲爱的的': '亲爱的',   # '亲爱的' 的 连写残片
-    '聊成你在': None,         # 对话残片 → 直接剔除
-    '刚忙完一': None,         # 事务叙述残片（刚忙完一点事情）→ 剔除
+    '亲爱的的': '亲爱的',   #'亲爱的' 的 连写残片
+    '聊成你在': None,         #对话残片 → 直接剔除
+    '刚忙完一': None,         #事务叙述残片（刚忙完一点事情）→ 剔除
     '点事情': None,
-    '你今天咋': None,         # 对话开头残片
+    '你今天咋': None,         #对话开头残片
     '你现在是': None,
-    '每句话不': None,         # 提示词残片（每句话不超过X个字）
+    '每句话不': None,         #提示词残片（每句话不超过X个字）
     '超过': None,
     '个字': None,
-    '主人的女': None,         # 长句碎片（主人的女朋友）
-    '的操作': None,           # 阶段B: 长句残片（安全的操作→碎成'的操作'）
-    '你是聊天': None,         # 阶段B: 长句残片
+    '主人的女': None,         #长句碎片（主人的女朋友）
+    '的操作': None,           #阶段B: 长句残片（安全的操作→碎成'的操作'）
+    '你是聊天': None,         #阶段B: 长句残片
     # ── 阶段B: 高频对话/人格样板残片（6月归档嵌入块，无信息量）──
     '对不对': None, '咋样呀': None, '样呀': None,
     '说话规则': None, '直奔主题': None, '主人说': None,
@@ -127,11 +121,7 @@ _TAG_DIGIT_START_RE = re.compile(r'^\d')
 
 
 def _tag_quality(tag: str):
-    """V2.20.4 注入三道闸——返回 (是否通过, 归一化标签)。
-    ①纯ASCII剔除（英文实体不进高频中文标签统计）
-    ②中文停用词剔除
-    ③长度闸 len 4~8（含）：纯中文2-3字实体名（测试用户/沙漏/记忆）是提取器原生组，豁免；
-      超8字片段/1字残片出局；含标点或数字开头剔除。"""
+    """V2.20.4 注入三道闸——返回 (是否通过, 归一化标签)。 ①纯ASCII剔除（英文实体不进高频中文标签统计） ②中文停用词剔除 ③长度闸 len 4~8（含）：纯中文2-3字实体名（测试用户/沙漏/记忆）是提取器原生组，豁免； 超8字片段/1字残片出局；含标点或数字开头剔除。"""
     t = (tag or '').strip()
     if not t:
         return False, ''
@@ -179,8 +169,7 @@ _PERSONA_ECHO_MARKERS = ('【说话规则】', '【人格】', '第一句就回�
 
 
 def _is_system_tool_content(text: str) -> bool:
-    """V2.20.4 内容特征判断——JSON工具输出/系统注记/注入块标记 归为 system/tool 源。
-    阶段B 扩展：人格提示词样板回显（【说话规则】/【人格】）同样视为非用户信号源。"""
+    """V2.20.4 内容特征判断——JSON工具输出/系统注记/注入块标记 归为 system/tool 源。 阶段B 扩展：人格提示词样板回显（【说话规则】/【人格】）同样视为非用户信号源。"""
     if not text:
         return False
     if _content_part(text).strip().startswith(_SYSTEM_TOOL_PREFIXES):
@@ -208,9 +197,7 @@ def _sandglass_line_count() -> int:
 
 
 def extract_tags(text: str, limit: int = 10) -> list:
-    """V2.20.4 统一提取器——shadow_index / backfill / 重建共用。
-    对 _ENTITY_RE 命中做 停用词/长度/ASCII 过滤 + 别名归一化；
-    system/tool 注入块特征内容不提取标签。"""
+    """V2.20.4 统一提取器——shadow_index / backfill / 重建共用。 对 _ENTITY_RE 命中做 停用词/长度/ASCII 过滤 + 别名归一化； system/tool 注入块特征内容不提取标签。"""
     if not text or _is_system_tool_content(text):
         return []
     found = []
@@ -237,8 +224,8 @@ def extract_tags(text: str, limit: int = 10) -> list:
 
 
 _conn = None
-_conn_inode = None  # 连接建立时 shadow_sand.db 的 inode——文件被替换后靠它检测
-_db_lock = threading.RLock()  # 共享连接跨线程串行化；RLock 允许公开函数与内部连接助手嵌套加锁
+_conn_inode = None  #连接建立时 shadow_sand.db 的 inode——文件被替换后靠它检测
+_db_lock = threading.RLock()  #共享连接跨线程串行化；RLock 允许公开函数与内部连接助手嵌套加锁
 
 def _close_conn():
     """废弃当前连接（文件被替换/路径重定向时调用）。"""
@@ -268,8 +255,7 @@ def _get_conn():
             # 磁盘文件已被替换/重建（inode 变了）→ 旧连接指向已删除的文件，必须重连
             _close_conn()
         if _conn is None:
-            _conn = sqlite3.connect(_SHADOW_DB, check_same_thread=False)
-            _conn.execute("PRAGMA journal_mode=WAL")
+            _conn = db_connect(_SHADOW_DB, wal=True, check_same_thread=False)
             _conn.executescript(_SCHEMA)
             _conn.commit()
             _conn_inode = _db_inode()
@@ -277,10 +263,8 @@ def _get_conn():
 
 def _maybe_commit():
     with _db_lock:
-        _get_conn().commit()  # V2.10.17: 每次写入立即commit,防崩溃丢数据
+        _get_conn().commit()  #每次写入立即commit,防崩溃丢数据
 
-
-# ═══════════════════ 查询（脱口而出层） ═══════════════════
 
 def shadow_search(query: str, limit: int = 10) -> list:
     """影子沙优先搜索。返回 [(行号, 信任分), ...]"""
@@ -334,12 +318,7 @@ def shadow_max_trust() -> int:
 
 
 def shadow_top_tags(limit: int = 2000) -> list:
-    """fact_tags 质量闸标签——V2.20.4 注入侧统一入口（__init__.py 与 memory_provider.py 共用）。
-    行号门控：只取 line_num ≤ 当前沙漏物理行数（95.4% 越界残留直接出局）；
-    内容特征：排除 system/tool/cron 注入块特征行（按内容前缀，不按 role 硬切）；
-    三道闸：ASCII/中文停用词/长度标点 + 别名归一化。
-    ORDER BY line_num DESC——让 LIMIT 覆盖最近行（fact_tags 无 per-tag COUNT 列，
-    line_num DESC 即等价排序，配合 Python 侧 Counter 聚合）。"""
+    """fact_tags 质量闸标签——V2.20.4 注入侧统一入口（__init__.py 与 memory_provider.py 共用）。 行号门控：只取 line_num ≤ 当前沙漏物理行数（95.4% 越界残留直接出局）； 内容特征：排除 system/tool/cron 注入块特征行（按内容前缀，不按 role 硬切）； 三道闸：ASCII/中文停用词/长度标点 + 别名归一化。 ORDER BY line_num DESC——让 LIMIT 覆盖最近行（fact_tags 无 per-tag COUNT 列， line_num DESC 即等价排序，配合 Python 侧 Counter 聚合）。"""
     with _db_lock:
         try:
             cur_lines = _sandglass_line_count()
@@ -356,7 +335,7 @@ def shadow_top_tags(limit: int = 2000) -> list:
             out = []
             for ln, tags in rows:
                 if 0 < ln <= len(lines) and _is_system_tool_content(lines[ln - 1]):
-                    continue  # system/tool 源注入块——不参与统计
+                    continue  #system/tool 源注入块——不参与统计
                 for t in tags.split(","):
                     ok, norm = _tag_quality(t)
                     if ok:
@@ -394,13 +373,7 @@ def shadow_top_entities(limit: int = 5) -> list:
 
 
 def shadow_top_fact_categories(limit: int = 5) -> list:
-    """fact_tags 分类明细——冲突6 system_prompt 事实标签块用。
-
-    行号门控：只取 line_num <= 当前沙漏物理行数（越界历史残留直接出局）；
-    内容特征：排除 system/tool/cron 注入块特征行；
-    质量闸：每个 tag 走 _tag_quality；category 排除 general/exam_general/空/未分类。
-    ORDER BY line_num DESC——最近分类优先；返回 [(category, tags), ...]。
-    """
+    """fact_tags 分类明细——冲突6 system_prompt 事实标签块用。 行号门控：只取 line_num <= 当前沙漏物理行数（越界历史残留直接出局）； 内容特征：排除 system/tool/cron 注入块特征行； 质量闸：每个 tag 走 _tag_quality；category 排除 general/exam_general/空/未分类。 ORDER BY line_num DESC——最近分类优先；返回 [(category, tags), ...]。"""
     with _db_lock:
         try:
             cur_lines = _sandglass_line_count()
@@ -418,7 +391,7 @@ def shadow_top_fact_categories(limit: int = 5) -> list:
             out = []
             for ln, category, tags in rows:
                 if 0 < ln <= len(lines) and _is_system_tool_content(lines[ln - 1]):
-                    continue  # system/tool 源注入块——不进入事实标签明细
+                    continue  #system/tool 源注入块——不进入事实标签明细
                 good = []
                 for t in tags.split(","):
                     ok, norm = _tag_quality(t)
@@ -433,8 +406,7 @@ def shadow_top_fact_categories(limit: int = 5) -> list:
 
 
 def shadow_boost(candidate_lines: set, limit: int = 10) -> list:
-    """对投石问路的候选行号做影子加权排序。
-    返回 [(行号, 信任分), ...]"""
+    """对投石问路的候选行号做影子加权排序。 返回 [(行号, 信任分), ...]"""
     with _db_lock:
         if not candidate_lines:
             return []
@@ -450,8 +422,6 @@ def shadow_boost(candidate_lines: set, limit: int = 10) -> list:
         return scored[:limit]
 
 
-# ═══════════════════ 写入（落沙后同步） ═══════════════════
-
 def shadow_index(text: str, category: str = "general", tags: str = "", line_num: int = 0) -> None:
     """落沙后同步——调用方传入实际行号，避免COUNT(*)偏移。V2.20.4: 统一走 extract_tags 质量闸。"""
     with _db_lock:
@@ -462,9 +432,9 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
             logger.warning(f"shadow_index: 静默异常", exc_info=True)
             pass
         db = _get_conn()
-        # V2.9.9.8: 行号由调用方传入，不自计数（防止与sandglass物理行号偏移）
+        # 行号由调用方传入，不自计数（防止与sandglass物理行号偏移）
 
-        # V2.20.4: 统一提取器——停用词/长度/ASCII 过滤 + 别名归一化 + system/tool 内容跳过
+        # 统一提取器——停用词/长度/ASCII 过滤 + 别名归一化 + system/tool 内容跳过
         entities_found = extract_tags(text)
         for name in entities_found:
             row = db.execute(
@@ -495,7 +465,7 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
         # 写入标签
         if category != "general" or tags:
             if category in ("general", "exam_general"):
-                # V2.20.4: category 不再用首标签污染——空则 '未分类'，非空保持 general
+                # category 不再用首标签污染——空则 '未分类'，非空保持 general
                 if not tags:
                     category = "未分类"
             db.execute(
@@ -507,8 +477,7 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
 
 
 def shadow_index_archive(text: str, category: str = "general") -> None:
-    """冷沙归档标签——阶段B 重建：逐行走统一提取器，写入 fact_tags_archive 独立表。
-    不占用热沙行号（归档内容在其归档文件中），无越界行号。"""
+    """冷沙归档标签——阶段B 重建：逐行走统一提取器，写入 fact_tags_archive 独立表。 不占用热沙行号（归档内容在其归档文件中），无越界行号。"""
     with _db_lock:
         try:
             if not text or _is_system_tool_content(text):
@@ -526,8 +495,6 @@ def shadow_index_archive(text: str, category: str = "general") -> None:
             logger.warning(f"shadow_index_archive: 静默异常", exc_info=True)
             pass
 
-
-# ═══════════════════ 反馈 ═══════════════════
 
 def shadow_feedback(line_num: int, helpful: bool) -> dict:
     """信任评分反馈。"""

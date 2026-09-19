@@ -1,21 +1,4 @@
-"""
-NexSandglass V2.4+ 数据迁移工具
-===============================
-用途：将旧版本 DPAPI/base64 加密的 sandglass.txt 解密为明文。
-V2.4.0 开始 NexSandglass 改为明文存储，旧加密数据需要迁移。
-
-用法：
-  python migrate_v2_4.py [--dry-run] [sandglass.txt路径]
-
-  --dry-run  预览，不实际修改
-  不传路径默认 ~/.neurobase/sandglass.txt
-
-注意：
-  - 会自动备份原文件为 sandglass.txt.bak.时间戳
-  - 已明文的行自动跳过
-  - Windows: 需要 pywin32 (win32crypt) 解密 DPAPI
-  - 非 Windows: base64 编码的沙子尝试解码，无法解码的保持原样
-"""
+"""NexSandglass V2.4+ 数据迁移工具 =============================== 用途：将旧版本 DPAPI/base64 加密的 sandglass.txt 解密为明文。 V2.4.0 开始 NexSandglass 改为明文存储，旧加密数据需要迁移。 用法： python migrate_v2_4.py [--dry-run] [sandglass.txt路径] --dry-run 预览，不实际修改 不传路径默认 ~/.neurobase/sandglass.txt 注意： - 会自动备份原文件为 sandglass.txt.bak.时间戳 - 已明文的行自动跳过 - Windows: 需要 pywin32 (win32crypt) 解密 DPAPI - 非 Windows: base64 编码的沙子尝试解码，无法解码的保持原样"""
 import argparse
 import base64
 import os

@@ -1,16 +1,4 @@
-"""
-NexSandglass MemoryProvider — 核心下沉版（熔炼任务 B）
-========================================================
-让任意 agent 使用 NexSandglass 作为记忆后端，替代 Holographic。
-
-本文件是沙漏唯一核心实现：NexSandglassProvider、工具 schema、
-system_prompt_block 组装、prefetch/queue_prefetch、落沙钩子、计数。
-agent 适配层（Hermes 的 __init__.py / plugin.py）只做路径准备与注册转发，
-不得再出现第二份 NexSandglassProvider。
-
-零API Key、零外部依赖——纯本地驱动。投石问路（倒排索引）优先、
-五维权重排序、偏移率感知、回音折情绪追踪、影子灵魂预测。
-"""
+"""NexSandglass MemoryProvider — 核心下沉版（熔炼任务 B） ======================================================== 让任意 agent 使用 NexSandglass 作为记忆后端，替代 Holographic。 本文件是沙漏唯一核心实现：NexSandglassProvider、工具 schema、 system_prompt_block 组装、prefetch/queue_prefetch、落沙钩子、计数。 agent 适配层（Hermes 的 __init__.py / plugin.py）只做路径准备与注册转发， 不得再出现第二份 NexSandglassProvider。 零API Key、零外部依赖——纯本地驱动。投石问路（倒排索引）优先、 五维权重排序、偏移率感知、回音折情绪追踪、影子灵魂预测。"""
 from __future__ import annotations
 
 import collections, hashlib, json, logging, os, re, threading, time
@@ -41,131 +29,18 @@ logger = logging.getLogger(__name__)
 # 版本号由主人最终确认，熔炼迭代禁止自行 bump。
 __version__ = "3.1.1"
 
-# ══════════════════════════════════════════════════════════
 # 工具方法——把 sandglass 函数暴露给 Hermes 模型调用
-# ══════════════════════════════════════════════════════════
 
 _TOOL_SCHEMAS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "sandglass_search",
-            "description": "搜索沙漏记忆——投石问路（倒排索引）优先，五维权重排序。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "搜索关键词"},
-                    "limit": {"type": "integer", "default": 10},
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "sandglass_semantic",
-            "description": "精炼语义搜索——六维滤镜+影子沙+同义词+情感重排。概念查询更准。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "搜索关键词"},
-                    "limit": {"type": "integer", "default": 5},
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "sandglass_migrate",
-            "description": "一键导出全部记忆数据为 tar.gz。换电脑时解压即用。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "output": {"type": "string", "description": "输出路径", "default": ""},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "sandglass_export",
-            "description": "导出沙漏为可迁移文本文件。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "output_path": {"type": "string", "description": "输出路径"},
-                    "limit": {"type": "integer", "description": "导出条数"},
-                    "month": {"type": "string", "description": "指定月份 YYYY-MM"},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "sandglass_recent",
-            "description": "获取最近 N 条记忆。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "n": {"type": "integer", "default": 10},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "sandglass_offset",
-            "description": "计算当前偏移率——主人决策方向的趋势。返回偏移百分比和方向。",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fact_store",
-            "description": "影子沙事实存储。action=add/search/probe/reason。存储结构化事实，信任评分排序。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "action": {"type": "string", "enum": ["add", "search", "probe", "reason"]},
-                    "content": {"type": "string", "description": "事实内容"},
-                    "category": {"type": "string", "default": "general"},
-                    "query": {"type": "string"},
-                    "entity": {"type": "string"},
-                },
-                "required": ["action"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fact_feedback",
-            "description": "信任评分反馈。标记记忆是否有帮助。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "line_num": {"type": "integer"},
-                    "helpful": {"type": "boolean"},
-                },
-                "required": ["line_num", "helpful"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "sandglass_echo",
-            "description": "读取回音折——最近的情感风向。",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
+    {'type': 'function', 'function': {'name': 'sandglass_search', 'description': '搜索沙漏记忆——投石问路（倒排索引）优先，五维权重排序。', 'parameters': {'type': 'object', 'properties': {'query': {'type': 'string', 'description': '搜索关键词'}, 'limit': {'type': 'integer', 'default': 10}}, 'required': ['query']}}},
+    {'type': 'function', 'function': {'name': 'sandglass_semantic', 'description': '精炼语义搜索——六维滤镜+影子沙+同义词+情感重排。概念查询更准。', 'parameters': {'type': 'object', 'properties': {'query': {'type': 'string', 'description': '搜索关键词'}, 'limit': {'type': 'integer', 'default': 5}}, 'required': ['query']}}},
+    {'type': 'function', 'function': {'name': 'sandglass_migrate', 'description': '一键导出全部记忆数据为 tar.gz。换电脑时解压即用。', 'parameters': {'type': 'object', 'properties': {'output': {'type': 'string', 'description': '输出路径', 'default': ''}}}}},
+    {'type': 'function', 'function': {'name': 'sandglass_export', 'description': '导出沙漏为可迁移文本文件。', 'parameters': {'type': 'object', 'properties': {'output_path': {'type': 'string', 'description': '输出路径'}, 'limit': {'type': 'integer', 'description': '导出条数'}, 'month': {'type': 'string', 'description': '指定月份 YYYY-MM'}}}}},
+    {'type': 'function', 'function': {'name': 'sandglass_recent', 'description': '获取最近 N 条记忆。', 'parameters': {'type': 'object', 'properties': {'n': {'type': 'integer', 'default': 10}}}}},
+    {'type': 'function', 'function': {'name': 'sandglass_offset', 'description': '计算当前偏移率——主人决策方向的趋势。返回偏移百分比和方向。', 'parameters': {'type': 'object', 'properties': {}}}},
+    {'type': 'function', 'function': {'name': 'fact_store', 'description': '影子沙事实存储。action=add/search/probe/reason。存储结构化事实，信任评分排序。', 'parameters': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['add', 'search', 'probe', 'reason']}, 'content': {'type': 'string', 'description': '事实内容'}, 'category': {'type': 'string', 'default': 'general'}, 'query': {'type': 'string'}, 'entity': {'type': 'string'}}, 'required': ['action']}}},
+    {'type': 'function', 'function': {'name': 'fact_feedback', 'description': '信任评分反馈。标记记忆是否有帮助。', 'parameters': {'type': 'object', 'properties': {'line_num': {'type': 'integer'}, 'helpful': {'type': 'boolean'}}, 'required': ['line_num', 'helpful']}}},
+    {'type': 'function', 'function': {'name': 'sandglass_echo', 'description': '读取回音折——最近的情感风向。', 'parameters': {'type': 'object', 'properties': {}}}},
 ]
 
 
@@ -177,7 +52,7 @@ class NexSandglassProvider(MemoryProvider):
         self._lock = threading.Lock()
         self._initialized = False
         self._turn_count = 0
-        # V2.20.3: 阶段一——注入块内容hash缓存 + prefetch 3轮去重（纯内存，跨会话重置）
+        # 阶段一——注入块内容hash缓存 + prefetch 3轮去重（纯内存，跨会话重置）
         self._session_id = ""
         self._inject_cached_hash: Optional[str] = None
         self._inject_cached_text: Optional[str] = None
@@ -187,7 +62,6 @@ class NexSandglassProvider(MemoryProvider):
         self._prefetch_hints: list = []
         self._last_rule_context: str = ""
 
-    # ═══════ V2.20.3 阶段一：token 优化——注入缓存 + prefetch 去重 ═══════
 
     def _reset_stage1_cache(self) -> None:
         """V2.20.3: 清空阶段一内存缓存（注入块hash缓存 + prefetch 3轮去重）。须在持锁下调用。"""
@@ -197,7 +71,7 @@ class NexSandglassProvider(MemoryProvider):
         self._queue_prefetch_query_history.clear()
         self._prefetch_last_text = ""
         self._last_rule_context = ""
-        # V2.20.5: 连同 prefetch 生成的 hints 一起清理，避免跨会话残留
+        # 连同 prefetch 生成的 hints 一起清理，避免跨会话残留
         if getattr(self, "_prefetch_hints", None):
             self._prefetch_hints.clear()
 
@@ -226,7 +100,14 @@ class NexSandglassProvider(MemoryProvider):
         except Exception:
             return False
 
-    # ═══════ MemoryProvider 核心接口 ═══════
+
+    def _prepare_prefetch(self, query: str, history: Any) -> tuple[str, bool]:
+        nq = self._normalize_query(query)
+        self._last_rule_context = str(query or "")
+        if not nq:
+            return nq, False
+        with self._lock:
+            return nq, any(self._query_similar(nq, hq) for hq in history)
 
     @property
     def name(self) -> str:
@@ -239,7 +120,7 @@ class NexSandglassProvider(MemoryProvider):
     def initialize(self, session_id: str = "", **kwargs) -> None:
         """设置沙漏路径、重建投石问路索引。"""
         with self._lock:
-            # V2.20.3: 跨会话重置——session_id 变化时清空阶段一缓存（同一实例复用场景）
+            # 跨会话重置——session_id 变化时清空阶段一缓存（同一实例复用场景）
             if session_id and session_id != self._session_id:
                 self._reset_stage1_cache()
                 self._session_id = session_id
@@ -253,7 +134,7 @@ class NexSandglassProvider(MemoryProvider):
             if _NB_SCRIPTS not in sys.path:
                 sys.path.insert(0, _NB_SCRIPTS)
 
-            # V2.20.2: 统一路径解析——复用 sandglass_paths.get_nb()（环境变量→config.yaml→默认），
+            # 统一路径解析——复用 sandglass_paths.get_nb()（环境变量→config.yaml→默认），
             # 不再手算 fallback，避免与 sandglass_paths 解析不一致而读到 ~/.neurobase 空壳
             from sandglass_paths import get_nb
             _NB_DATA = get_nb()
@@ -262,10 +143,11 @@ class NexSandglassProvider(MemoryProvider):
             from sandglass_paths import validate
             validate()
             rebuild_index()
-            # V2.9.21: 回填空tags（重启时一次性执行）
+            # 回填空tags（重启时一次性执行）
             try:
-                import sqlite3, re
-                db = sqlite3.connect(os.path.join(_NB_DATA, "shadow_sand.db"))
+                import re
+                from sandglass_util import db_connect
+                db = db_connect(os.path.join(_NB_DATA, "shadow_sand.db"))
                 rows = db.execute("SELECT rowid, line_num FROM fact_tags WHERE tags='' OR tags IS NULL").fetchall()
                 if rows:
                     sand_path = os.path.join(_NB_DATA, "sandglass.txt")
@@ -275,7 +157,7 @@ class NexSandglassProvider(MemoryProvider):
                         for rid, ln in rows:
                             if 0 < ln <= len(sand_lines):
                                 text = sand_lines[ln - 1]
-                                # V2.20.4: 统一提取器——与 shadow_index 同源（停用词/长度/ASCII/别名归一化）
+                                # 统一提取器——与 shadow_index 同源（停用词/长度/ASCII/别名归一化）
                                 try:
                                     from shadow_sand import extract_tags
                                     entities = extract_tags(text)
@@ -298,11 +180,7 @@ class NexSandglassProvider(MemoryProvider):
             logger.info(f"NexSandglass V{_ver} 就绪")
 
     def _build_explicit_memory_block(self) -> tuple[str, set[str]]:
-        """冲突6：显式记忆块——回溯 _SANDGLASS 最近 200 行中的 memory_write。
-
-        只取 `[action] target: content` 可解析行；按 (action, target, content)
-        去重并保留最近 10 条；content 截断约 60 字符。返回 (块文本, seen_facts)。
-        """
+        """冲突6：显式记忆块——回溯 _SANDGLASS 最近 200 行中的 memory_write。 只取 `[action] target: content` 可解析行；按 (action, target, content) 去重并保留最近 10 条；content 截断约 60 字符。返回 (块文本, seen_facts)。"""
         try:
             from sandglass_paths import _SANDGLASS
             if not os.path.exists(_SANDGLASS):
@@ -352,11 +230,7 @@ class NexSandglassProvider(MemoryProvider):
             return "", set()
 
     def _build_entity_block(self, seen_facts: set, token_budget: int = None) -> str:
-        """冲突6：高信实体块——过织布机加工层，关联场景上下文。
-
-        数字/单字/已见实体过滤保留在 weave_l3.weave_entities_with_context；
-        token_budget 用于三块合计 ≤250 token 的预算截断。
-        """
+        """冲突6：高信实体块——过织布机加工层，关联场景上下文。 数字/单字/已见实体过滤保留在 weave_l3.weave_entities_with_context； token_budget 用于三块合计 ≤250 token 的预算截断。"""
         try:
             from weave_l3 import weave_entities_with_context
             lines = weave_entities_with_context(
@@ -372,10 +246,7 @@ class NexSandglassProvider(MemoryProvider):
             return ""
 
     def _build_fact_tag_block(self, seen_facts: set, token_budget: int = None) -> str:
-        """冲突6：事实标签块——过织布机加工层，关联来源上下文。
-
-        与显式记忆/高信实体共用 seen_facts 去重；token_budget 用于三块合计预算截断。
-        """
+        """冲突6：事实标签块——过织布机加工层，关联来源上下文。 与显式记忆/高信实体共用 seen_facts 去重；token_budget 用于三块合计预算截断。"""
         try:
             from weave_l3 import weave_fact_categories_with_context
             lines = weave_fact_categories_with_context(
@@ -387,8 +258,7 @@ class NexSandglassProvider(MemoryProvider):
             return ""
 
     def system_prompt_block(self) -> str:
-        """V2.9.8: 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完
-        V2.20.3: 内容hash缓存——相同数据必返回与上次字节完全一致的字符串（服务端前缀KV缓存命中）。"""
+        """V2.9.8: 四层问答式注入 — 你是谁→往哪走→怎么变成这样→还没做完 V2.20.3: 内容hash缓存——相同数据必返回与上次字节完全一致的字符串（服务端前缀KV缓存命中）。"""
         injected_rules = []
         try:
             from sandglass_vault import count
@@ -409,7 +279,6 @@ class NexSandglassProvider(MemoryProvider):
 
             blocks = []
 
-            # ═══════ 纪律最前：红牌常驻 + 普通触发（单3） ═══════
             try:
                 from discipline import iron_rule_layers, iron_rule_inject_bump
                 rule_context_parts = [
@@ -442,7 +311,6 @@ class NexSandglassProvider(MemoryProvider):
             except Exception:
                 logger.warning("铁律双层注入失败", exc_info=True)
 
-            # ═══════ 冲突6：显式记忆/高信实体/事实标签（纪律后、你是谁前） ═══════
             # 三个块共用 seen_facts，失败各自降级，不影响基础注入。
             seen_facts: set = set()
             try:
@@ -478,7 +346,6 @@ class NexSandglassProvider(MemoryProvider):
             except Exception:
                 logger.warning("system_prompt_block 事实标签块失败", exc_info=True)
 
-            # ═══════ 第一层：你是谁 V2.9.9.10 数据点 ═══════
             identity_parts = []
             
             # 身份：从画像快照提取
@@ -507,7 +374,7 @@ class NexSandglassProvider(MemoryProvider):
                             all_entries.append((imp * conf, entry["content"]))
                     all_entries.sort(reverse=True)
                     for _, content in all_entries[:5]:
-                        # V2.9.28: 极简注入→只取标题（"："前的部分）
+                        # 极简注入→只取标题（"："前的部分）
                         title = content.split("：")[0].split(":")[0].split("=")[0].strip()[:20]
                         if title and title not in identity_parts:
                             identity_parts.append(title)
@@ -517,7 +384,7 @@ class NexSandglassProvider(MemoryProvider):
             # 决策：管道洞察已含偏移方向，此处不重复
             
             # 关注：从fact_tags高频标签
-            # V2.20.4: 与 memory_provider.py 同口径——统一走 shadow_sand.shadow_top_tags()
+            # 与 memory_provider.py 同口径——统一走 shadow_sand.shadow_top_tags()
             # （行号门控 + 三道闸 + 内容特征过滤），收编裸连接
             try:
                 from collections import Counter
@@ -547,7 +414,7 @@ class NexSandglassProvider(MemoryProvider):
             if scene_text:
                 blocks.append(f"📍 {scene_text}")
 
-            # V2.9.9.7: 溯源异常告警
+            # 溯源异常告警
             try:
                 from l3_persona_verify import persona_verify
                 pv = persona_verify()
@@ -556,7 +423,6 @@ class NexSandglassProvider(MemoryProvider):
             except Exception:
                 logger.warning("system_prompt_block 画像溯源检查失败", exc_info=True)
 
-            # ═══════ 第二层：你在往哪走（极简） ═══════
             layer2 = []
             # 情绪状态
             if mood != "平稳":
@@ -589,7 +455,7 @@ class NexSandglassProvider(MemoryProvider):
             if decisions:
                 layer2.append(f"📋 最近：{'；'.join(decisions)}")
 
-            # V2.9.9.7: 情绪×偏移预判+语气合并行
+            # 情绪×偏移预判+语气合并行
             try:
                 from offset_l3 import psychology_hint
                 hint = psychology_hint()
@@ -622,7 +488,6 @@ class NexSandglassProvider(MemoryProvider):
 
             blocks.append("\n".join(layer2))
 
-            # ═══════ 第三层：你怎么变成这样 ═══════
             try:
                 from weavethread import wthread_stats, wthread_weave
                 stats = wthread_stats()
@@ -633,7 +498,6 @@ class NexSandglassProvider(MemoryProvider):
             except Exception:
                 logger.debug("织线失败", exc_info=True)
 
-            # ═══════ 第四层：还没做完 ═══════
             layer4 = []
 
             # 待办
@@ -652,7 +516,6 @@ class NexSandglassProvider(MemoryProvider):
                 layer4.extend(f"  {i+1}. {t}" for i, t in enumerate(tasks))
                 blocks.append("\n".join(layer4))
 
-            # ═══════ 管道洞察（V2.9.11） ═══════
             try:
                 from sandglass_think import _synthesize_3d
                 syn = _synthesize_3d(trigger="inject")
@@ -661,14 +524,13 @@ class NexSandglassProvider(MemoryProvider):
             except Exception:
                 logger.warning("system_prompt_block 管道洞察注入失败", exc_info=True)
 
-            # ═══════ 尾部 ═══════
             blocks.append(f"沙漏: {total}条 | 阶段: {stage}")
 
             content = "\n\n".join(blocks).strip()
         except Exception:
             logger.warning("system_prompt_block 整体失败", exc_info=True)
             content = "NexSandglass记忆系统已就绪。使用sandglass_search搜索记忆。"
-        # V2.20.3: 内容hash缓存——hash相同→复用上次字符串（字节级稳定）；
+        # 内容hash缓存——hash相同→复用上次字符串（字节级稳定）；
         # 缓存任何异常→照常返回本次生成内容（异常兜底，不吞注入）
         try:
             digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
@@ -679,7 +541,7 @@ class NexSandglassProvider(MemoryProvider):
                 self._inject_cached_text = content
         except Exception:
             logger.warning("system_prompt_block hash缓存写入失败", exc_info=True)
-        # V2.20.x: 只在真正组装出新 system prompt 后 bump 一次 inject_count；
+        # .x: 只在真正组装出新 system prompt 后 bump 一次 inject_count；
         # hash 命中会提前 return，因此缓存命中不会自增，读取路径更不会 bump。
         try:
             for r in injected_rules:
@@ -689,19 +551,13 @@ class NexSandglassProvider(MemoryProvider):
         return content
 
     def prefetch(self, query: str, **kwargs) -> str:
-        """V2.9.34: 两段式轮次注入 — 搜索上下文+状态快照。~60t。激励LLM主动搜索。
-        V2.20.3: 同query 3轮内重复→跳过重算，复用上次快照（字节级稳定）。
-        V2.20.5: 签名兼容 Hermes — 接受 session_id 等关键字参数。"""
+        """V2.9.34: 两段式轮次注入 — 搜索上下文+状态快照。~60t。激励LLM主动搜索。 V2.20.3: 同query 3轮内重复→跳过重算，复用上次快照（字节级稳定）。 V2.20.5: 签名兼容 Hermes — 接受 session_id 等关键字参数。"""
         try:
-            nq = self._normalize_query(query)
-            self._last_rule_context = str(query or "")
-            if nq:
-                with self._lock:
-                    if any(self._query_similar(nq, hq) for hq in self._prefetch_query_history):
-                        return self._prefetch_last_text  # V2.20.3: 3轮内重复→跳过重算
+            nq, seen = self._prepare_prefetch(query, self._prefetch_query_history)
+            if seen:
+                return self._prefetch_last_text
             parts = []
             
-            # ═══ 块A: 搜索上下文 (~25t) ═══
             hints = getattr(self, '_prefetch_hints', [])
             if hints:
                 ctx = f"🔍 {' / '.join(hints[:3])}"
@@ -713,7 +569,6 @@ class NexSandglassProvider(MemoryProvider):
                     logger.warning("prefetch 场景注入失败", exc_info=True)
                 parts.append(ctx)
             
-            # ═══ 块B: 状态快照 (~35t) ═══
             from sandglass_think import comprehensive_offset, _emotional_entropy, _synthesize_3d
             off = comprehensive_offset()
             ent = _emotional_entropy()
@@ -750,7 +605,7 @@ class NexSandglassProvider(MemoryProvider):
             parts.append("\n".join(lines))
             
             result = "\n".join(parts)
-            result = result[:500]  # ~60t 硬截断
+            result = result[:500]  #~60t 硬截断
             if nq:
                 with self._lock:
                     self._prefetch_query_history.append(nq)
@@ -760,16 +615,11 @@ class NexSandglassProvider(MemoryProvider):
             return ""
 
     def queue_prefetch(self, query: str, **kwargs) -> None:
-        """后台预热——语义扩展+标签提取。激励LLM主动调sandglass_search。
-        V2.20.3: 同query 3轮内重复→跳过，保留上次 hints，避免每轮重复扩展。
-        V2.20.5: 签名兼容 Hermes — 接受 session_id 等关键字参数。"""
+        """后台预热——语义扩展+标签提取。激励LLM主动调sandglass_search。 V2.20.3: 同query 3轮内重复→跳过，保留上次 hints，避免每轮重复扩展。 V2.20.5: 签名兼容 Hermes — 接受 session_id 等关键字参数。"""
         try:
-            nq = self._normalize_query(query)
-            self._last_rule_context = str(query or "")
-            if nq:
-                with self._lock:
-                    if any(self._query_similar(nq, hq) for hq in self._queue_prefetch_query_history):
-                        return  # V2.20.3: 3轮内重复→跳过（保留上次 _prefetch_hints）
+            nq, seen = self._prepare_prefetch(query, self._queue_prefetch_query_history)
+            if seen:
+                return
             from sandglass_think import _infer_expand_with_context, search_filter
             sf = search_filter(query)
             ctx = sf or {}
@@ -807,7 +657,6 @@ class NexSandglassProvider(MemoryProvider):
         """清理。"""
         logger.info("NexSandglass MemoryProvider shutdown")
 
-    # ═══════ fact_store / fact_feedback ═══════
 
     def _handle_fact_store(self, args: dict) -> str:
         try:
@@ -864,13 +713,13 @@ class NexSandglassProvider(MemoryProvider):
     def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
         """会话结束——落沙 + 偏移检查 + V2.9.9.1情绪摘要。V2.20.3: 顺带重置阶段一缓存。"""
         try:
-            # V2.20.3: 会话结束→重置阶段一缓存，防串会话（失败不影响落沙）
+            # 会话结束→重置阶段一缓存，防串会话（失败不影响落沙）
             try:
                 with self._lock:
                     self._reset_stage1_cache()
             except Exception:
                 logger.debug("on_session_end 重置阶段一缓存失败（非致命）", exc_info=True)
-            # V2.20.x: 会话结束重置铁律注入去重，下一会话可重新统计 inject_count
+            # .x: 会话结束重置铁律注入去重，下一会话可重新统计 inject_count
             try:
                 from discipline import iron_rule_session_reset
                 iron_rule_session_reset()
@@ -890,7 +739,7 @@ class NexSandglassProvider(MemoryProvider):
             if abs(off.get("offset", 0)) >= 30:
                 logger.info(f"会话结束偏移: {off['offset']:+d}% ({off['direction']})")
 
-            # V2.9.9.1: 情绪会话摘要
+            # 情绪会话摘要
             try:
                 from emotion_vocab import detect as emotion_detect
                 from sandglass_paths import _NB
@@ -927,7 +776,6 @@ class NexSandglassProvider(MemoryProvider):
         except Exception:
             logger.debug("on_session_switch 重置阶段一缓存失败（非致命）", exc_info=True)
 
-    # ═══════ 工具暴露 ═══════
 
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
         return _TOOL_SCHEMAS
@@ -979,7 +827,6 @@ class NexSandglassProvider(MemoryProvider):
         except Exception as e:
             return tool_error(f"NexSandglass error: {e}")
 
-    # ═══════ 可选钩子 ═══════
 
     def on_memory_write(self, action: str, target: str, content: str, metadata: dict = None) -> None:
         """镜像内置记忆写入——同步落沙。"""

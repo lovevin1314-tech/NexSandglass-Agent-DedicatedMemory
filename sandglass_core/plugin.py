@@ -15,7 +15,7 @@ def _on_message(event, **_kw) -> None:
     try:
         os.makedirs(os.path.dirname(_SANDGLASS), exist_ok=True)
         sender = getattr(event.source, "user_id", "") or ""
-        if not sender: return  # 只记用户消息——AI回复不落沙
+        if not sender: return  #只记用户消息——AI回复不落沙
         text = getattr(event, "text", "") or "(media)"
         with open(_SANDGLASS, "a", encoding="utf-8") as f:
             f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} | {sender} | {text}\n")

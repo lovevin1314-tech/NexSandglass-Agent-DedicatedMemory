@@ -1,11 +1,5 @@
-#!/usr/bin/env python3
-"""
-NexSandglass L3 — 画像验证模块
-persona_trace / persona_verify / persona_diff — SHA256溯源验证
-
-从 sandglass_think.py 提取 (2026-06-11)
-原位置: L692-803
-"""
+#!/usr/bin/env python3/usr/bin/env python3
+"""NexSandglass L3 — 画像验证模块 persona_trace / persona_verify / persona_diff — SHA256溯源验证 从 sandglass_think.py 提取 (2026-06-11) 原位置: L692-803"""
 
 import os
 from sandglass_paths import _NB
@@ -27,7 +21,6 @@ def persona_trace(claim: str) -> list:
         expected_hash = src_match.group(1)
         line_num = int(src_match.group(2))
         # 验证源行内容是否匹配
-        results = search("", limit=1)
         # 直接读沙漏行验证 hash
         sg = os.path.join(_VAULT, "sandglass.txt")
         if os.path.exists(sg):

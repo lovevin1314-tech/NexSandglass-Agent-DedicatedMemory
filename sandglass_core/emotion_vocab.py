@@ -1,9 +1,4 @@
-"""
-NexSandglass 情绪词库 — 七大情绪分类
-=====================================
-基于 Ekman + Plutchik 情绪理论。
-动态学习 + 主语判断 + 小二回应策略。
-"""
+"""NexSandglass 情绪词库 — 七大情绪分类 ===================================== 基于 Ekman + Plutchik 情绪理论。 动态学习 + 主语判断 + 小二回应策略。"""
 
 import json, os, re
 
@@ -90,7 +85,6 @@ def load_vocab() -> dict:
             return vocab
         except Exception:
             logger.warning(f"load_vocab: 静默异常", exc_info=True)
-            pass
 
     vocab = {mood: {k: v for k, v in data.items()} for mood, data in _BUILTIN.items()}
     save_vocab(vocab)
@@ -139,7 +133,7 @@ def detect(message: str) -> dict:
             idx = msg_lower.find(word.lower())
             if idx >= 0:
                 # ── 否定检查：开心词前面有否定 → 跳过 ──
-                if mood in ("开心", "积极"):
+                if mood == "开心":
                     ctx8 = msg_lower[max(0, idx-8):idx]
                     if any(n in ctx8 for n in _NEGATION):
                         continue
