@@ -238,19 +238,20 @@ def extract_tags(text: str, limit: int = 10) -> list:
 
 _conn = None
 _conn_inode = None  # 连接建立时 shadow_sand.db 的 inode——文件被替换后靠它检测
-_conn_lock = threading.Lock()
+_db_lock = threading.RLock()  # 共享连接跨线程串行化；RLock 允许公开函数与内部连接助手嵌套加锁
 
 def _close_conn():
     """废弃当前连接（文件被替换/路径重定向时调用）。"""
     global _conn, _conn_inode
-    c, _conn = _conn, None
-    _conn_inode = None
-    if c is not None:
-        try:
-            c.close()
-        except Exception:
-            logger.warning(f"_close_conn: 静默异常", exc_info=True)
-            pass
+    with _db_lock:
+        c, _conn = _conn, None
+        _conn_inode = None
+        if c is not None:
+            try:
+                c.close()
+            except Exception:
+                logger.warning(f"_close_conn: 静默异常", exc_info=True)
+                pass
 
 def _db_inode() -> int:
     """当前磁盘上 shadow_sand.db 的 inode；文件不存在返回 0。"""
@@ -261,73 +262,75 @@ def _db_inode() -> int:
 
 def _get_conn():
     global _conn, _conn_inode
-    cur = _db_inode()
-    if _conn is not None and _conn_inode is not None and cur != _conn_inode:
-        # 磁盘文件已被替换/重建（inode 变了）→ 旧连接指向已删除的文件，必须重连
-        _close_conn()
-    if _conn is None:
-        with _conn_lock:
-            if _conn is None:
-                _conn = sqlite3.connect(_SHADOW_DB, check_same_thread=False)
-                _conn.execute("PRAGMA journal_mode=WAL")
-                _conn.executescript(_SCHEMA)
-                _conn.commit()
-                _conn_inode = _db_inode()
-    return _conn
+    with _db_lock:
+        cur = _db_inode()
+        if _conn is not None and _conn_inode is not None and cur != _conn_inode:
+            # 磁盘文件已被替换/重建（inode 变了）→ 旧连接指向已删除的文件，必须重连
+            _close_conn()
+        if _conn is None:
+            _conn = sqlite3.connect(_SHADOW_DB, check_same_thread=False)
+            _conn.execute("PRAGMA journal_mode=WAL")
+            _conn.executescript(_SCHEMA)
+            _conn.commit()
+            _conn_inode = _db_inode()
+        return _conn
 
 def _maybe_commit():
-    _get_conn().commit()  # V2.10.17: 每次写入立即commit,防崩溃丢数据
+    with _db_lock:
+        _get_conn().commit()  # V2.10.17: 每次写入立即commit,防崩溃丢数据
 
 
 # ═══════════════════ 查询（脱口而出层） ═══════════════════
 
 def shadow_search(query: str, limit: int = 10) -> list:
     """影子沙优先搜索。返回 [(行号, 信任分), ...]"""
-    db = _get_conn()
-    words = [w for w in re.findall(r'\w+', query.lower()) if len(w) > 1]
-    # 方法1: 实体名匹配（最快）
-    results = []
-    for w in words:
-        rows = db.execute(
-            "SELECT line_nums FROM entities WHERE name LIKE ? LIMIT 1",
-            (f"%{w}%",)
+    with _db_lock:
+        db = _get_conn()
+        words = [w for w in re.findall(r'\w+', query.lower()) if len(w) > 1]
+        # 方法1: 实体名匹配（最快）
+        results = []
+        for w in words:
+            rows = db.execute(
+                "SELECT line_nums FROM entities WHERE name LIKE ? LIMIT 1",
+                (f"%{w}%",)
+            ).fetchall()
+            for row in rows:
+                for ln in row[0].split(","):
+                    if ln.strip().isdigit():
+                        results.append(int(ln.strip()))
+
+        # 方法2: 标签匹配
+        tag_rows = db.execute(
+            "SELECT line_num FROM fact_tags WHERE tags LIKE ? OR category LIKE ? LIMIT ?",
+            (f"%{query}%", f"%{query}%", limit)
         ).fetchall()
-        for row in rows:
-            for ln in row[0].split(","):
-                if ln.strip().isdigit():
-                    results.append(int(ln.strip()))
+        for row in tag_rows:
+            results.append(row[0])
 
-    # 方法2: 标签匹配
-    tag_rows = db.execute(
-        "SELECT line_num FROM fact_tags WHERE tags LIKE ? OR category LIKE ? LIMIT ?",
-        (f"%{query}%", f"%{query}%", limit)
-    ).fetchall()
-    for row in tag_rows:
-        results.append(row[0])
+        # 去重 + 信任加权排序
+        if results:
+            unique = list(set(results))
+            scored = []
+            for ln in unique[:limit * 3]:
+                tr = db.execute(
+                    "SELECT score FROM trust WHERE line_num = ?", (ln,)
+                ).fetchone()
+                score = tr[0] if tr else 0.5
+                scored.append((score, ln))
+            scored.sort(key=lambda x: x[0], reverse=True)
+            return scored[:limit]
 
-    # 去重 + 信任加权排序
-    if results:
-        unique = list(set(results))
-        scored = []
-        for ln in unique[:limit * 3]:
-            tr = db.execute(
-                "SELECT score FROM trust WHERE line_num = ?", (ln,)
-            ).fetchone()
-            score = tr[0] if tr else 0.5
-            scored.append((score, ln))
-        scored.sort(key=lambda x: x[0], reverse=True)
-        return scored[:limit]
-
-    return []
+        return []
 
 
 def shadow_max_trust() -> int:
     """trust 表最大行号——增量初始化断点。"""
-    try:
-        row = _get_conn().execute("SELECT COALESCE(MAX(line_num), 0) FROM trust").fetchone()
-        return int(row[0]) if row else 0
-    except Exception:
-        return 0
+    with _db_lock:
+        try:
+            row = _get_conn().execute("SELECT COALESCE(MAX(line_num), 0) FROM trust").fetchone()
+            return int(row[0]) if row else 0
+        except Exception:
+            return 0
 
 
 def shadow_top_tags(limit: int = 2000) -> list:
@@ -337,55 +340,57 @@ def shadow_top_tags(limit: int = 2000) -> list:
     三道闸：ASCII/中文停用词/长度标点 + 别名归一化。
     ORDER BY line_num DESC——让 LIMIT 覆盖最近行（fact_tags 无 per-tag COUNT 列，
     line_num DESC 即等价排序，配合 Python 侧 Counter 聚合）。"""
-    try:
-        cur_lines = _sandglass_line_count()
-        if cur_lines <= 0:
-            return []
-        rows = _get_conn().execute(
-            "SELECT line_num, tags FROM fact_tags "
-            "WHERE tags != '' AND tags != '未分类' "
-            "AND line_num > 0 AND line_num <= ? "
-            "ORDER BY line_num DESC LIMIT ?",
-            (cur_lines, limit)
-        ).fetchall()
-        lines = _sandglass_lines()
-        out = []
-        for ln, tags in rows:
-            if 0 < ln <= len(lines) and _is_system_tool_content(lines[ln - 1]):
-                continue  # system/tool 源注入块——不参与统计
-            for t in tags.split(","):
-                ok, norm = _tag_quality(t)
-                if ok:
-                    out.append(norm)
-        # 冷沙归档标签——阶段B 重建后纳入统计（独立表，不占热沙行号，无越界）
+    with _db_lock:
         try:
-            for (tags,) in _get_conn().execute(
-                "SELECT tags FROM fact_tags_archive WHERE tags != '' AND tags != '未分类'"
-            ).fetchall():
+            cur_lines = _sandglass_line_count()
+            if cur_lines <= 0:
+                return []
+            rows = _get_conn().execute(
+                "SELECT line_num, tags FROM fact_tags "
+                "WHERE tags != '' AND tags != '未分类' "
+                "AND line_num > 0 AND line_num <= ? "
+                "ORDER BY line_num DESC LIMIT ?",
+                (cur_lines, limit)
+            ).fetchall()
+            lines = _sandglass_lines()
+            out = []
+            for ln, tags in rows:
+                if 0 < ln <= len(lines) and _is_system_tool_content(lines[ln - 1]):
+                    continue  # system/tool 源注入块——不参与统计
                 for t in tags.split(","):
                     ok, norm = _tag_quality(t)
                     if ok:
                         out.append(norm)
+            # 冷沙归档标签——阶段B 重建后纳入统计（独立表，不占热沙行号，无越界）
+            try:
+                for (tags,) in _get_conn().execute(
+                    "SELECT tags FROM fact_tags_archive WHERE tags != '' AND tags != '未分类'"
+                ).fetchall():
+                    for t in tags.split(","):
+                        ok, norm = _tag_quality(t)
+                        if ok:
+                            out.append(norm)
+            except Exception:
+                logger.warning(f"shadow_top_tags: 静默异常", exc_info=True)
+                pass
+            return out
         except Exception:
-            logger.warning(f"shadow_top_tags: 静默异常", exc_info=True)
-            pass
-        return out
-    except Exception:
-        return []
+            return []
 
 
 def shadow_top_entities(limit: int = 5) -> list:
     """按关联行数降序取实体——system_prompt 实体注入用。"""
-    try:
-        return _get_conn().execute(
-            "SELECT name, line_nums FROM entities "
-            "WHERE length(name) >= 2 "
-            "ORDER BY length(line_nums) - length(replace(line_nums,',','')) DESC "
-            "LIMIT ?",
-            (limit,)
-        ).fetchall()
-    except Exception:
-        return []
+    with _db_lock:
+        try:
+            return _get_conn().execute(
+                "SELECT name, line_nums FROM entities "
+                "WHERE length(name) >= 2 "
+                "ORDER BY length(line_nums) - length(replace(line_nums,',','')) DESC "
+                "LIMIT ?",
+                (limit,)
+            ).fetchall()
+        except Exception:
+            return []
 
 
 def shadow_top_fact_categories(limit: int = 5) -> list:
@@ -396,163 +401,169 @@ def shadow_top_fact_categories(limit: int = 5) -> list:
     质量闸：每个 tag 走 _tag_quality；category 排除 general/exam_general/空/未分类。
     ORDER BY line_num DESC——最近分类优先；返回 [(category, tags), ...]。
     """
-    try:
-        cur_lines = _sandglass_line_count()
-        if cur_lines <= 0:
+    with _db_lock:
+        try:
+            cur_lines = _sandglass_line_count()
+            if cur_lines <= 0:
+                return []
+            rows = _get_conn().execute(
+                "SELECT line_num, category, tags FROM fact_tags "
+                "WHERE category NOT IN ('general','exam_general','','未分类') "
+                "AND tags != '' AND tags != '未分类' "
+                "AND line_num > 0 AND line_num <= ? "
+                "ORDER BY line_num DESC LIMIT ?",
+                (cur_lines, limit)
+            ).fetchall()
+            lines = _sandglass_lines()
+            out = []
+            for ln, category, tags in rows:
+                if 0 < ln <= len(lines) and _is_system_tool_content(lines[ln - 1]):
+                    continue  # system/tool 源注入块——不进入事实标签明细
+                good = []
+                for t in tags.split(","):
+                    ok, norm = _tag_quality(t)
+                    if ok:
+                        good.append(norm)
+                if good:
+                    out.append((category.strip() or "未分类", ",".join(good)))
+            return out
+        except Exception:
+            logger.warning(f"shadow_top_fact_categories: 静默异常", exc_info=True)
             return []
-        rows = _get_conn().execute(
-            "SELECT line_num, category, tags FROM fact_tags "
-            "WHERE category NOT IN ('general','exam_general','','未分类') "
-            "AND tags != '' AND tags != '未分类' "
-            "AND line_num > 0 AND line_num <= ? "
-            "ORDER BY line_num DESC LIMIT ?",
-            (cur_lines, limit)
-        ).fetchall()
-        lines = _sandglass_lines()
-        out = []
-        for ln, category, tags in rows:
-            if 0 < ln <= len(lines) and _is_system_tool_content(lines[ln - 1]):
-                continue  # system/tool 源注入块——不进入事实标签明细
-            good = []
-            for t in tags.split(","):
-                ok, norm = _tag_quality(t)
-                if ok:
-                    good.append(norm)
-            if good:
-                out.append((category.strip() or "未分类", ",".join(good)))
-        return out
-    except Exception:
-        logger.warning(f"shadow_top_fact_categories: 静默异常", exc_info=True)
-        return []
 
 
 def shadow_boost(candidate_lines: set, limit: int = 10) -> list:
     """对投石问路的候选行号做影子加权排序。
     返回 [(行号, 信任分), ...]"""
-    if not candidate_lines:
-        return []
-    db = _get_conn()
-    placeholders = ",".join("?" * len(candidate_lines))
-    rows = db.execute(
-        f"SELECT line_num, score FROM trust WHERE line_num IN ({placeholders})",
-        list(candidate_lines)
-    ).fetchall()
-    trust_map = {r[0]: r[1] for r in rows}
-    scored = [(trust_map.get(ln, 0.5), ln) for ln in candidate_lines]
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return scored[:limit]
+    with _db_lock:
+        if not candidate_lines:
+            return []
+        db = _get_conn()
+        placeholders = ",".join("?" * len(candidate_lines))
+        rows = db.execute(
+            f"SELECT line_num, score FROM trust WHERE line_num IN ({placeholders})",
+            list(candidate_lines)
+        ).fetchall()
+        trust_map = {r[0]: r[1] for r in rows}
+        scored = [(trust_map.get(ln, 0.5), ln) for ln in candidate_lines]
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return scored[:limit]
 
 
 # ═══════════════════ 写入（落沙后同步） ═══════════════════
 
 def shadow_index(text: str, category: str = "general", tags: str = "", line_num: int = 0) -> None:
     """落沙后同步——调用方传入实际行号，避免COUNT(*)偏移。V2.20.4: 统一走 extract_tags 质量闸。"""
-    try:
-        from sandglass_think import scene_mode
-        if scene_mode() == 'exam': category = 'exam_' + category
-    except Exception:
-        logger.warning(f"shadow_index: 静默异常", exc_info=True)
-        pass
-    db = _get_conn()
-    # V2.9.9.8: 行号由调用方传入，不自计数（防止与sandglass物理行号偏移）
+    with _db_lock:
+        try:
+            from sandglass_think import scene_mode
+            if scene_mode() == 'exam': category = 'exam_' + category
+        except Exception:
+            logger.warning(f"shadow_index: 静默异常", exc_info=True)
+            pass
+        db = _get_conn()
+        # V2.9.9.8: 行号由调用方传入，不自计数（防止与sandglass物理行号偏移）
 
-    # V2.20.4: 统一提取器——停用词/长度/ASCII 过滤 + 别名归一化 + system/tool 内容跳过
-    entities_found = extract_tags(text)
-    for name in entities_found:
-        row = db.execute(
-            "SELECT line_nums FROM entities WHERE name = ?", (name,)
-        ).fetchone()
-        if row:
-            nums = set(row[0].split(",")) | {str(line_num)}
-            db.execute(
-                "UPDATE entities SET line_nums = ? WHERE name = ?",
-                (",".join(sorted(nums, key=int)), name)
-            )
-        else:
-            db.execute(
-                "INSERT INTO entities (name, line_nums) VALUES (?, ?)",
-                (name, str(line_num))
-            )
+        # V2.20.4: 统一提取器——停用词/长度/ASCII 过滤 + 别名归一化 + system/tool 内容跳过
+        entities_found = extract_tags(text)
+        for name in entities_found:
+            row = db.execute(
+                "SELECT line_nums FROM entities WHERE name = ?", (name,)
+            ).fetchone()
+            if row:
+                nums = set(row[0].split(",")) | {str(line_num)}
+                db.execute(
+                    "UPDATE entities SET line_nums = ? WHERE name = ?",
+                    (",".join(sorted(nums, key=int)), name)
+                )
+            else:
+                db.execute(
+                    "INSERT INTO entities (name, line_nums) VALUES (?, ?)",
+                    (name, str(line_num))
+                )
 
-    # 写入信任记录
-    db.execute(
-        "INSERT OR IGNORE INTO trust (line_num, score) VALUES (?, 0.5)",
-        (line_num,)
-    )
-
-    # 兜底 tags：无 tags 时用实体名填充
-    if not tags and entities_found:
-        tags = ",".join(entities_found[:10])
-
-    # 写入标签
-    if category != "general" or tags:
-        if category in ("general", "exam_general"):
-            # V2.20.4: category 不再用首标签污染——空则 '未分类'，非空保持 general
-            if not tags:
-                category = "未分类"
+        # 写入信任记录
         db.execute(
-            "INSERT OR REPLACE INTO fact_tags (line_num, category, tags) VALUES (?, ?, ?)",
-            (line_num, category, tags)
+            "INSERT OR IGNORE INTO trust (line_num, score) VALUES (?, 0.5)",
+            (line_num,)
         )
 
-    _maybe_commit()
+        # 兜底 tags：无 tags 时用实体名填充
+        if not tags and entities_found:
+            tags = ",".join(entities_found[:10])
+
+        # 写入标签
+        if category != "general" or tags:
+            if category in ("general", "exam_general"):
+                # V2.20.4: category 不再用首标签污染——空则 '未分类'，非空保持 general
+                if not tags:
+                    category = "未分类"
+            db.execute(
+                "INSERT OR REPLACE INTO fact_tags (line_num, category, tags) VALUES (?, ?, ?)",
+                (line_num, category, tags)
+            )
+
+        _maybe_commit()
 
 
 def shadow_index_archive(text: str, category: str = "general") -> None:
     """冷沙归档标签——阶段B 重建：逐行走统一提取器，写入 fact_tags_archive 独立表。
     不占用热沙行号（归档内容在其归档文件中），无越界行号。"""
-    try:
-        if not text or _is_system_tool_content(text):
-            return
-        entities_found = extract_tags(text)
-        if not entities_found:
-            return
-        db = _get_conn()
-        db.execute(
-            "INSERT INTO fact_tags_archive (category, tags) VALUES (?, ?)",
-            (category, ",".join(entities_found[:10]))
-        )
-        _maybe_commit()
-    except Exception:
-        logger.warning(f"shadow_index_archive: 静默异常", exc_info=True)
-        pass
+    with _db_lock:
+        try:
+            if not text or _is_system_tool_content(text):
+                return
+            entities_found = extract_tags(text)
+            if not entities_found:
+                return
+            db = _get_conn()
+            db.execute(
+                "INSERT INTO fact_tags_archive (category, tags) VALUES (?, ?)",
+                (category, ",".join(entities_found[:10]))
+            )
+            _maybe_commit()
+        except Exception:
+            logger.warning(f"shadow_index_archive: 静默异常", exc_info=True)
+            pass
 
 
 # ═══════════════════ 反馈 ═══════════════════
 
 def shadow_feedback(line_num: int, helpful: bool) -> dict:
     """信任评分反馈。"""
-    db = _get_conn()
-    row = db.execute(
-        "SELECT score, helpful, unhelpful FROM trust WHERE line_num = ?",
-        (line_num,)
-    ).fetchone()
-    if not row:
-        db.execute("INSERT INTO trust (line_num, score) VALUES (?, 0.5)", (line_num,))
-        old_score = 0.5
-    else:
-        old_score = row[0]
+    with _db_lock:
+        db = _get_conn()
+        row = db.execute(
+            "SELECT score, helpful, unhelpful FROM trust WHERE line_num = ?",
+            (line_num,)
+        ).fetchone()
+        if not row:
+            db.execute("INSERT INTO trust (line_num, score) VALUES (?, 0.5)", (line_num,))
+            old_score = 0.5
+        else:
+            old_score = row[0]
 
-    delta = 0.05 if helpful else -0.10
-    new_score = max(0.0, min(1.0, old_score + delta))
-    col = "helpful" if helpful else "unhelpful"
+        delta = 0.05 if helpful else -0.10
+        new_score = max(0.0, min(1.0, old_score + delta))
+        col = "helpful" if helpful else "unhelpful"
 
-    db.execute(
-        f"UPDATE trust SET score = ?, {col} = {col} + 1, updated_at = datetime('now') WHERE line_num = ?",
-        (new_score, line_num)
-    )
-    _maybe_commit()
-    return {"line_num": line_num, "old_trust": old_score, "new_trust": new_score}
+        db.execute(
+            f"UPDATE trust SET score = ?, {col} = {col} + 1, updated_at = datetime('now') WHERE line_num = ?",
+            (new_score, line_num)
+        )
+        _maybe_commit()
+        return {"line_num": line_num, "old_trust": old_score, "new_trust": new_score}
 
 
 def shadow_retrieval_bump(line_nums: list) -> None:
     """标记检索——增加retrievals计数。"""
-    if not line_nums:
-        return
-    db = _get_conn()
-    placeholders = ",".join("?" * len(line_nums))
-    db.execute(
-        f"UPDATE trust SET retrievals = retrievals + 1 WHERE line_num IN ({placeholders})",
-        line_nums
-    )
-    _maybe_commit()
+    with _db_lock:
+        if not line_nums:
+            return
+        db = _get_conn()
+        placeholders = ",".join("?" * len(line_nums))
+        db.execute(
+            f"UPDATE trust SET retrievals = retrievals + 1 WHERE line_num IN ({placeholders})",
+            line_nums
+        )
+        _maybe_commit()
