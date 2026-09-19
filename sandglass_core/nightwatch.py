@@ -1,9 +1,4 @@
-"""
-NeuroBase 守夜人 — 全系统 V1.0 守护
-====================================
-会话启动时检查三层健康状态。
-用法：在 SOUL.md 或 prefill 中调用 night_watch()。
-"""
+"""NeuroBase 守夜人 — 全系统 V1.0 守护 ==================================== 会话启动时检查三层健康状态。 用法：在 SOUL.md 或 prefill 中调用 night_watch()。"""
 
 import os
 from sandglass_paths import _NB
@@ -21,7 +16,6 @@ _PERSONA = os.path.join(_VAULT, "persona", "persona.md")
 
 def night_watch() -> str:
     """全系统守夜人检查。返回状态报告。如有告急，立即告知主人。"""
-    import hashlib
     alerts = []
     ok = []
 

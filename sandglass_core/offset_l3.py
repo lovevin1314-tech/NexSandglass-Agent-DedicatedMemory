@@ -10,10 +10,6 @@ _PERSONA_DIR = os.path.join(_VAULT, "persona")
 _PERSONA = os.path.join(_PERSONA_DIR, "persona.md")
 _PERSONA_TIMELINE = os.path.join(_PERSONA_DIR, "persona-timeline.jsonl")
 _DECISION_LOG = os.path.join(_PERSONA_DIR, "decision-log.jsonl")
-_TASK_LOG = os.path.join(_PERSONA_DIR, "task-log.jsonl")
-_CANVAS = os.path.join(_VAULT, "profile", "canvas.md")
-_PATTERNS = os.path.join(_VAULT, "profile", "thinking-patterns.md")
-_INSIGHTS = os.path.join(_VAULT, "memory", "insights.md")
 logger = logging.getLogger(__name__)
 
 from offset_signals import _OFFSET_SIGNALS
@@ -40,26 +36,18 @@ def _lazy_import():
         _weave_guard = False; weave_contradiction = _wc
 
 
+_STAGE_THRESHOLD = 60  #±60% 综合偏移率触发阶段切换信号
 
-_STAGE_THRESHOLD = 60  # ±60% 综合偏移率触发阶段切换信号
+_STAGE_CONSECUTIVE = 2  #连续 2 次高偏移 → 静默切阶段
 
-_STAGE_CONSECUTIVE = 2  # 连续 2 次高偏移 → 静默切阶段
+_FRUGAL = 60   #省钱信号正在变实（累计+）
 
-_FRUGAL = 60   # 省钱信号正在变实（累计+）
+_SPEND = -60   #花钱轮廓正在成形（累计-）
 
-_SPEND = -60   # 花钱轮廓正在成形（累计-）
+_DRIFT = -80   #放弃倾向的影子（累计--）
 
-_DRIFT = -80   # 放弃倾向的影子（累计--）
 
-_SEARCH_WEIGHTS = {
-    "scene_match": 1.5,     # 当前场景匹配 → ×1.5
-    "default": 1.0,          # 默认权重
-    "persona_boost": 1.3,   # 画像相关 → ×1.3
-    "stage_bias": 0.7,      # 过去阶段 → ×0.7（现在更重要）
-    "particle_push": 1.2,   # 决策粒子强化 → ×1.2
-}
-
-@__import__("offset_signals")._fail_open({})
+@__import__("sandglass_util")._fail_open({})
 def offset_check(decision_text: str, user_persisted: bool = False) -> dict:
     """计算决策偏移率。user_persisted=True 表示主人明知偏移仍坚持。"""
     text = decision_text.lower()
@@ -116,7 +104,7 @@ def offset_check(decision_text: str, user_persisted: bool = False) -> dict:
 
     # 主人明知偏移仍坚持 → 检查是否该切阶段
     if user_persisted and abs(offset) >= _STAGE_THRESHOLD:
-        comp = comprehensive_offset()  # ← 先算综合偏移率，再切阶段（切了会清日志）
+        comp = comprehensive_offset()  #← 先算综合偏移率，再切阶段（切了会清日志）
         new_stage = _maybe_switch_stage(direction)
         if new_stage:
             result["stage_switched"] = True
@@ -134,10 +122,9 @@ def offset_check(decision_text: str, user_persisted: bool = False) -> dict:
 
 
 def comprehensive_offset(scene: str = "") -> dict:
-    """综合偏移率——滚动窗口加权平均。可选按场景过滤。
-    scene 参数匹配场景标签列表中的任意一项。"""
-    global _weave_guard  # V2.1.10: 修复UnboundLocalError
-    _lazy_import()        # V2.1.18: 确保weave_contradiction已加载
+    """综合偏移率——滚动窗口加权平均。可选按场景过滤。 scene 参数匹配场景标签列表中的任意一项。"""
+    global _weave_guard  #修复UnboundLocalError
+    _lazy_import()        #确保weave_contradiction已加载
     entries = _read_decision_log(50)
     if not entries:
         return {"offset": 0, "direction": "neutral", "sample": 0, "trend": "stable"}
@@ -209,7 +196,7 @@ def comprehensive_offset(scene: str = "") -> dict:
         "direction": max(directions, key=directions.get),
         "sample": len(entries),
         "trend": trend,
-        "chain": chain_stats,  # 🆕 决策链条——犹豫度/平均长度
+        "chain": chain_stats,  #🆕 决策链条——犹豫度/平均长度
     }
     if scene:
         result["scene"] = scene
@@ -226,7 +213,7 @@ def comprehensive_offset(scene: str = "") -> dict:
     return result
 
 
-# V2.9.9: 情绪x偏移预判 — 零依赖,纯本地
+# 情绪x偏移预判 — 零依赖,纯本地
 def psychology_hint() -> str:
     """V2.9.36: 多维判据预判心理状态——方向×熵层级×幅度×趋势。15种模式。"""
     try:
@@ -281,11 +268,9 @@ def psychology_hint() -> str:
         return ""
 
 
-@__import__("offset_signals")._fail_open({})
+@__import__("sandglass_util")._fail_open({})
 def cross_stage_offset(decision_text: str) -> dict:
-    """跨阶段偏移对比——同一个决策放到每个历史阶段的画像上量偏移率。
-    返回 {trajectory: [{stage, offset, direction}], evolution: 描述}。
-    核心用途：时间回溯——看一个人在多个阶段间的演变轨迹。"""
+    """跨阶段偏移对比——同一个决策放到每个历史阶段的画像上量偏移率。 返回 {trajectory: [{stage, offset, direction}], evolution: 描述}。 核心用途：时间回溯——看一个人在多个阶段间的演变轨迹。"""
     _lazy_import()
     result = {"trajectory": [], "evolution": ""}
 
@@ -391,10 +376,7 @@ def offset_chart(topic: str = "") -> str:
 
 
 def shadow_chart(sensitivity: dict = None) -> str:
-    """
-    玻璃影子可视化——三个维度的轮廓深度。
-    Unicode 阴影条 → 一屏看清省钱/花钱/放弃哪个影子更深。
-    """
+    """玻璃影子可视化——三个维度的轮廓深度。 Unicode 阴影条 → 一屏看清省钱/花钱/放弃哪个影子更深。"""
     if sensitivity is None:
         sensitivity = _WAVE_THRESHOLDS
 
@@ -443,7 +425,7 @@ def _log_decision(decision_text: str, offset_result: dict) -> None:
 
     # 决策全维度快照（点线面）—— 传offset_result断递归
     try:
-        from sandglass_think import decision_snapshot  # lazy import 防循环引用
+        from sandglass_think import decision_snapshot  #lazy import 防循环引用
         snapshot = decision_snapshot(decision_text, offset_result)
         snap_path = os.path.join(_NB, "decision_snapshots.txt")
         with open(snap_path, "a", encoding="utf-8") as f:
@@ -503,12 +485,7 @@ def _read_decision_log(limit: int = 20) -> list:
 
 
 def _maybe_switch_stage(direction: str) -> str | None:
-    """检查是否该静默切阶段。返回新阶段名或 None。
-    
-    触发条件：
-    1. 最近20条决策中，同方向≥8条高偏移(≥60%) → 切阶段
-    2. 沙子总数跨过500/1000/1500/2000量级 → 自然阶段
-    """
+    """检查是否该静默切阶段。返回新阶段名或 None。 触发条件： 1. 最近20条决策中，同方向≥8条高偏移(≥60%) → 切阶段 2. 沙子总数跨过500/1000/1500/2000量级 → 自然阶段"""
     from sandglass_vault import count as sv_count
     
     entries = _read_decision_log(20)
@@ -537,7 +514,6 @@ def _maybe_switch_stage(direction: str) -> str | None:
     if os.path.exists(_PERSONA):
         archived = os.path.join(_PERSONA_DIR, f"persona.{stage_name}.md")
         shutil.copy2(_PERSONA, archived)
-        persona_canvas(persona_path=archived, stage=stage_name)
 
     # 记录阶段切换
     os.makedirs(_PERSONA_DIR, exist_ok=True)
@@ -557,8 +533,7 @@ def _maybe_switch_stage(direction: str) -> str | None:
 
 
 def stage_mark(stage: str, tag: str, note: str = "") -> dict:
-    """给阶段打标记。不合并阶段，只标记关联关系。
-    例如：stage_mark('2024', 'similar_to', '2025') → 2024 和 2025 相似但不合并"""
+    """给阶段打标记。不合并阶段，只标记关联关系。 例如：stage_mark('2024', 'similar_to', '2025') → 2024 和 2025 相似但不合并"""
     _lazy_import()
     marks = {}
     if os.path.exists(_STAGE_MARKS):
@@ -596,4 +571,3 @@ def stage_marks(stage: str = "") -> list:
         return marks
     except Exception:
         return []
-

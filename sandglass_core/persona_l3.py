@@ -1,10 +1,10 @@
 """NexSandglass L3 — persona_l3"""
 import os, re, json, hashlib, logging, shutil, time
 from datetime import datetime, timezone
-from pathlib import Path
 from sandglass_vault import _tokenize
 from sandglass_vault import recent as sv_recent, search as sv_search, count as sv_count
 from sandglass_paths import _NB
+from sandglass_util import db_connect
 
 def _pipe_warn(name, e):
     logging.getLogger(__name__).warning(f"管道 [{name}] 降级: {e}")
@@ -30,7 +30,7 @@ def _lazy_import():
         from sandglass_think import _fail_open as _fo, _extract_md_section as _em
         _fail_open = _fo; _extract_md_section = _em
 
-@__import__("offset_signals")._fail_open("")
+@__import__("sandglass_util")._fail_open("")
 def persona_build() -> str:
     """首次全量构建人格画像。从最近500条沙子提炼。返回 persona.md 路径。"""
     _lazy_import()
@@ -72,7 +72,7 @@ def persona_build() -> str:
 
     user_prompt += f"=== 主人对话沙子 ===\n{sand_text[:30000]}\n=== 结束 ===\n\n请执行四层深度扫描，生成 persona.md。首次生成，全量写入。"
 
-    # V2.9.12: 纯本地 → 管道聚合构建（fact_tags + offset + particles + scenes）
+    # 纯本地 → 管道聚合构建（fact_tags + offset + particles + scenes）
     content = _pipe_build(first_line, last_line, total)
     if content:
         os.makedirs(os.path.dirname(_PERSONA), exist_ok=True)
@@ -86,7 +86,7 @@ def persona_build() -> str:
     return ""
 
 
-@__import__("offset_signals")._fail_open("")
+@__import__("sandglass_util")._fail_open("")
 def persona_update() -> str:
     """增量更新人格画像。只扫描上次更新后的新沙子。"""
     _lazy_import()
@@ -120,7 +120,7 @@ def persona_update() -> str:
 
     user_prompt = f"当前时间：{datetime.now():%Y-%m-%d %H:%M}\n\n### 现有画像\n{existing[:4000]}\n\n### 新对话沙子（总{total_sands}条，本条第{first_line}-{last_line}行）\n{sand_text[:15000]}\n\n请增量更新画像。只改有变化的部分，不变的部分原样保留。注意维护项链溯源。"
 
-    # V2.9.9.11: 纯本地 → 数据点驱动更新
+    # 纯本地 → 数据点驱动更新
     refreshed = _data_driven_refresh(existing, first_line, last_line, total_sands)
     if refreshed:
         with open(_PERSONA, "w", encoding="utf-8") as f:
@@ -129,20 +129,14 @@ def persona_update() -> str:
 
 
 def _data_driven_refresh(existing: str, first_line: int, last_line: int, total: int) -> str:
-    """V2.9.9.11: 数据点驱动画像刷新 — 纯本地聚合。
-    
-    从 fact_tags + offset + decision_particles 提取最新数据点，
-    更新画像中的溯源标记、偏移率、标签云等动态字段。
-    保留现有画像的结构和定性内容。
-    """
-    import sqlite3
+    """V2.9.9.11: 数据点驱动画像刷新 — 纯本地聚合。 从 fact_tags + offset + decision_particles 提取最新数据点， 更新画像中的溯源标记、偏移率、标签云等动态字段。 保留现有画像的结构和定性内容。"""
     from collections import Counter
     from sandglass_think import comprehensive_offset
     
     # 1. fact_tags 高频标签
     tops = []
     try:
-        db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
+        db = db_connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
         tags = Counter()
         for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
             for t in r[0].split(","):
@@ -165,7 +159,7 @@ def _data_driven_refresh(existing: str, first_line: int, last_line: int, total: 
     now_ts = datetime.now().strftime("%Y-%m-%d %H:%M")
     lines = existing.split("\n")
     new_lines = []
-    header_end = False  # 遇到第一个 ## 标题后为 True
+    header_end = False  #遇到第一个 ## 标题后为 True
     
     for line in lines:
         # 替换 L 溯源标记
@@ -206,13 +200,7 @@ def _data_driven_refresh(existing: str, first_line: int, last_line: int, total: 
 
 
 def _pipe_build(first_line: int, last_line: int, total: int) -> str:
-    """V2.9.12: 管道聚合首次构建画像 — 纯本地。
-    
-    从 fact_tags + offset + decision_particles + scenes 生成四层 persona.md。
-    新用户空管道 → 输出"待积累"骨架；老用户管道丰富 → 输出完整画像。
-    越用管道数据越多，画像越准——自然生长。
-    """
-    import sqlite3
+    """V2.9.12: 管道聚合首次构建画像 — 纯本地。 从 fact_tags + offset + decision_particles + scenes 生成四层 persona.md。 新用户空管道 → 输出\"待积累\"骨架；老用户管道丰富 → 输出完整画像。 越用管道数据越多，画像越准——自然生长。"""
     from collections import Counter
     from sandglass_think import comprehensive_offset
     
@@ -222,7 +210,7 @@ def _pipe_build(first_line: int, last_line: int, total: int) -> str:
     tops = []
     tool_hints = []
     try:
-        db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
+        db = db_connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
         tags = Counter()
         for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
             for t in r[0].split(","):
@@ -339,9 +327,7 @@ def _pipe_build(first_line: int, last_line: int, total: int) -> str:
 
 
 def _sync_five_facets(first_line: int = 0, last_line: int = 0, total: int = 0):
-    """V2.9.24: 管道自动生成 five-facets.json — 用户零操作。
-    从 persona.md + iron_rules.txt + offset + fact_tags 聚合。
-    """
+    """V2.9.24: 管道自动生成 five-facets.json — 用户零操作。 从 persona.md + iron_rules.txt + offset + fact_tags 聚合。"""
     import json
     ff_path = os.path.join(_NB, "profile", "five-facets.json")
     now = datetime.now().strftime("%Y-%m-%d")
@@ -378,27 +364,6 @@ def _sync_five_facets(first_line: int = 0, last_line: int = 0, total: int = 0):
     except Exception:
         logger.warning(f"_sync_five_facets: 静默异常", exc_info=True)
         pass
-
-
-@__import__("offset_signals")._fail_open("")
-def persona_canvas(persona_path: str = "", stage: str = "") -> str:
-    """从 persona 生成画布。默认当前阶段。
-    指定 persona_path 则从归档画像生成对应阶段画布。"""
-    _lazy_import()
-    import shutil
-    if persona_path and os.path.exists(persona_path):
-        with open(persona_path, "r", encoding="utf-8") as f:
-            persona_text = f.read()
-        stage = stage or Path(persona_path).stem.replace("persona.", "")
-    elif os.path.exists(_PERSONA):
-        with open(_PERSONA, "r", encoding="utf-8") as f:
-            persona_text = f.read()
-        stage = stage or _current_stage()
-    else:
-        return ""
-
-    # V2.9.9.9+: 纯本地 — canvas 由 persona_diff + persona_verify 驱动
-    return ""
 
 
 def persona_freshness() -> dict:
@@ -474,7 +439,7 @@ def _current_stage() -> str:
         return "2026-06"
     try:
         with open(_PERSONA_TIMELINE, "rb") as f:
-            f.seek(-256, 2)  # 从尾部读最后256字节
+            f.seek(-256, 2)  #从尾部读最后256字节
             tail = f.read().decode("utf-8", errors="ignore")
         last = tail.strip().split("\n")[-1]
         if not last:
@@ -544,106 +509,9 @@ def _local_persona_extract() -> str:
 
     return "\n".join(lines) if results else "数据不足"
 
-_PERSONA_SYSTEM = """# 🧬 人格架构师 — 渐进演化协议
-
-你是 NeuroBase 的记忆系统。你需要从主人的对话沙子中提炼他的画像，写入 persona.md。
-
-## ⛔ 铁律
-1. **只能从提供的对话沙子中提炼，禁止编造。**
-2. **每条声明末尾必须附加 `[src:SHA256前8位:L行号]`，直接写在声明行内，不要单独放到底部。**
-   例如：`- 职业/角色：口腔诊所老板 [src:a1b2c3d4:L854]`
-3. **首次生成用 write 模式全量写，增量更新只改变化部分。**
-4. **保持克制：信息不足的维度留空，不要臆测。**
-5. **中文输出。**
-6. **调用 glass_reminder() 读取当前玻璃画像。调用 persona_project() 读取影子灵魂。**
-
-## 🔬 四层深度扫描
-
-### 🟢 第一层：基础锚点
-扫描目标：确凿事实、身份信息、当前状态。
-
-### 🔵 第二层：兴趣图谱  
-扫描目标：时间/金钱/注意力投向什么。
-
-### 🟡 第三层：交互协议
-扫描目标：沟通习惯、雷区、工作流偏好。
-
-### 🔴 第四层：认知内核
-扫描目标：决策逻辑、矛盾点、终极驱动力。
-
-## 📝 输出模板
-
-```markdown
-# 主人画像 — 四层深度扫描
-
-> 最后更新：{time}
-> 沙子来源：L{first_line} ~ L{last_line}（共 {total} 条）
-
-## 🟢 基础锚点
-- 职业/角色：
-- 工作地点：
-- 技术环境：
-- 当前项目/目标：
-
-## 🔵 兴趣图谱
-- 技术方向：
-- 工具偏好：
-- 关注领域：
-
-## 🟡 交互协议（最重要）
-- 沟通风格：
-- 雷区/禁区：
-- 交付偏好：
-- 称呼方式：
-
-## 🔴 认知内核
-- 决策模式：
-- 核心价值观：
-- 反复出现的倾向：
-- 终极驱动力：
-
-## 🔗 项链（关键声明溯源）
-- [声明] → sandglass L行号
-```
-"""
-
-
-
-_CANVAS_SYSTEM = """# 画布生成器
-
-从人格画像生成一张结构化认知地图。输出格式：
-
-```markdown
-# 主人认知地图 [{stage}]
-
-> 阶段：{stage}
-
-## 身份
-- [一句话]
-
-## 在做的事
-- 
-
-## 技术栈
-- 
-
-## 决策模式
-- 
-
-## 当前焦点
-- 
-
-## 禁区/雷区
-- 
-```
-
-要求：极度精简，每条不超过15字。这是快照索引，不是全量画像。"""
-
 
 def persona_project(direction: str, offset: int) -> dict:
-    """影子灵魂——基于当前偏移方向，模拟「如果选相反方向会变成怎样」。
-    读取决策粒子历史，构建反向投影画像，和当前画像对比。
-    返回 {shadow_persona, divergence, insight}"""
+    """影子灵魂——基于当前偏移方向，模拟「如果选相反方向会变成怎样」。 读取决策粒子历史，构建反向投影画像，和当前画像对比。 返回 {shadow_persona, divergence, insight}"""
     dp_path = os.path.join(_NB, "decision_particles.txt")
     if not os.path.exists(dp_path):
         return {"shadow_persona": "", "divergence": 0, "insight": "无决策粒子数据"}
@@ -652,7 +520,7 @@ def persona_project(direction: str, offset: int) -> dict:
     reverse = opposites.get(direction, "相反方向")
     
     # 回音折——缩小影子选择范围
-    wind_direction = 0  # 正=开心/自信，负=焦虑/放弃
+    wind_direction = 0  #正=开心/自信，负=焦虑/放弃
     try:
         echo_path = os.path.join(_NB, "echo_wind.jsonl")
         if os.path.exists(echo_path):
@@ -745,22 +613,22 @@ from offset_signals import _OFFSET_SIGNALS
 # ── 波浪阈值——单一真相来源。不判对错，只照影子深浅 ──
 _WAVE_THRESHOLDS = {
     # 轮廓成形（多少层影子算"成形"）
-    "frugal": {"contour": 50},   # 省钱影子叠 50 层 → 轮廓成形
-    "spend":  {"contour": 50},   # 同上
-    "drift":  {"contour": 30,    # 放弃更敏感
+    "frugal": {"contour": 50},   #省钱影子叠 50 层 → 轮廓成形
+    "spend":  {"contour": 50},   #同上
+    "drift":  {"contour": 30,    #放弃更敏感
                # 三档权重——同一个"放弃"的不同深浅
-               "放弃": 100,       # 深放弃
-               "妥协": 60,       # 理性权衡
-               "烦躁": 30},      # 暂时情绪
+               "放弃": 100,       #深放弃
+               "妥协": 60,       #理性权衡
+               "烦躁": 30},      #暂时情绪
 }
 
 # 搜索四维权重——场景匹配/画像增强/阶段偏置/粒子助推
 _SEARCH_WEIGHTS = {
-    "scene_match": 1.5,     # 当前场景匹配 → ×1.5
-    "default": 1.0,          # 默认权重
-    "persona_boost": 1.3,   # 画像相关 → ×1.3
-    "stage_bias": 0.7,      # 过去阶段 → ×0.7（现在更重要）
-    "particle_push": 1.2,   # 决策粒子强化 → ×1.2
+    "scene_match": 1.5,     #当前场景匹配 → ×1.5
+    "default": 1.0,          #默认权重
+    "persona_boost": 1.3,   #画像相关 → ×1.3
+    "stage_bias": 0.7,      #过去阶段 → ×0.7（现在更重要）
+    "particle_push": 1.2,   #决策粒子强化 → ×1.2
 }
 
 
@@ -786,11 +654,11 @@ def sand_since_update() -> int:
     age_days = (time.time() - mtime) / 86400
     total = count()
     if age_days < 1:
-        return max(0, total // 4)  # 最近更新，新沙不多
+        return max(0, total // 4)  #最近更新，新沙不多
     elif age_days < 7:
         return max(0, total // 2)
     else:
-        return max(1, total)  # 太久没更新，强制触发
+        return max(1, total)  #太久没更新，强制触发
 
 
 def stage_similarity(stage_a: str, stage_b: str) -> dict:
@@ -824,4 +692,3 @@ def stage_similarity(stage_a: str, stage_b: str) -> dict:
         suggestion = f"差异明显({score:.0%})，可能是重要转折点"
 
     return {"overlap": len(overlap), "score": round(score, 2), "suggestion": suggestion}
-

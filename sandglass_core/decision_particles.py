@@ -1,25 +1,16 @@
-"""
-NexSandglass 决策粒子 — 第三层通用燃料 V2
-==========================================
-三层标签架构：
-  ① 本地关键词（baseline，免费快）
-  ② 本地词库推断（enhance，喂画像+阶段+粒子+织布机，自己推，不抄表面理由）
-  ③ _learn()  自进化（新标签 → 学进本地词库 → 下次免费命中）
-==========================================
-"""
+"""NexSandglass 决策粒子 — 第三层通用燃料 V2 ========================================== 三层标签架构： ① 本地关键词（baseline，免费快） ② 本地词库推断（enhance，喂画像+阶段+粒子+织布机，自己推，不抄表面理由） ③ _learn() 自进化（新标签 → 学进本地词库 → 下次免费命中） =========================================="""
 
 import os, json, time, logging
 from datetime import datetime
 from sandglass_paths import _NB
+from sandglass_util import _pipe_warn
 
 logger = logging.getLogger(__name__)
 
 _PARTICLES = os.path.join(_NB, "decision_particles.txt")
 _VOCAB = os.path.join(_NB, "decision_vocab.txt")
 
-# ═══════════════════════════════════════════════
 # 本地标签词库
-# ═══════════════════════════════════════════════
 
 _TAG_MAP = {
     "免费|不花钱|省钱|性价比|开源|free|open source":                    ["成本观", "性价比优先"],
@@ -36,9 +27,7 @@ _DIRECTION_MAP = {
 }
 
 
-# ═══════════════════════════════════════════════
 # 本地标签（baseline）
-# ═══════════════════════════════════════════════
 
 # 自进化词库缓存（并发TOCTOU修复: Lock + 元组原子赋值）
 import threading
@@ -68,7 +57,7 @@ def _tag_local(choice: str) -> str:
                     if _VOCAB_CACHE is None or mtime > _VOCAB_CACHE_MTIME:
                         with open(_VOCAB, "r", encoding="utf-8") as f:
                             new_cache = [l.strip() for l in f if l.strip() and len(l.strip()) < 50]
-                        _VOCAB_CACHE, _VOCAB_CACHE_MTIME = new_cache, mtime  # 元组原子赋值
+                        _VOCAB_CACHE, _VOCAB_CACHE_MTIME = new_cache, mtime  #元组原子赋值
             if _VOCAB_CACHE:
                 for t in _VOCAB_CACHE:
                     if t and t not in seen and t.lower() in choice.lower():
@@ -80,9 +69,7 @@ def _tag_local(choice: str) -> str:
     return ",".join(tags) if tags else ""
 
 
-# ═══════════════════════════════════════════════
 # 选项提取（本地快速）
-# ═══════════════════════════════════════════════
 
 def _extract_options(question: str) -> str:
     """从问题中拆选项：'A还是B'→'A_B'"""
@@ -91,18 +78,14 @@ def _extract_options(question: str) -> str:
 
 
 def _is_decision(text: str) -> bool:
-    """
-    粗筛——快速判断消息是不是决策。
-    过滤条件：去掉纯指令、闲话、确认回复。
-    保留条件：包含选择信号（中英双语）。
-    """
+    """粗筛——快速判断消息是不是决策。 过滤条件：去掉纯指令、闲话、确认回复。 保留条件：包含选择信号（中英双语）。"""
     import re
     
     # 纯指令/闲话——不是决策
     noise = [
         r"^(推|OK|好的|确认|删|发|等|继续|下一个)[吧了]?$",
         r"^(还有|还有吗|有没有|在吗|好了吗)[？?]?$",
-        r"^[a-zA-Z]{1,3}$",  # 单字母/短英文
+        r"^[a-zA-Z]{1,3}$",  #单字母/短英文
     ]
     for n in noise:
         if re.match(n, text.strip()):
@@ -110,7 +93,7 @@ def _is_decision(text: str) -> bool:
     
     # 选择信号——是决策
     signals = [
-        r"(?:还是|或者|or|either).{2,30}(?:还是|或者|or|either)?",  # A还是B
+        r"(?:还是|或者|or|either).{2,30}(?:还是|或者|or|either)?",  #A还是B
         r"(?:选|用|装|换|搞|跑|试|买|做)(?:择|了|这个|哪个)?\s*[。！，\n]?",
         r"(?:就用|就选|就搞|决定|定了|确定)\s*.{1,20}",
         r"(?:go with|choose|pick|decide|switch to|use)\s+.{1,30}",
@@ -125,15 +108,7 @@ def _is_decision(text: str) -> bool:
 
 
 def _detect_chain(text: str) -> list[str]:
-    """
-    决策链条检测——不判对错，记录全过程。
-    
-    "选A吧...还是B了...最后搞了C...算了还是A好"
-      → ['A', 'B', 'C', 'A']
-    
-    真实人类的决策是波浪形的——犹豫、试探、回退。
-    记忆体的责任是记录这个波浪，本地引擎吃进画像+链条来推断倾向。
-    """
+    """决策链条检测——不判对错，记录全过程。 \"选A吧...还是B了...最后搞了C...算了还是A好\" → ['A', 'B', 'C', 'A'] 真实人类的决策是波浪形的——犹豫、试探、回退。 记忆体的责任是记录这个波浪，本地引擎吃进画像+链条来推断倾向。"""
     import re
     
     chain = []
@@ -198,60 +173,14 @@ def _chain_summary(chain: list[str]) -> str:
     return " → ".join(compact)
 
 
-# ═══════════════════════════════════════════════
-# 第三层全量上下文——本地推断引擎
-# ═══════════════════════════════════════════════
-
-def _read_context() -> str:
-    """采集第三层四支柱全部数据，供本地推断引擎使用。"""
-    parts = []
-
-    # 1. 画像（认知内核 + 交互协议）
-    persona_path = os.path.join(_NB, "persona", "persona.md")
-    if os.path.exists(persona_path):
-        with open(persona_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        # 只取最关键的段落——认知内核和交互协议
-        for section in ["🟡 交互协议", "🔴 认知内核", "🟢 基础锚点"]:
-            start = content.find(f"## {section}")
-            if start >= 0:
-                end = content.find("\n## ", start + 10)
-                parts.append(content[start:end if end > 0 else start + 800])
-
-    # 2. 近期决策粒子（最近 20 条）
-    if os.path.exists(_PARTICLES):
-        with open(_PARTICLES, "r", encoding="utf-8") as f:
-            lines = f.readlines()[-20:]
-        if lines:
-            parts.append("## 近期决策粒子\n" + "".join(lines))
-
-    # 3. 搜索权重（最近热门话题）
-    wf = os.path.join(_NB, "search_weights.txt")
-    if os.path.exists(wf):
-        with open(wf, "r", encoding="utf-8") as f:
-            parts.append("## 搜索权重\n" + f.read()[:500])
-
-    # 4. 织布机矛盾告警
-    wl = os.path.join(_NB, "weave_alerts.txt")
-    if os.path.exists(wl):
-        with open(wl, "r", encoding="utf-8") as f:
-            parts.append("## 织布机矛盾\n" + f.read()[:500])
-
-    return "\n\n".join(parts)
-
-
-# ═══════════════════════════════════════════════
 # 本地深层推断标签
-# ═══════════════════════════════════════════════
 
 def _tag_infer(question: str, choice: str) -> str:
     """纯本地引擎 — 标签由本地词库+自进化覆盖"""
     return ""
 
 
-# ═══════════════════════════════════════════════
 # 自进化——标签学进本地词库
-# ═══════════════════════════════════════════════
 
 def _learn(tags: str, choice: str = "") -> None:
     """标签写入 vocab 文件。V2.9.9: 不再读全文件去重(依赖缓存mtime刷新)"""
@@ -277,48 +206,13 @@ def _learn(tags: str, choice: str = "") -> None:
                     f.write(f"{t}\n")
 
 
-# ═══════════════════════════════════════════════
-# 本地丰富选择原因
-# ═══════════════════════════════════════════════
-
-def _enrich_choice_desc(question: str, choice: str) -> str:
-    """V2.9.36: 模板引擎——从链条推断+标签中生成选择理由。纯本地。"""
-    templates = {
-        "习惯回退": lambda: f"选了{choice}，回归到习惯选项",
-        "选择困难": lambda: f"选了{choice}，经过多次犹豫后的最终选择",
-        "决策疲劳": lambda: f"选了{choice}，在决策疲劳状态下的简化选择",
-    }
-    # 尝试从最近决策粒子中提取推断
-    try:
-        import os, re
-        # V2.20.2: 统一路径解析——复用 sandglass_paths._NB，不再手算 fallback
-        dp_path = os.path.join(_NB, "decision_particles.txt")
-        if os.path.exists(dp_path):
-            with open(dp_path, "r", encoding="utf-8", errors="replace") as f:
-                dps = [l.strip() for l in f if l.strip() and not l.startswith("#")]
-            if dps:
-                last = dps[-1]
-                for pattern, fn in templates.items():
-                    if pattern in last:
-                        return fn()
-                # 方向推断
-                if "| frugal" in last: return f"选了{choice} — 成本导向"
-                if "| spend" in last: return f"选了{choice} — 效率优先"
-    except Exception:
-        logger.warning(f"_enrich_choice_desc: 静默异常", exc_info=True)
-        pass
-    return choice
-
-
-# ═══════════════════════════════════════════════
 # 双层标签融合
-# ═══════════════════════════════════════════════
 
 def _tag(question: str, choice: str) -> str:
     local = _tag_local(choice)
     t0 = time.time()
     infer_tags = _tag_infer(question, choice)
-    # V2.9.9 metrics 埋点
+    # metrics 埋点
     try:
         from metrics import emit_metric
         emit_metric('tag_result', local_hit=bool(local), infer_used=bool(infer_tags))
@@ -347,14 +241,7 @@ def _direction(choice: str) -> str:
 
 
 def _infer_local(chain: list[str]) -> str:
-    """
-    本地模糊推断——靠三层结构已有数据。
-    
-    策略：
-      ① 链条模式匹配：回退→习惯偏好，多条→选择困难，放弃→决策疲劳
-      ② 关键词标签：拆每个选项的关键词，匹配画像已有标签
-      ③ 历史粒子比对：最近50条粒子找相似模式
-    """
+    """本地模糊推断——靠三层结构已有数据。 策略： ① 链条模式匹配：回退→习惯偏好，多条→选择困难，放弃→决策疲劳 ② 关键词标签：拆每个选项的关键词，匹配画像已有标签 ③ 历史粒子比对：最近50条粒子找相似模式"""
     if not chain or len(chain) < 2:
         return ""
     
@@ -366,9 +253,9 @@ def _infer_local(chain: list[str]) -> str:
     
     # ① 链条模式
     if len(compact) >= 2 and compact[-1] in compact[:-1]:
-        hints.append("习惯回退")  # A→B→A 或 A→B→C→A
+        hints.append("习惯回退")  #A→B→A 或 A→B→C→A
     if len(compact) >= 3:
-        hints.append("选择困难")  # 3个以上不同选择
+        hints.append("选择困难")  #3个以上不同选择
     if any(g in " ".join(chain) for g in ["不管了", "放弃", "随便", "算了"]):
         hints.append("决策疲劳")
     
@@ -400,56 +287,10 @@ def _infer_local(chain: list[str]) -> str:
     return ""
 
 
-def _infer_resolution(chain: list[str]) -> str:
-    """
-    决策链条推断——纯本地。
-    
-    本地：关键词+链条模式+历史比对，模糊画像
-    """
-    if not chain or len(chain) < 2:
-        return ""
-    
-    # 本地兜底——三层结构已有数据
-    return _infer_local(chain)
-
-
-_ECHO_WIND = os.path.join(_NB, "echo_wind.jsonl")
-
-def _infer_sentiment(question: str) -> str:
-    """从决策粒子上下文推断情感风。"""
-    positive = ["太棒", "太好了", "终于", "完美", "好主意", "聪明", "厉害"]
-    negative = ["烦死", "太难", "不好", "失败", "后悔", "算了", "没用"]
-    for w in positive:
-        if w in question: return "正面"
-    for w in negative:
-        if w in question: return "负面"
-    return ""
-
-def _echo_spread(sentiment: str, options: str) -> None:
-    """回音折扩散——情感风落到语义邻居。"""
-    if not sentiment: return
-    entry = {"ts": datetime.now().isoformat(), "sentiment": sentiment,
-             "options": options,
-             "spread_weight": 1.3 if sentiment == "正面" else 0.8}
-    os.makedirs(os.path.dirname(_ECHO_WIND), exist_ok=True)
-    with open(_ECHO_WIND, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-
-# ═══════════════════════════════════════════════
 # 落粒子
-# ═══════════════════════════════════════════════
 
 def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
-    """
-    落一粒决策。记录全链条，本地推断倾向。
-    
-    格式：早饭_午饭 | A → B → A  回到A(成本敏感) | furgal | 成本观,习惯偏好
-              ↑选项     ↑决策链条+推断                   ↑方向  ↑标签
-    
-    chain: 调用方已检测的决策链条（如 pulse.py 从全量消息检测）。
-           若未提供，内部从 question+choice 重新检测。
-    """
+    """落一粒决策。记录全链条，本地推断倾向。 格式：早饭_午饭 | A → B → A 回到A(成本敏感) | furgal | 成本观,习惯偏好 ↑选项 ↑决策链条+推断 ↑方向 ↑标签 chain: 调用方已检测的决策链条（如 pulse.py 从全量消息检测）。 若未提供，内部从 question+choice 重新检测。"""
     if not ts:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -462,7 +303,7 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
         chain = _detect_chain(question + " " + choice)
     if chain:
         summary = _chain_summary(chain)
-        inference = _infer_local(chain)  # V2.9.9.9: 纯本地链条推断
+        inference = _infer_local(chain)  #纯本地链条推断
         resolved = f"{summary}  ({inference})" if inference else summary
         # 链条标签合并到决策标签
         if inference:
@@ -480,7 +321,7 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
             emotion_tag = det['mood']
     except ImportError:
         logger.warning(f"log: 局部导入失败: from emotion_vocab import detect as emotion_detect", exc_info=True)
-        pass  # emotion_vocab 模块未安装
+        pass  #emotion_vocab 模块未安装
     except Exception:
         logger.debug('情绪检测失败', exc_info=True)
 
@@ -526,9 +367,7 @@ def log(question: str, choice: str, ts: str = "", chain: list = None) -> None:
     except Exception as e:
         _pipe_warn("decision_particles_L519", e)
 
-# ═══════════════════════════════════════════════
 # 读取 & 偏移比
-# ═══════════════════════════════════════════════
 
 def read(limit: int = 50) -> list:
     if not os.path.exists(_PARTICLES):
@@ -556,9 +395,7 @@ def ratio() -> dict:
     }
 
 
-# ═══════════════════════════════════════════════
 # 四支柱反哺
-# ═══════════════════════════════════════════════
 
 def feed_all(choice: str, tags: str, direction: str) -> None:
     feed_persona(tags)

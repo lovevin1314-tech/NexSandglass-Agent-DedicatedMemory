@@ -9,9 +9,8 @@ import statistics
 import time
 import urllib.request
 
-# V2.20.3: 本地 stub——避免循环导入 memory_provider
-def _pipe_warn(name, e):
-    logging.getLogger(__name__).warning(f"管道 [{name}] 降级: {e}")
+# 本地 stub——避免循环导入 memory_provider
+from sandglass_util import _pipe_warn, db_connect, _fail_open
 import urllib.error
 from datetime import datetime
 
@@ -48,7 +47,7 @@ from l3_persona_verify import persona_verify, persona_diff
 from l3_search_core import _synonym_expand, _tfidf_search, _sentiment_wind, sentiment_rerank
 from l3_persona import persona_project
 from persona_l3 import (
-    persona_build, persona_update, persona_canvas,
+    persona_build, persona_update,
     persona_freshness, stage_list, stage_canvas,
     _current_stage, _load_persona, _local_persona_extract,
     sand_since_update, stage_similarity,
@@ -65,7 +64,6 @@ from offset_l3 import (
 # ── 配置 ──
 logger = logging.getLogger(__name__)
 
-# ═══════════════════ 场景感知 ═══════════════════
 def _extract_md_section(content, section_name):
     """从 markdown 内容中提取指定 section 的文本。"""
     start_tag = f"## {section_name}"
@@ -76,9 +74,6 @@ def _extract_md_section(content, section_name):
     if end < 0:
         return content[start:]
     return content[start:end]
-
-# ── fail-open 装饰器（单一来源：offset_signals）──
-from offset_signals import _fail_open
 
 _FULL_SANITY = {
     "L1_plugin": ["plugin.py"],
@@ -97,17 +92,41 @@ _FULL_SANITY = {
 
 _HEALTH_REPORT = os.path.join(_NB, "health_report.json")
 
-def full_sanity() -> dict:
-    """
-    沙漏记忆系统全面体检----三层健康 + 全接口冒烟。
-    
-    - L0（会话层）：Hermes alive check
-    - L1（写层）：沙漏文件 + 明文 + 插件
-    - L2（读层）：FTS5/idx/mmap/search
-    - L3（思层）：偏移率/画像/情绪熵/织布机/决策粒子/搜索
+def _sanity_decision_particles() -> str:
+    from decision_particles import _detect_chain
+    return "✅" if isinstance(_detect_chain("选A还是B"), list) else "⚠️"
 
-    返回 {l0, l1, l2, l3, total, summary, details}
-    """
+def _sanity_scene_validation() -> str:
+    findings = scene_stage_cross_validate().get("findings", [])
+    refined = sum(1 for finding in findings if finding.get("refined"))
+    return f"✅ {refined}处需细化" if refined else "✅ 一致"
+
+_FULL_SANITY_L3_CHECKS = (
+    ("情绪熵", lambda: "✅" if _emotional_entropy() >= 0 else "?"),
+    ("偏移率", lambda: f"✅ {(o := comprehensive_offset())['offset']:+d}% ({o['sample']}条)"),
+    ("织布机", lambda: f"✅ {len(weave_contradiction().get('conflicts', []))}处矛盾"),
+    ("阶段", lambda: f"✅ {len(stage_list())}阶段"),
+    ("搜索", lambda: "✅" if search_filter("test").get("keywords") else "⚠️"),
+    ("决策粒子", _sanity_decision_particles),
+    ("场景矩阵", lambda: f'✅ {len((m := scene_stage_matrix()).get("stages", []))}阶段×{len(m.get("scenes", []))}场景'),
+    ("场景-阶段交叉验证", _sanity_scene_validation),
+    ("熵镜", lambda: "✅" if ((em := entropy_mirror("最近决策")).get("found_mirror") or "无匹配" in str(em)) else "✅"),
+    ("幽灵决策", lambda: "✅" if isinstance(entropy_ghost("如果选另一个选项呢"), dict) else "⚠️"),
+    ("度量反馈", lambda: "✅" if isinstance(_metrics_feedback(), dict) else "⚠️"),
+)
+
+def _run_sanity_checks() -> dict:
+    checks = {}
+    for name, check in _FULL_SANITY_L3_CHECKS:
+        try:
+            checks[name] = check()
+        except Exception:
+            logger.warning("full_sanity: 静默异常", exc_info=True)
+            checks[name] = "❌"
+    return checks
+
+def full_sanity() -> dict:
+    """沙漏记忆系统全面体检----三层健康 + 全接口冒烟。 - L0（会话层）：Hermes alive check - L1（写层）：沙漏文件 + 明文 + 插件 - L2（读层）：FTS5/idx/mmap/search - L3（思层）：偏移率/画像/情绪熵/织布机/决策粒子/搜索 返回 {l0, l1, l2, l3, total, summary, details}"""
     report = {"ts": datetime.now().isoformat(), "layers": {}, "total": 0, "passed": 0, "details": {}}
 
     # L0
@@ -150,76 +169,7 @@ def full_sanity() -> dict:
     try:
         from functools import lru_cache
         # 只测不会产生副作用的读接口
-        checks = {}
-        try:
-            checks["情绪熵"] = "✅" if _emotional_entropy() >= 0 else "?"
-        except Exception:
-            logger.warning(f"full_sanity: 静默异常", exc_info=True)
-            checks["情绪熵"] = "❌"
-        try:
-            o = comprehensive_offset()
-            checks["偏移率"] = f"✅ {o['offset']:+d}% ({o['sample']}条)"
-        except Exception:
-            logger.warning(f"full_sanity: 静默异常", exc_info=True)
-            checks["偏移率"] = "❌"
-        try:
-            from sandglass_think import weave_contradiction
-            w = weave_contradiction()
-            checks["织布机"] = f"✅ {len(w.get('conflicts',[]))}处矛盾"
-        except Exception:
-            logger.warning(f"full_sanity: 静默异常", exc_info=True)
-            checks["织布机"] = "❌"
-        try:
-            s = stage_list()
-            checks["阶段"] = f"✅ {len(s)}阶段"
-        except Exception:
-            logger.warning(f"full_sanity: 静默异常", exc_info=True)
-            checks["阶段"] = "❌"
-        try:
-            sf = search_filter("test")
-            checks["搜索"] = "✅" if sf.get("keywords") else "⚠️"
-        except Exception:
-            logger.warning(f"full_sanity: 静默异常", exc_info=True)
-            checks["搜索"] = "❌"
-        try:
-            from decision_particles import _detect_chain
-            c = _detect_chain("选A还是B")
-            checks["决策粒子"] = "✅" if isinstance(c, list) else "⚠️"
-        except Exception:
-            logger.warning(f"full_sanity: 静默异常", exc_info=True)
-            checks["决策粒子"] = "❌"
-        try:
-            ssm = scene_stage_matrix()
-            checks["场景矩阵"] = f'✅ {len(ssm.get("stages",[]))}阶段×{len(ssm.get("scenes",[]))}场景'
-        except Exception:
-            logger.warning(f"full_sanity: 静默异常", exc_info=True)
-            checks["场景矩阵"] = "❌"
-        try:
-            sv = scene_stage_cross_validate()
-            n_refined = sum(1 for f in sv.get("findings", []) if f.get("refined"))
-            checks["场景-阶段交叉验证"] = f"✅ {n_refined}处需细化" if n_refined else "✅ 一致"
-        except Exception:
-            logger.warning(f"full_sanity: 静默异常", exc_info=True)
-            checks["场景-阶段交叉验证"] = "❌"
-        try:
-            em = entropy_mirror("最近决策")
-            checks["熵镜"] = "✅" if em.get("found_mirror") or "无匹配" in str(em) else "✅"
-        except Exception:
-            logger.warning(f"full_sanity: 静默异常", exc_info=True)
-            checks["熵镜"] = "❌"
-        try:
-            eg = entropy_ghost("如果选另一个选项呢")
-            checks["幽灵决策"] = "✅" if isinstance(eg, dict) else "⚠️"
-        except Exception:
-            logger.warning(f"full_sanity: 静默异常", exc_info=True)
-            checks["幽灵决策"] = "❌"
-        try:
-            fb = _metrics_feedback()
-            checks["度量反馈"] = "✅" if isinstance(fb, dict) else "⚠️"
-        except Exception:
-            logger.warning(f"full_sanity: 静默异常", exc_info=True)
-            checks["度量反馈"] = "❌"
-
+        checks = _run_sanity_checks()
         l3_ok = all("✅" in v for v in checks.values())
         report["layers"]["L3"] = "✅ 全接口通过" if l3_ok else "⚠️ 部分接口异常"
         report["details"]["L3_checks"] = checks
@@ -332,7 +282,7 @@ def _current_stage() -> str:
         return "2026-06"
     try:
         with open(_PERSONA_TIMELINE, "rb") as f:
-            f.seek(-256, 2)  # 从尾部读最后256字节
+            f.seek(-256, 2)  #从尾部读最后256字节
             tail = f.read().decode("utf-8", errors="ignore")
         last = tail.strip().split("\n")[-1]
         if not last:
@@ -342,8 +292,7 @@ def _current_stage() -> str:
         return "2026-06"
 
 def decision_stability() -> dict:
-    """决策稳定性指数。按场景×阶段分析偏移波动。
-    返回 {overall: {stability, volatility}, scenes: {scene: {stability}}}"""
+    """决策稳定性指数。按场景×阶段分析偏移波动。 返回 {overall: {stability, volatility}, scenes: {scene: {stability}}}"""
     entries = _read_decision_log(100)
     if len(entries) < 5:
         return {"overall": {"stability": "unknown", "volatility": 0}, "scenes": {}}
@@ -384,9 +333,7 @@ def decision_stability() -> dict:
     return {"overall": {"stability": overall, "volatility": volatility}, "scenes": scenes}
 
 def scene_stage_cross_validate() -> dict:
-    """场景-阶段交叉验证。
-    阶段标记说两个阶段相似，但按场景拆分后重新检查----相似只存在于某些场景。
-    返回 {findings, suggestion}"""
+    """场景-阶段交叉验证。 阶段标记说两个阶段相似，但按场景拆分后重新检查----相似只存在于某些场景。 返回 {findings, suggestion}"""
     marks = stage_marks()
     if isinstance(marks, list):
         return {"findings": [], "suggestion": "暂无阶段标记数据"}
@@ -461,7 +408,6 @@ def persona_maintain() -> dict:
 
     result_path = persona_update()
     if result_path:
-        persona_canvas()
         return {"triggered": True,
                 "reason": "自动维护：" + str(fresh["since_sands"]) + "条新沙子，偏移稳定，画像已更新",
                 "result": result_path,
@@ -483,8 +429,6 @@ def search_with_stage_label(query: str, limit: int = 5) -> list:
         })
     return labeled
 
-
-# ═══════════════════ V2.8 四路并发搜索引擎 ═══════════════════
 
 def _detect_lang(query: str) -> str:
     """纯文本语言检测：'zh', 'en', 'mixed'"""
@@ -547,8 +491,7 @@ def dynamic_expand(hit_line: int, query_tokens: set, all_lines: list, max_ctx: i
         else: break
     return all_lines[start:end+1]
 def search_semantic(query: str, limit: int = 10) -> list:
-    """V2.8.7: SearchRouter 统一搜索入口 + 密度元数据输出。
-    search_filter 扩展关键词 → SearchRouter → 密度标注 → 情感重排。"""
+    """V2.8.7: SearchRouter 统一搜索入口 + 密度元数据输出。 search_filter 扩展关键词 → SearchRouter → 密度标注 → 情感重排。"""
     expanded_query = query
     try:
         filt = search_filter(query)
@@ -569,7 +512,7 @@ def search_semantic(query: str, limit: int = 10) -> list:
 
     if not results:
         try:
-            # V2.9.9.9: 本地TF-IDF语义搜索
+            # 本地TF-IDF语义搜索
             from l3_search_core import _tfidf_search
             results = _tfidf_search(query, limit)
         except Exception:
@@ -583,7 +526,7 @@ def search_semantic(query: str, limit: int = 10) -> list:
             logger.warning(f"search_semantic: 局部导入失败: from sandglass_vault import search as vs", exc_info=True)
             return []
 
-    # V2.8.7: 标注密度元数据 — 每条结果附带 sand:0.XX 标签
+    # 标注密度元数据 — 每条结果附带 sand:0.XX 标签
     query_tokens = _tokenize_for_density(query)
     enriched = []
     for item in results:
@@ -595,12 +538,6 @@ def search_semantic(query: str, limit: int = 10) -> list:
     # 还原为3元组——调用方(memory_provider/tool层)按 (ln, ts, text) 解包，
     # sand: 密度标签曾导致 "too many values to unpack (expected 3)"
     return [(ln, ts, text) for ln, ts, text, _sand in reranked]
-
-def _infer_expand(query: str) -> list:
-    """语义扩展——同义词词典 + TF-IDF 动态扩展。纯本地。"""
-    from l3_search_core import _synonym_expand
-    expanded = _synonym_expand(query)
-    return [query] + expanded[:5] if expanded else [query]
 
 
 def _infer_expand_with_context(query: str, persona_ctx: str, scene_ctx: str, stage_ctx: str, dp_ctx: str = "", decision_bias: str = "") -> list:
@@ -647,10 +584,7 @@ def decision_snapshot(decision_text: str, offset_result: dict = None) -> dict:
     return {"point": point, "line": line, "surface": surface}
 
 def search_filter(query: str) -> dict:
-    """场景+画像+阶段+决策粒子+偏移率+影子沙 六维感知搜索滤镜。
-    返回 {keywords, weights, scene_context, persona_context, stage_context,
-           decision_bias, decision_weight_boost, shadow_context, time_range,
-           alt_keywords, hint, source}"""
+    """场景+画像+阶段+决策粒子+偏移率+影子沙 六维感知搜索滤镜。 返回 {keywords, weights, scene_context, persona_context, stage_context, decision_bias, decision_weight_boost, shadow_context, time_range, alt_keywords, hint, source}"""
     result = {"keywords": [query], "weights": {}, "scene_context": "", "stage_context": "", "decision_bias": ""}
 
     # ── 场景感知（当前语境）──
@@ -697,7 +631,7 @@ def search_filter(query: str) -> dict:
         logger.warning(f"search_filter: 静默异常", exc_info=True)
         pass
 
-    # V2.9.9: 偏移引导 — 根据画像自动偏置搜索方向
+    # 偏移引导 — 根据画像自动偏置搜索方向
     try:
         guide = offset_guide(query)
         if guide.get("bias") and guide["bias"] != "neutral":
@@ -736,7 +670,7 @@ def search_filter(query: str) -> dict:
                 # 行号匹配
                 if any(str(ln) in parts for ln in line_nums):
                     entities.append((name,))
-                # V2.9.9.5: 查询词命中实体名也注入
+                # 查询词命中实体名也注入
                 elif query and query.lower() in name.lower():
                     entities.append((name,))
                 if len(entities) >= 5:
@@ -744,7 +678,7 @@ def search_filter(query: str) -> dict:
             for (name,) in entities:
                 if name.lower() not in [k.lower() for k in result["keywords"]]:
                     result["keywords"].append(name)
-                    result["weights"][name] = 1.6  # 实体名最高权重
+                    result["weights"][name] = 1.6  #实体名最高权重
             if sh or entities:
                 result["shadow_context"] = f"影子沙命中{len(sh)}条, 实体{len(entities)}个"
     except Exception:
@@ -769,11 +703,9 @@ def search_filter(query: str) -> dict:
     if time_hint:
         result["time_range"] = time_hint
 
-    # ═══════════════════════════════════════════════
     # 注：偏移率（comprehensive_offset）是独立系统，不在此处计算。
     # 搜索滤镜专注：决策粒子权重 → 搜索偏置。偏移率做：计算偏移方向/幅度。
     # 但偏移方向作为第 5 维权重注入搜索结果排序。
-    # ═══════════════════════════════════════════════
 
     # ── 偏移方向（第 5 维权重）──
     offset_dir = ""
@@ -868,8 +800,7 @@ def _parse_time_range(query: str) -> list:
 # 织布机不生产新数据，只合成已有数据。
 
 def weave_links() -> dict:
-    """互链层----跨阶段关联自动发现并喂给当前画像。
-    过去封存不动，变化规律长进现在的你。"""
+    """互链层----跨阶段关联自动发现并喂给当前画像。 过去封存不动，变化规律长进现在的你。"""
     stages = stage_list()
     if len(stages) < 2:
         return {"linked": False, "insight": "需要至少2个阶段才能生成互链"}
@@ -930,7 +861,7 @@ def local_distill(period: str = "daily") -> str:
     try:
         from sandglass_vault import count
         from sandglass_think import comprehensive_offset, _emotional_entropy
-        import sqlite3, os
+        import os
         from collections import Counter
         
         total = count()
@@ -946,8 +877,8 @@ def local_distill(period: str = "daily") -> str:
         lines.append(f"偏移: {dirs.get(d,d)}{off.get('offset',0):+d}%({off.get('sample',0)}次) | 情绪熵:{ent:.2f} | 沙量:{total}")
         
         # 关键标签
-        # V2.20.2: 统一路径解析——复用 sandglass_paths._NB，不再手算 fallback
-        db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
+        # 统一路径解析——复用 sandglass_paths._NB，不再手算 fallback
+        db = db_connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
         tags = Counter()
         for r in db.execute("SELECT tags FROM fact_tags WHERE tags!='' AND tags!='未分类'").fetchall():
             for t in r[0].split(","):
@@ -958,7 +889,7 @@ def local_distill(period: str = "daily") -> str:
         if top: lines.append(f"标签: {', '.join(f'{t}({c})' for t,c in top)}")
         
         # 决策粒子
-        # V2.20.2: 统一路径解析——复用 sandglass_paths._NB
+        # 统一路径解析——复用 sandglass_paths._NB
         dp_path = os.path.join(_NB, "decision_particles.txt")
         if os.path.exists(dp_path):
             with open(dp_path, encoding="utf-8", errors="replace") as f:
@@ -974,12 +905,7 @@ def local_distill(period: str = "daily") -> str:
 
 
 def stage_brief() -> str:
-    """
-    织布机----阶段简报。阶段切换时生成更新日志。
-    不自动推送，主人手动调用。
-    
-    格式：阶段名、触发原因、偏移率、高权重标签、关键决策
-    """
+    """织布机----阶段简报。阶段切换时生成更新日志。 不自动推送，主人手动调用。 格式：阶段名、触发原因、偏移率、高权重标签、关键决策"""
     from sandglass_vault import count as sv_count
     
     lines = []
@@ -1096,8 +1022,7 @@ def stage_brief() -> str:
     return "\n".join(lines)
 
 def session_context(n: int = 5) -> str:
-    """新会话启动时，返回：场景标签 + 当前阶段画布 + 可选历史阶段。
-    降级：最近沙子。"""
+    """新会话启动时，返回：场景标签 + 当前阶段画布 + 可选历史阶段。 降级：最近沙子。"""
     parts = []
 
     # 1. 场景标签（可多个重合）
@@ -1164,15 +1089,7 @@ def _three_d_ready() -> bool:
     return False
 
 def _should_synthesize() -> tuple[bool, str]:
-    """
-    判断是否该生成新的 3D 注解。四个触发条件：
-    ① 阶段切换 → 新阶段该有新的大标签
-    ② 偏移率超 ±60% → 轮廓变了
-    ③ 沙子里程碑（比上次生成多 100 条）→ 够多了重新看
-    ④ 情绪波动（焦虑/放弃/开心）→ 立刻重新审视
-    
-    返回 (should, trigger_reason)
-    """
+    """判断是否该生成新的 3D 注解。四个触发条件： ① 阶段切换 → 新阶段该有新的大标签 ② 偏移率超 ±60% → 轮廓变了 ③ 沙子里程碑（比上次生成多 100 条）→ 够多了重新看 ④ 情绪波动（焦虑/放弃/开心）→ 立刻重新审视 返回 (should, trigger_reason)"""
     try:
         from sandglass_vault import count as sv_count
         current = sv_count()
@@ -1276,14 +1193,8 @@ def _latest_annotation() -> dict:
         return {}
 
 def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
-    """
-    3D 立体画像合成----永久注解模式。
-    
-    - 先检查 _should_synthesize() → 不需要生成则返回最新注解
-    - 需要生成 → 全量数据 → 保存为永久注解
-    - 不接 API Key 返回空 dict → 上游走 2D 玻璃
-    """
-    # V2.9.9.14: 管道式3D合成 — fact_tags趋势 + offset拐点 + particles模式 + weave告警
+    """3D 立体画像合成----永久注解模式。 - 先检查 _should_synthesize() → 不需要生成则返回最新注解 - 需要生成 → 全量数据 → 保存为永久注解 - 不接 API Key 返回空 dict → 上游走 2D 玻璃"""
+    # 管道式3D合成 — fact_tags趋势 + offset拐点 + particles模式 + weave告警
     try:
         persona_text = ""
         if os.path.exists(_PERSONA):
@@ -1296,9 +1207,8 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
         # ── 管道洞察：fact_tags趋势 + offset拐点 + particles模式 + weave告警 ──
         pipe_insights = []
         try:
-            import sqlite3
             from collections import Counter
-            db = sqlite3.connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
+            db = db_connect(os.path.join(_NB, "shadow_sand.db"), check_same_thread=False)
             tags = Counter()
             for r in db.execute("SELECT tags FROM fact_tags WHERE tags != '' AND tags != '未分类'").fetchall():
                 for t in r[0].split(","):
@@ -1331,10 +1241,10 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
                     total_arrows = 0
                     hesitation_count = 0
                     recent_chains = []
-                    for line in dps[-10:]:  # 最近10条
+                    for line in dps[-10:]:  #最近10条
                         parts = line.split(" | ")
                         if len(parts) >= 3:
-                            chain_field = parts[2]  # chain_or_choice
+                            chain_field = parts[2]  #chain_or_choice
                             arrows = _re_dp.findall(r"→\s*(\S+)", chain_field)
                             if len(arrows) >= 2:
                                 total_arrows += len(arrows)
@@ -1402,7 +1312,7 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
             "synthesis_fallback_reason": "llm_disabled",
         }
 
-        # V3.1.0 丢失物#2：模型可用时用 Qwen 织立体像；失败/不可用完全回落本地聚合。
+        # 丢失物#2：模型可用时用 Qwen 织立体像；失败/不可用完全回落本地聚合。
         try:
             from weave_llm import synthesize_3d as _llm_synthesize_3d
             weave_thread = ""
@@ -1455,14 +1365,10 @@ def _synthesize_3d(force: bool = False, trigger: str = "") -> dict:
         return {}
 
 def _emotional_entropy(recent_n: int = 20) -> float:
-    """
-    香农熵——量化情绪波动程度。V2.9.9.1: 优先读会话摘要，降级扫沙子。
-    0 = 完全平静（全是同一种情绪）
-    ~1.95 = 高熵（7种情绪均匀分布，波动大）
-    """
+    """香农熵——量化情绪波动程度。V2.9.9.1: 优先读会话摘要，降级扫沙子。 0 = 完全平静（全是同一种情绪） ~1.95 = 高熵（7种情绪均匀分布，波动大）"""
     import math, os, json
 
-    # 优先: 会话级情绪摘要 (V2.9.9.1)
+    # 优先: 会话级情绪摘要 ()
     emo_path = os.path.join(_NB, "emotion_session.jsonl")
     if os.path.exists(emo_path):
         sessions = []
@@ -1473,7 +1379,7 @@ def _emotional_entropy(recent_n: int = 20) -> float:
                 except json.JSONDecodeError:
                     continue
         if sessions:
-            recent = sessions[-20:]  # 最近20个会话
+            recent = sessions[-20:]  #最近20个会话
             mood_counts = {}
             total = 0
             for s in recent:
@@ -1512,9 +1418,7 @@ def _emotional_entropy(recent_n: int = 20) -> float:
     return round(entropy, 2)
 
 def entropy_chart(recent_n: int = 20) -> str:
-    """
-    情绪熵 ASCII 可视化。
-    """
+    """情绪熵 ASCII 可视化。"""
     entropy = _emotional_entropy(recent_n)
     bar_len = min(int(entropy * 20), 40)
     bar = "█" * bar_len + "░" * (40 - bar_len)
@@ -1522,18 +1426,7 @@ def entropy_chart(recent_n: int = 20) -> str:
     return f"🫧 情绪熵 {entropy:.2f} {bar}  {level}"
 
 def memory_migrate(output_path: str = "") -> str:
-    """
-    一键导出全部记忆数据为 tar.gz。换电脑时解压到新 .neurobase/ 即可。
-    
-    打包内容：
-      sandglass.txt / sandglass.backup（沙子+阴影）
-      sandglass.idx（投石问路）
-      persona/（画像+阶段+时间线）
-      decision_particles.txt（决策粒子）
-      search_weights.txt / echo_wind.jsonl（搜索权重+回音折风）
-    
-    不打包代码----只打包记忆本身。
-    """
+    """一键导出全部记忆数据为 tar.gz。换电脑时解压到新 .neurobase/ 即可。 打包内容： sandglass.txt / sandglass.backup（沙子+阴影） sandglass.idx（投石问路） persona/（画像+阶段+时间线） decision_particles.txt（决策粒子） search_weights.txt / echo_wind.jsonl（搜索权重+回音折风） 不打包代码----只打包记忆本身。"""
     import tarfile, os
     
     if not output_path:

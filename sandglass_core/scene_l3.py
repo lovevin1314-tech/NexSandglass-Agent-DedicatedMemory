@@ -5,9 +5,6 @@ from datetime import datetime, timezone
 
 _VAULT = _NB
 _PERSONA_DIR = os.path.join(_VAULT, "persona")
-_PERSONA = os.path.join(_PERSONA_DIR, "persona.md")
-_PERSONA_TIMELINE = os.path.join(_PERSONA_DIR, "persona-timeline.jsonl")
-_DECISION_LOG = os.path.join(_PERSONA_DIR, "decision-log.jsonl")
 logger = logging.getLogger(__name__)
 
 try: from offset_l3 import _read_decision_log
@@ -22,7 +19,7 @@ try: from persona_l3 import _STAGE_THRESHOLD
 except ImportError:
     _STAGE_THRESHOLD = 60
 
-_SCENE_MODE = None  # None=自动, 'exam'=考试, 'normal'=日常
+_SCENE_MODE = None  #None=自动, 'exam'=考试, 'normal'=日常
 def scene_mode(mode: str = None) -> str:
     """设置/读取场景模式。'exam'只走影子沙，'normal'全开L3。"""
     global _SCENE_MODE
@@ -84,9 +81,7 @@ def scene_history(stage: str = "") -> list:
     return entries
 
 def scene_dominance() -> dict:
-    """场景主导权转移分析。
-    返回 {current: {scene: %}, shift: [{scene, from_pct, to_pct}], insight: 描述}
-    核心：注意力分配变了=你不是同一个人了。"""
+    """场景主导权转移分析。 返回 {current: {scene: %}, shift: [{scene, from_pct, to_pct}], insight: 描述} 核心：注意力分配变了=你不是同一个人了。"""
     history = scene_history()
     if len(history) < 2:
         return {"current": {}, "shift": [], "insight": "数据不足"}
@@ -151,8 +146,7 @@ def scene_dominance() -> dict:
     return {"current": latest, "shift": shifts, "insight": insight}
 
 def stage_switch_prediction() -> dict:
-    """阶段切换预测。基于偏移轨迹斜率估算切换时间。
-    返回 {predicted, eta_sands, confidence, trend_slope}"""
+    """阶段切换预测。基于偏移轨迹斜率估算切换时间。 返回 {predicted, eta_sands, confidence, trend_slope}"""
     entries = _read_decision_log(50)
     if len(entries) < 10:
         return {"predicted": False, "eta_sands": -1, "confidence": 0, "trend_slope": 0}
@@ -252,7 +246,6 @@ def scene_stage_matrix() -> dict:
 
 def novel_scene_detect() -> dict:
     """频率突变检测——突增+消退+停用词过滤+偏移率触发。纯统计，零依赖。"""
-    import re
     from sandglass_vault import recent
     recent_sands = recent(20)
     hist_sands = recent(200)
@@ -368,9 +361,7 @@ def _save_scenes(tags: list) -> None:
     with open(_SCENE_FILE, "w", encoding="utf-8") as f:
         json.dump(tags, f, ensure_ascii=False)
 
-# ═══════════════════════════════════════════════
 # 场景关键词（可扩展）
-# ═══════════════════════════════════════════════
 _SCENE_KEYWORDS = {
     "工作项目": ["项目", "任务", "进度", "交付", "上线", "需求", "方案"],
     "学习研究": ["学习", "教程", "算法", "框架", "论文", "原理"],

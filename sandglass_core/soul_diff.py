@@ -1,14 +1,4 @@
-"""
-NexSandglass — 灵魂差分 (Soul Diff)
-=====================================
-跨设备同步认知状态，不暴露原始数据。
-导出：偏移率 + 决策链 + 回音折残留 → .soul-diff 文件
-合并：追加写入另一台设备
-
-用法:
-  python soul_diff.py export  → 导出到 ~/.neurobase/soul_diff.json
-  python soul_diff.py merge <file>  → 从文件合并
-"""
+"""NexSandglass — 灵魂差分 (Soul Diff) ===================================== 跨设备同步认知状态，不暴露原始数据。 导出：偏移率 + 决策链 + 回音折残留 → .soul-diff 文件 合并：追加写入另一台设备 用法: python soul_diff.py export → 导出到 ~/.neurobase/soul_diff.json python soul_diff.py merge <file> → 从文件合并"""
 import sys, os, json, shutil, logging
 from datetime import datetime
 

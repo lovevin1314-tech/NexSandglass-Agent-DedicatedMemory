@@ -1,19 +1,15 @@
 import threading
-"""
-NexSandglass SQLite FTS5 加速层
-================================
-V1.4.4：sandglass.txt不动，SQLite分词FTS5平行加速。
-纯 stdlib，零依赖。FTS5挂了自动降级。
-"""
+"""NexSandglass SQLite FTS5 加速层 ================================ V1.4.4：sandglass.txt不动，SQLite分词FTS5平行加速。 纯 stdlib，零依赖。FTS5挂了自动降级。"""
 
-import os, re, sqlite3, threading
+import os, re, threading
 
 from sandglass_paths import _NB
+from sandglass_util import db_connect
 import logging
 logger = logging.getLogger(__name__)
 _DB = os.path.join(_NB, "sandglass.db")
 _lock = threading.Lock()
-_last_sync_mtime = 0  # 记录上次同步时的 sandglass.txt 修改时间
+_last_sync_mtime = 0  #记录上次同步时的 sandglass.txt 修改时间
 
 
 def _tokenize(text: str) -> str:
@@ -39,38 +35,12 @@ def _get_db():
         with _fts_lock:
             if _fts_conn is None:
                 os.makedirs(os.path.dirname(_DB), exist_ok=True)
-                _fts_conn = sqlite3.connect(_DB, check_same_thread=False)
-                _fts_conn.execute("PRAGMA journal_mode=WAL")
+                _fts_conn = db_connect(_DB, wal=True, check_same_thread=False)
                 _fts_conn.execute("PRAGMA synchronous=NORMAL")
                 _fts_conn.execute("CREATE TABLE IF NOT EXISTS sandglass (id INTEGER PRIMARY KEY, ts TEXT, sender TEXT, text TEXT)")
                 _fts_conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS sandglass_fts USING fts5(tokens)")
                 _fts_conn.commit()
     return _fts_conn
-
-
-def sync_all() -> int:
-    """全量同步。返回条数，失败返回-1。"""
-    try:
-        from sandglass_vault import _SANDGLASS, _parse_line
-        with _lock:
-            conn = _get_db()
-            conn.execute("DELETE FROM sandglass")
-            conn.execute("DELETE FROM sandglass_fts")
-            rows = []; fts = []
-            if os.path.exists(_SANDGLASS):
-                with open(_SANDGLASS, "r", encoding="utf-8") as f:
-                    for n, line in enumerate(f, 1):
-                        ts, sender, text = _parse_line(line)
-                        if ts:
-                            rows.append((n, ts, sender, text))
-                            fts.append((n, _tokenize(text)))
-            conn.executemany("INSERT INTO sandglass VALUES(?,?,?,?)", rows)
-            conn.executemany("INSERT INTO sandglass_fts(rowid, tokens) VALUES(?,?)", fts)
-            conn.commit()
-            return len(rows)
-    except Exception:
-        logger.warning(f"sync_all: 局部导入失败: from sandglass_vault import _SANDGLASS, _parse_line", exc_info=True)
-        return -1
 
 
 def sync_incremental() -> int:
@@ -124,28 +94,8 @@ def search_in(line_ids: list, query: str, limit: int = 100) -> list:
         return []
 
 
-def search_year(query: str, year: str, limit: int = -1) -> list:
-    """FTS5 按年份搜索。year='2026' 只搜该年。"""
-    try:
-        tokens = _tokenize(query)
-        if not tokens.strip():
-            return []
-        with _lock:
-            conn = _get_db()
-            sql = "SELECT s.id, s.ts, s.text FROM sandglass_fts f JOIN sandglass s ON s.id=f.rowid WHERE s.ts LIKE ? AND sandglass_fts MATCH ? ORDER BY rank"
-            if limit > 0:
-                sql += " LIMIT ?"
-            params = [f"{year}%", tokens]
-            if limit > 0: params.append(limit)
-            cur = conn.execute(sql, params)
-            return [(row[0], row[1], row[2]) for row in cur.fetchall()]
-    except Exception:
-        return []
-
-
 def search(query: str, limit: int = 10) -> list:
-    """FTS5搜索。limit=-1 全量。返回[(行号,时间,明文),...]。
-    中文用AND语义，英文自动切换OR避免n-gram碎片化。"""
+    """FTS5搜索。limit=-1 全量。返回[(行号,时间,明文),...]。 中文用AND语义，英文自动切换OR避免n-gram碎片化。"""
     try:
         tokens = _tokenize(query)
         if not tokens.strip():
@@ -165,11 +115,3 @@ def search(query: str, limit: int = 10) -> list:
             return [(row[0], row[1], row[2]) for row in cur.fetchall()]
     except Exception:
         return []
-
-
-def count() -> int:
-    try:
-        with _lock:
-            return _get_db().execute("SELECT COUNT(*) FROM sandglass").fetchone()[0]
-    except Exception:
-        return 0

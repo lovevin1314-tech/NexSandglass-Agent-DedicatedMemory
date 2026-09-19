@@ -1,10 +1,4 @@
-"""
-NexSandglass V3.1.1 — 感知深度
-=================================
-识别 → 觉察(含情绪感知) → 提醒
-三层独立函数 + pulse() 编排。
-每次对话前 pulse() 自动选择最深的一层回应。
-"""
+"""NexSandglass V3.1.1 — 感知深度 ================================= 识别 → 觉察(含情绪感知) → 提醒 三层独立函数 + pulse() 编排。 每次对话前 pulse() 自动选择最深的一层回应。"""
 
 import os, re, random, logging
 from datetime import datetime
@@ -16,9 +10,7 @@ import sys; sys.path.insert(0, sys_path)
 from sandglass_paths import _NB
 
 
-# ══════════════════════════════════════════════════════════
 # 三层感知 — 独立函数，可独立测试
-# ══════════════════════════════════════════════════════════
 
 def _layer1_recognize(user_message: str, signals: list):
     """第一层：识别 — 实时感知身份信号。你说什么，立刻听懂。"""
@@ -52,7 +44,7 @@ def _layer2_perceive(user_message: str, signals: list):
             echo(user_message)
     except ImportError:
         logger.error("emotion_vocab 导入失败——核心模块损坏，情绪+决策链路中断")
-        raise  # 致命——让 pulse() 捕获并返回空
+        raise  #致命——让 pulse() 捕获并返回空
 
     # ── 决策粒子 ──
     try:
@@ -170,9 +162,7 @@ def _layer3_remind(signals: list):
         logger.warning(f"里程碑检测失败: {e}")
 
 
-# ══════════════════════════════════════════════════════════
 # 编排入口 — pulse() 只做编排+格式化，不处理感知逻辑
-# ══════════════════════════════════════════════════════════
 
 def pulse(user_message: str = "") -> str:
     """三层感知编排。自动中英切换。V2.20.4: 三层独立函数。"""
@@ -242,7 +232,6 @@ def pulse(user_message: str = "") -> str:
                 f"> （原名「{old_name}」已封存——沙漏里还是那个你。）\n"
             )
 
-    # ═══ 三层感知 ═══
     _layer1_recognize(user_message, signals)
     try:
         _layer2_perceive(user_message, signals)
@@ -250,7 +239,6 @@ def pulse(user_message: str = "") -> str:
         return ""
     _layer3_remind(signals)
 
-    # ═══ 情绪协调 + 格式化 ═══
     if signals:
         try:
             from emotion_vocab import detect as _ed
@@ -278,9 +266,7 @@ def pulse(user_message: str = "") -> str:
     return ""
 
 
-# ══════════════════════════════════════════════════════════
 # 辅助函数
-# ══════════════════════════════════════════════════════════
 
 def echo(user_message: str, assistant_response: str = "") -> None:
     """对话后自动落沙。"""

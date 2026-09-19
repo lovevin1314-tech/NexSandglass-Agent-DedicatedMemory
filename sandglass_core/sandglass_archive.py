@@ -1,12 +1,10 @@
-"""
-NexSandglass V2.1.1 — 冷热分层存储
-热沙(sandglass.txt): 最近30天完整对话
-冷沙(archive/): 超过30天，按月分文件，AI低价值丢弃
-"""
+"""NexSandglass V2.1.1 — 冷热分层存储 热沙(sandglass.txt): 最近30天完整对话 冷沙(archive/): 超过30天，按月分文件，AI低价值丢弃"""
 import os, re, shutil
 from sandglass_paths import _NB
 from datetime import datetime, timedelta
 import logging
+
+from sandglass_util import _atomic_write
 logger = logging.getLogger(__name__)
 
 _VAULT = _NB
@@ -35,11 +33,7 @@ def is_old(ts: str, cutoff_days: int = _HOT_DAYS) -> bool:
 
 
 def cold_migration(dry_run: bool = False) -> dict:
-    """
-    冷迁移：将超过30天的沙子从热沙移到冷沙。
-    AI低价值回复在冷沙中丢弃。
-    返回 {moved, dropped, kept}。
-    """
+    """冷迁移：将超过30天的沙子从热沙移到冷沙。 AI低价值回复在冷沙中丢弃。 返回 {moved, dropped, kept}。"""
     hot_file = os.path.join(_VAULT, "sandglass.txt")
     if not os.path.exists(hot_file):
         return {"moved": 0, "dropped": 0, "kept": 0}
@@ -59,7 +53,7 @@ def cold_migration(dry_run: bool = False) -> dict:
                 continue
 
             # 超过30天——移入冷沙
-            month = ts[:7]  # '2026-06'
+            month = ts[:7]  #'2026-06'
             parts = line.split(" | ", 2)
             sender = parts[1] if len(parts) > 1 else "agent"
 
@@ -93,11 +87,7 @@ def cold_migration(dry_run: bool = False) -> dict:
 
         try:
             # 重写热沙
-            tmp = hot_file + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                for line in to_keep:
-                    f.write(line + "\n")
-            os.replace(tmp, hot_file)
+            _atomic_write(hot_file, "".join(line + "\n" for line in to_keep))
         finally:
             try:
                 os.unlink(lock)
@@ -136,15 +126,3 @@ def search_archive(query: str, limit: int = 10) -> list:
             break
 
     return results[:limit]
-
-
-def archive_stats() -> dict:
-    """冷沙统计。"""
-    if not os.path.exists(_ARCHIVE):
-        return {"files": 0, "total_lines": 0}
-    files = [f for f in os.listdir(_ARCHIVE) if f.startswith("sandglass_")]
-    total = 0
-    for f in files:
-        with open(os.path.join(_ARCHIVE, f), "r", encoding="utf-8") as fh:
-            total += sum(1 for _ in fh)
-    return {"files": len(files), "total_lines": total}

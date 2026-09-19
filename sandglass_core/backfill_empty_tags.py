@@ -1,55 +1,18 @@
-"""
-Backfill empty fact_tags — 修复714条空标签
-==========================================
-复用 shadow_sand 已有的 _ENTITY_RE 管线，不建新提取器。
-
-用法：
-    python backfill_empty_tags.py
-
-前提：确保没有其他进程持有 shadow_sand.db 的写锁。
-如果报 "database is locked"，先停掉 Hermes Agent 再运行。
-"""
-import sqlite3
+"""Backfill empty fact_tags — 修复714条空标签 ========================================== 复用 shadow_sand 已有的 _ENTITY_RE 管线，不建新提取器。 用法： python backfill_empty_tags.py 前提：确保没有其他进程持有 shadow_sand.db 的写锁。 如果报 \"database is locked\"，先停掉 Hermes Agent 再运行。"""
 import os
-import re
 import sys
 
-# Same regex as shadow_sand.py
-_ENTITY_RE = re.compile(
-    r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b|'
-    r'"([^"]+)"|'
-    r"'([^']+)'|"
-    r'([\u4e00-\u9fff]{2,4})'
-)
+from shadow_sand import extract_tags
+from sandglass_util import db_connect
 
 NB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 DB = os.path.join(NB, "shadow_sand.db")
 SANDGLASS = os.path.join(NB, "sandglass.txt")
 
 
-def extract_tags(text: str) -> str:
-    """Extract tags from text using _ENTITY_RE — same pipeline as shadow_index"""
-    if not text:
-        return ""
-    entities = []
-    for m in _ENTITY_RE.finditer(text):
-        name = m.group(1) or m.group(2) or m.group(3) or m.group(4) or ""
-        name = name.strip()
-        if name and len(name) > 1:
-            entities.append(name)
-    seen = set()
-    unique = []
-    for e in entities:
-        if e not in seen:
-            seen.add(e)
-            unique.append(e)
-    return ",".join(unique[:5])
-
-
 def main():
     # Connect with WAL and long timeout
-    db = sqlite3.connect(DB, timeout=60)
-    db.execute("PRAGMA journal_mode=WAL")
+    db = db_connect(DB, wal=True, timeout=60)
     db.execute("PRAGMA busy_timeout=60000")
 
     # Find all empty fact_tags
@@ -85,7 +48,7 @@ def main():
             skipped += 1
             continue
 
-        tags = extract_tags(text)
+        tags = ",".join(extract_tags(text, limit=5))
         if tags:
             db.execute(
                 "UPDATE fact_tags SET tags = ? WHERE line_num = ?",

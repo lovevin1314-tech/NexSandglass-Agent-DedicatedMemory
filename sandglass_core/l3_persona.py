@@ -1,11 +1,5 @@
-#!/usr/bin/env python3
-"""
-NexSandglass L3 — 影子灵魂模块
-persona_project — 基于当前偏移方向，模拟「如果选相反方向会变成怎样」
-
-从 sandglass_think.py 提取 (2026-06-11)
-原位置: L694-787
-"""
+#!/usr/bin/env python3/usr/bin/env python3
+"""NexSandglass L3 — 影子灵魂模块 persona_project — 基于当前偏移方向，模拟「如果选相反方向会变成怎样」 从 sandglass_think.py 提取 (2026-06-11) 原位置: L694-787"""
 
 import os
 from sandglass_paths import _NB
@@ -20,9 +14,7 @@ _PERSONA_DIR = os.path.join(_VAULT, "persona")
 
 
 def persona_project(direction: str, offset: int) -> dict:
-    """影子灵魂——基于当前偏移方向，模拟「如果选相反方向会变成怎样」。
-    读取决策粒子历史，构建反向投影画像，和当前画像对比。
-    返回 {shadow_persona, divergence, insight}"""
+    """影子灵魂——基于当前偏移方向，模拟「如果选相反方向会变成怎样」。 读取决策粒子历史，构建反向投影画像，和当前画像对比。 返回 {shadow_persona, divergence, insight}"""
     dp_path = os.path.join(_NB, "decision_particles.txt")
     if not os.path.exists(dp_path):
         return {"shadow_persona": "", "divergence": 0, "insight": "无决策粒子数据"}
@@ -31,7 +23,7 @@ def persona_project(direction: str, offset: int) -> dict:
     reverse = opposites.get(direction, "相反方向")
 
     # 回音折——缩小影子选择范围
-    wind_direction = 0  # 正=开心/自信，负=焦虑/放弃
+    wind_direction = 0  #正=开心/自信，负=焦虑/放弃
     try:
         echo_path = os.path.join(_NB, "echo_wind.jsonl")
         if os.path.exists(echo_path):

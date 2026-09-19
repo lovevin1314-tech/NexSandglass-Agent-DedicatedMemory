@@ -1,9 +1,4 @@
-"""
-NexSandglass 路径配置 — 单一真相来源 V2.2
-===========================================
-所有模块从这里获取 _NB，不再各自计算。
-用法: from sandglass_paths import _NB, _SCRIPTS, _PERSONA, ... 
-"""
+"""NexSandglass 路径配置 — 单一真相来源 V2.2 =========================================== 所有模块从这里获取 _NB，不再各自计算。 用法: from sandglass_paths import _NB, _SCRIPTS, _PERSONA, ..."""
 
 import os, logging
 _logger = logging.getLogger(__name__)
@@ -41,7 +36,7 @@ def _resolve_nb() -> str:
 
 _NB = _resolve_nb()
 __version__ = "3.1.2"
-get_nb = _resolve_nb  # V2.10.41: 动态获取,post_setup修改环境变量后可用
+get_nb = _resolve_nb  #动态获取,post_setup修改环境变量后可用
 _SCRIPTS = os.path.join(_NB, "scripts")
 _PERSONA = os.path.join(_NB, "persona")
 _ARCHIVE = os.path.join(_NB, "archive")
@@ -71,7 +66,7 @@ def validate() -> dict:
             created.append(d)
         else:
             existed.append(d)
-    # V2.20.2: 空壳目录告警——最终解析目录没有 sandglass.txt 说明可能命中了
+    # 空壳目录告警——最终解析目录没有 sandglass.txt 说明可能命中了
     # ~/.neurobase 之类的迁移副本/空目录，明确提示而不是静默空转
     sandglass_txt = os.path.exists(os.path.join(_NB, "sandglass.txt"))
     if not sandglass_txt:

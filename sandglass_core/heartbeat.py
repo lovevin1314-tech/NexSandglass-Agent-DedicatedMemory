@@ -1,10 +1,7 @@
-"""
-NexSandglass 系统心跳 (Heartbeat)
-==================================
-每10分钟呼吸一次：检查沙漏健康、待办任务、当前环境。
-零依赖跨平台：Windows tasklist / Mac ps -ax / Linux ps -aux
-"""
-import os, json, platform, subprocess, logging, tempfile
+"""NexSandglass 系统心跳 (Heartbeat) ================================== 每10分钟呼吸一次：检查沙漏健康、待办任务、当前环境。 零依赖跨平台：Windows tasklist / Mac ps -ax / Linux ps -aux"""
+import os, json, platform, subprocess, logging
+
+from sandglass_util import _atomic_write
 from datetime import datetime
 from sandglass_paths import _NB
 
@@ -74,16 +71,7 @@ def tick() -> dict:
     if os.path.exists(_HEARTBEAT_LOG) and os.path.getsize(_HEARTBEAT_LOG) > 1_000_000:
         with open(_HEARTBEAT_LOG, "r", encoding="utf-8") as f:
             lines = f.readlines()[-1000:]
-        tmp = tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=os.path.dirname(_HEARTBEAT_LOG), delete=False
-        )
-        try:
-            with tmp:
-                tmp.writelines(lines)
-            os.replace(tmp.name, _HEARTBEAT_LOG)
-        finally:
-            if os.path.exists(tmp.name):
-                os.unlink(tmp.name)
+        _atomic_write(_HEARTBEAT_LOG, "".join(lines))
     with open(_HEARTBEAT_LOG, "a", encoding="utf-8") as f:
         f.write(json.dumps(status, ensure_ascii=False) + "\n")
 

@@ -1,16 +1,4 @@
-"""
-NeuroBase Sandglass — 插件源码备份 + 读取工具
-==============================================
-V2.4.0: 去掉DPAPI，明文存储。
-部署位置：
-  - plugins/sandglass/__init__.py  ← Gateway 插件
-  - .neurobase/scripts/sandglass.py ← vault 备份
-
-用法：
-  from sandglass import read, count
-  read(10)   # 读取最近10条
-  count()    # 总行数
-"""
+"""NeuroBase Sandglass — 插件源码备份 + 读取工具 ============================================== V2.4.0: 去掉DPAPI，明文存储。 部署位置： - plugins/sandglass/__init__.py ← Gateway 插件 - .neurobase/scripts/sandglass.py ← vault 备份 用法： from sandglass import read, count read(10) # 读取最近10条 count() # 总行数"""
 import logging
 import os
 from datetime import datetime

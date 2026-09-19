@@ -1,11 +1,5 @@
-#!/usr/bin/env python3
-"""
-NexSandglass L3 — 搜索核心模块
-_synonym_expand / _tfidf_search / composite_rerank / _search_with_fallback
-_sentiment_wind / sentiment_rerank / simhash / simhash_search + _SYNONYMS 词表
-
-V2.0.1: +SimHash语义搜索(零依赖纯Python)
-"""
+#!/usr/bin/env python3/usr/bin/env python3
+"""NexSandglass L3 — 搜索核心模块 _synonym_expand / _tfidf_search / composite_rerank / _search_with_fallback _sentiment_wind / sentiment_rerank / simhash / simhash_search + _SYNONYMS 词表 V2.0.1: +SimHash语义搜索(零依赖纯Python)"""
 
 import re
 import math
@@ -16,7 +10,7 @@ from sandglass_paths import _NB
 
 logger = logging.getLogger(__name__)
 
-# V2.9.29: Porter Stemmer — 轻量词干还原(零依赖)
+# Porter Stemmer — 轻量词干还原(零依赖)
 def _stem(word: str) -> str:
     """极简词干还原。覆盖常见后缀，零外部依赖。V2.9.29: VC保护防误切"""
     w = word.lower()
@@ -41,12 +35,7 @@ def _stem(word: str) -> str:
     return w
 
 
-# ═══════════════════════════════════════════════════════
-# 沙子密度引擎 (Sand Density Engine) — V2.8
-# token重叠率=候选行的token∩query的token / query的token
-# 零拍参数，越用越准
-# ═══════════════════════════════════════════════════════
-
+# 沙子密度引擎：token重叠率与同义词桥。
 def _detect_lang(text: str) -> str:
     """纯文本语言检测: 'zh', 'en', 'mixed'"""
     has_cjk = any('一' <= c <= '鿿' for c in text)
@@ -85,14 +74,12 @@ def sand_density(text: str, query_tokens: set) -> float:
     hit_tokens = _tokenize_for_density(text)
     return len(query_tokens & hit_tokens) / len(query_tokens)
 
-# ═══════════════════════════════════════════════════════
 # SimHash 语义哈希（Google 2007，纯stdlib，零依赖）
 # 文本→128bit指纹，汉明距离越小=语义越近
-# ═══════════════════════════════════════════════════════
 
 _SIMHASH_BITS = 128
-_simhash_cache = {}  # V2.0.5: 预计算缓存，key=text[:500], val=fingerprint
-_SIMHASH_CACHE_MAX = 10000  # V2.1.11: LRU上限，超过清空重建
+_simhash_cache = {}  #预计算缓存，key=text[:500], val=fingerprint
+_SIMHASH_CACHE_MAX = 10000  #LRU上限，超过清空重建
 _SIMHASH_CACHE_FILE = os.path.join(_NB, "simhash_cache.json")
 
 def _load_simhash_cache():
@@ -142,7 +129,7 @@ def simhash(text: str, bits: int = _SIMHASH_BITS) -> int:
         _save_simhash_cache()
         _simhash_cache.clear()
     
-    # V2.9.23: 每500条新指纹自动持久化
+    # 每500条新指纹自动持久化
     if len(_simhash_cache) % 500 == 0 and len(_simhash_cache) > 0:
         _save_simhash_cache()
     
@@ -169,19 +156,16 @@ def simhash(text: str, bits: int = _SIMHASH_BITS) -> int:
 def _hamming(a: int, b: int) -> int:
     """汉明距离。任一为-1(空文本)返回MAX。"""
     if a == -1 or b == -1:
-        return _SIMHASH_BITS  # 最大距离=完全不同
+        return _SIMHASH_BITS  #最大距离=完全不同
     return (a ^ b).bit_count()
 
 
 def simhash_search(query: str, candidates: list, limit: int = 20, threshold: int = None) -> list:
-    """SimHash语义搜索——从候选文档中返回最相似的limit条。
-    candidates: [(line_no, timestamp, text), ...]
-    threshold: 自适应——短查询(≤5 tokens)用30, 长查询用50
-    """
+    """SimHash语义搜索——从候选文档中返回最相似的limit条。 candidates: [(line_no, timestamp, text), ...] threshold: 自适应——短查询(≤5 tokens)用30, 长查询用50"""
     if not candidates:
         return []
     q_fp = simhash(query)
-    if q_fp == -1:  # 空文本查询，无法语义搜索
+    if q_fp == -1:  #空文本查询，无法语义搜索
         return []
     
     # 自适应阈值：token太少时较严(但不过严)，token多时宽松
@@ -200,12 +184,8 @@ def simhash_search(query: str, candidates: list, limit: int = 20, threshold: int
     scored.sort(key=lambda x: x[0])
     return [(ln, ts, text) for _, ln, ts, text in scored[:limit]]
 
-# ═══════════════════════════════════════════════════════
 
-
-# ═══════════════════════════════════════════════════════
 # 双向同义词——正链1.3x，反链0.8x（精准扩展）
-# ═══════════════════════════════════════════════════════
 def _build_bidirectional_syns(syns: dict) -> dict:
     """把单向同义词扩展为双向权重表。正链权重1.3，反链0.8。"""
     ws = {}
@@ -214,13 +194,12 @@ def _build_bidirectional_syns(syns: dict) -> dict:
         for v in vs:
             if v not in ws:
                 ws[v] = {}
-            ws[v][k] = ws[v].get(k, 0) or 0.8  # 反链不覆盖正链
+            ws[v][k] = ws[v].get(k, 0) or 0.8  #反链不覆盖正链
     return ws
 
 # _BIDIRECTIONAL_SYNS will be built at bottom after _SYNONYMS is defined
 
 # 通用技术同义词（模块级常量）
-# ═══════════════════════════════════════════════════════
 _SYNONYMS = {
     # 技术
     "加密": ["保护", "安全", "隐私", "密钥", "密文", "本地"],
@@ -243,21 +222,21 @@ _SYNONYMS = {
     "数据": ["信息", "data", "内容", "记录", "文件"],
     "本地": ["local", "离线", "本地化", "客户端", "本机"],
     "云端": ["cloud", "远程", "在线", "服务器", "SaaS"],
-    # 成本/价值（V2.0.1扩）
+    # 成本/价值（扩）
     "免费": ["不花钱", "开源", "无需付费", "free"],
     "付费": ["花钱", "购买", "订阅", "买", "收费", "pay"],
     "便宜": ["低价", "实惠", "划算", "廉价", "低成本"],
     "省钱": ["节约", "性价比", "经济", "节省", "省"],
     "效率": ["快速", "省事", "高效", "方便", "自动化"],
     "质量": ["好用", "稳定", "可靠", "精准", "准确"],
-    # 行为/偏好（V2.0.1扩）
+    # 行为/偏好（扩）
     "喜欢": ["偏好", "倾向", "习惯", "爱", "常用"],
     "讨厌": ["反感", "不喜欢", "烦", "受不了", "拒绝"],
     "自己": ["DIY", "手工", "亲自", "独立", "自主"],
     "外包": ["委托", "找人", "代劳", "付费做", "服务"],
     "简单": ["容易", "轻松", "不复杂", "直接", "快"],
     "复杂": ["麻烦", "困难", "繁琐", "难搞", "折腾"],
-    # 英文通用词 (V2.6.12)
+    # 英文通用词 ()
     "encryption": ["security", "privacy", "protect", "crypto"],
     "security": ["encryption", "privacy", "protect", "safe"],
     "search": ["find", "query", "lookup", "retrieve", "locate", "seek"],
@@ -275,7 +254,7 @@ _SYNONYMS = {
     "error": ["mistake", "fault", "failure", "exception", "crash"],
     "backup": ["copy", "snapshot", "save", "restore", "mirror"],
     "index": ["catalog", "directory", "register", "inventory"],
-    # 英文扩 (V2.6.13)
+    # 英文扩 ()
     "algorithm": ["method", "formula", "logic", "computation", "approach"],
     "database": ["db", "storage", "SQL", "NoSQL", "table", "store"],
     "cache": ["buffer", "temp", "memorize", "preload", "speedup"],
@@ -297,7 +276,7 @@ _SYNONYMS = {
     "dependency": ["library", "package", "module", "requirement", "import"],
     "file": ["document", "artifact", "asset", "resource", "attachment"],
     "network": ["internet", "online", "connection", "socket", "HTTP"],
-    # V2.9.9.10 扩展
+    # 扩展
     "性能": ["速度", "效率", "优化", "加速", "performance", "latency"],
     "费用": ["成本", "价格", "预算", "开销", "花费", "cost", "price"],
     "速度": ["性能", "效率", "快", "延迟", "响应", "speed"],
@@ -327,14 +306,14 @@ _SYNONYMS = {
     "过滤": ["筛选", "排除", "拦截", "净化", "filter"],
     "聚合": ["合并", "汇总", "统计", "组合", "aggregate"],
     "去重": ["唯一", "不重复", "独特", "distinct", "unique"],
-    # 口腔诊所 (V2.6.13)
+    # 口腔诊所 ()
     "诊所": ["口腔", "牙科", "医院", "门诊", "医疗"],
     "患者": ["病人", "客户", "顾客", "就诊人", "用户"],
     "预约": ["挂号", "排班", "schedule", "appointment", "约"],
     "治疗": ["手术", "修复", "检查", "诊断", "疗程"],
     "医生": ["医师", "牙医", "专家", "主治", "主任"],
     "管理": ["运营", "经营", "admin", "治理", "统筹"],
-    # 中文技术词 (V2.6.13)
+    # 中文技术词 ()
     "算法": ["方法", "逻辑", "计算", "formula", "流程"],
     "数据库": ["存储", "SQL", "db", "表", "查询"],
     "缓存": ["加速", "buffer", "预存", "临时", "快取"],
@@ -353,11 +332,8 @@ _SYNONYMS = {
 _BIDIRECTIONAL_SYNS = _build_bidirectional_syns(_SYNONYMS)
 
 
-
 def _synonym_expand(query: str) -> list:
-    """本地同义词扩展——零 LLM 消耗，覆盖 80% 语义搜索场景。
-    查询同义词库(单向) + 双向权重表 + 情绪词库，三库互积累。
-    返回 [原词, 同义词1, 同义词2, ...]"""
+    """本地同义词扩展——零 LLM 消耗，覆盖 80% 语义搜索场景。 查询同义词库(单向) + 双向权重表 + 情绪词库，三库互积累。 返回 [原词, 同义词1, 同义词2, ...]"""
     keywords = [query]
     seen = {query.lower()}
     # 2-gram 滑窗分词（和 _tokenize 一致）
@@ -400,10 +376,10 @@ def _synonym_expand(query: str) -> list:
                         seen.add(w.lower())
     except ImportError:
         logger.warning(f"_synonym_expand: 局部导入失败: from emotion_vocab import load_vocab", exc_info=True)
-        pass  # emotion_vocab 模块未安装
+        pass  #emotion_vocab 模块未安装
     except Exception:
         logger.debug("情绪词库扩展失败", exc_info=True)
-    # V2.9.9.10: TF-IDF动态同义词 — 词典覆盖不足时自动发现相关词
+    # TF-IDF动态同义词 — 词典覆盖不足时自动发现相关词
     if len(keywords) < 3:
         try:
             from l3_search_core import _tfidf_search
@@ -425,8 +401,7 @@ def _synonym_expand(query: str) -> list:
 
 
 def _tfidf_search(query: str, limit: int = 10) -> list:
-    """本地 TF-IDF 语义搜索——纯 stdlib，零外部依赖。
-    作为语义搜索的第三条 fallback 路径。"""
+    """本地 TF-IDF 语义搜索——纯 stdlib，零外部依赖。 作为语义搜索的第三条 fallback 路径。"""
     from sandglass_vault import recent, search as vs, _tokenize
 
     candidates = {}
@@ -465,8 +440,7 @@ def _tfidf_search(query: str, limit: int = 10) -> list:
 
 
 def composite_rerank(results, weights, text_w=0.6, ext_w=0.4):
-    """Composite Linear + Min-Max：多信号归一化→加权求和重排。
-    results: [(ln, ts, text, kw), ...] | weights: {kw: w, ...}"""
+    """Composite Linear + Min-Max：多信号归一化→加权求和重排。 results: [(ln, ts, text, kw), ...] | weights: {kw: w, ...}"""
     if not results or not weights:
         return sorted(results, key=lambda x: x[0], reverse=True)
 
@@ -488,7 +462,7 @@ def composite_rerank(results, weights, text_w=0.6, ext_w=0.4):
 
     def norm(v, lo, hi):
         if hi == lo:
-            return 0.0  # 均匀值→不做文本分，全交给ext权重
+            return 0.0  #均匀值→不做文本分，全交给ext权重
         return (v - lo) / (hi - lo)
 
     composites = [(norm(t, t_min, t_max) * text_w + norm(w, w_min, w_max) * ext_w, item)
@@ -528,7 +502,7 @@ def _sentiment_wind() -> float:
     for i, (_, _, text) in enumerate(sands):
         det = emotion_detect(text)
         if det.get("mood"):
-            weight = (i + 1) / len(sands)  # 最近权重最高
+            weight = (i + 1) / len(sands)  #最近权重最高
             scores.append(mood_scores.get(det["mood"], 0) * weight)
     return round(sum(scores) / max(len(scores), 1), 2)
 
@@ -554,11 +528,11 @@ def sentiment_rerank(results, wind: float):
             boost = sentiment_score * wind * 0.2
         elif wind < 0:
             if sentiment_score > 0:
-                boost = -sentiment_score * abs(wind) * 0.2  # 负面风压正面
+                boost = -sentiment_score * abs(wind) * 0.2  #负面风压正面
             elif sentiment_score < 0:
-                boost = sentiment_score * abs(wind) * 0.1   # 轻微压负面
+                boost = sentiment_score * abs(wind) * 0.1   #轻微压负面
             else:
-                boost = abs(wind) * 0.15  # 中性浮上来
+                boost = abs(wind) * 0.15  #中性浮上来
         else:
             boost = 0
         scored.append((boost, item))
@@ -566,10 +540,8 @@ def sentiment_rerank(results, wind: float):
     return [item for _, item in scored]
 
 
-# ═══════════════════════════════════════════════════════
 # 情绪→同义词桥（方案B：单向注入，零新文件）
-# ═══════════════════════════════════════════════════════
-_EMOTION_SYN_FED = False  # 只注入一次
+_EMOTION_SYN_FED = False  #只注入一次
 
 def _feed_emotion_to_synonyms():
     """情绪词库高频词 → 注入同义词表。只跑一次。"""
@@ -617,6 +589,3 @@ def _feed_emotion_to_synonyms():
     except Exception:
         logger.warning(f"_feed_emotion_to_synonyms: 静默异常", exc_info=True)
         pass
-
-
-# ======================== V2.8: sand density + dynamic expand ========================

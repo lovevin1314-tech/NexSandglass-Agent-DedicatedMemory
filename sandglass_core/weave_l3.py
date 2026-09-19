@@ -26,9 +26,7 @@ except ImportError:
 
 @_fail_open({})
 def weave_insight(topic: str) -> dict:
-    """织布：给定一个话题，从四个支柱分别取线，织成合成洞察。
-    返回 {persona_view, offset_view, search_view, thread_view, synthesis,
-         impression, impression_engine, synthesis_enhanced}"""
+    """织布：给定一个话题，从四个支柱分别取线，织成合成洞察。 返回 {persona_view, offset_view, search_view, thread_view, synthesis, impression, impression_engine, synthesis_enhanced}"""
     result = {}
 
     # 蒸馏的线：这个话题在画像里怎么说的
@@ -56,7 +54,7 @@ def weave_insight(topic: str) -> dict:
     search = search_with_stage_label(topic, limit=3)
     result["search_view"] = search
 
-    # V2.9.7 第四支柱：织线因果链（按话题查，有数据门控）
+    # 第四支柱：织线因果链（按话题查，有数据门控）
     result["thread_view"] = ""
     try:
         from weavethread import wthread_stats, wthread_to_weave
@@ -82,7 +80,7 @@ def weave_insight(topic: str) -> dict:
 
     result["synthesis"] = "；".join(synthesis) if synthesis else "数据不足，无法合成"
 
-    # V2.20.7 模型织印象（可选增强）。原 synthesis 永不替换；
+    # 模型织印象（可选增强）。原 synthesis 永不替换；
     # 模型失败时由 weave_llm 自动回落纯规则，且不写回 sandglass.txt / L0。
     try:
         from weave_llm import weave_impression
@@ -115,11 +113,7 @@ def weave_insight(topic: str) -> dict:
 
 
 def weave_thread_fill(topic: str = "", limit: int = 12) -> dict:
-    """织线补漏：从沙子检索结果中调用本地模型补织正则漏掉的三元组。
-
-    这是 V3.1.0 丢失物#1 的入口；模型不可用/失败时自动返回 `engine=rule`，
-    不做任何写入。写入走 `weave_llm.weave_missing_triples` → `wthread_add`。
-    """
+    """织线补漏：从沙子检索结果中调用本地模型补织正则漏掉的三元组。 这是 V3.1.0 丢失物#1 的入口；模型不可用/失败时自动返回 `engine=rule`， 不做任何写入。写入走 `weave_llm.weave_missing_triples` → `wthread_add`。"""
     from sandglass_vault import search as vs
     from weave_llm import weave_missing_triples
     from weavethread import wthread_query
@@ -133,8 +127,7 @@ def weave_thread_fill(topic: str = "", limit: int = 12) -> dict:
 
 @_fail_open({})
 def weave_contradiction() -> dict:
-    """织布：检测三大支柱之间的自相矛盾。
-    返回 [{pillar_a, pillar_b, conflict, evidence}]"""
+    """织布：检测三大支柱之间的自相矛盾。 返回 [{pillar_a, pillar_b, conflict, evidence}]"""
     conflicts = []
 
     # 矛盾1：画像说 frugal，偏移率说 spend
@@ -235,9 +228,7 @@ def weave_contradiction() -> dict:
 
 @_fail_open({})
 def weave_chain(start: str, depth: int = 3) -> dict:
-    """织布：从一个起点出发，沿着三大支柱往下追，看能牵出什么。
-    start 可以是：一个决策、一个画像声明、一个搜索关键词。
-    返回 {chain: [{step, pillar, found}], conclusion}"""
+    """织布：从一个起点出发，沿着三大支柱往下追，看能牵出什么。 start 可以是：一个决策、一个画像声明、一个搜索关键词。 返回 {chain: [{step, pillar, found}], conclusion}"""
     chain = []
 
     # 第一步：时间检索
@@ -266,14 +257,7 @@ def weave_chain(start: str, depth: int = 3) -> dict:
             else "该话题在三大支柱中无显著信号"}
 
 def weave_graph(question: str, max_hops: int = 3) -> dict:
-    """
-    因果图——回答"为什么"的问题。
-    
-    从沙子/决策粒子/标签三个源出发，用 CTE 递归追溯因果链。
-    零额外依赖——SQLite WITH RECURSIVE 内置。
-    
-    返回 {chains, root_causes, insight}
-    """
+    """因果图——回答\"为什么\"的问题。 从沙子/决策粒子/标签三个源出发，用 CTE 递归追溯因果链。 零额外依赖——SQLite WITH RECURSIVE 内置。 返回 {chains, root_causes, insight}"""
     try:
         from sandglass_sqlite import _get_db
         db = _get_db()
@@ -334,7 +318,7 @@ def weave_graph(question: str, max_hops: int = 3) -> dict:
                     if kw in line.lower():
                         parts = line.strip().split(" | ")
                         if len(parts) >= 5:
-                            dp_roots.add(parts[4][:50])  # 标签作为根源
+                            dp_roots.add(parts[4][:50])  #标签作为根源
         
         all_roots = root_causes | dp_roots
         
@@ -360,11 +344,7 @@ def weave_graph(question: str, max_hops: int = 3) -> dict:
                 "insight": "织布机因果图暂不可用（需要 sandglass_sqlite FTS5 索引）"}
 
 def weave_output(query: str = "", limit: int = 5) -> dict:
-    """V2.9.5: 织布机统一输出 → 搜索滤镜素材。
-    整合因果链 + 矛盾检测 + 场景感知 + 偏移率 + 情绪，
-    返回 {insight, contradictions, causal, scene_context, offset_guide, emotion_note,
-         impression, impression_engine, impression_model}
-    """
+    """V2.9.5: 织布机统一输出 → 搜索滤镜素材。 整合因果链 + 矛盾检测 + 场景感知 + 偏移率 + 情绪， 返回 {insight, contradictions, causal, scene_context, offset_guide, emotion_note, impression, impression_engine, impression_model}"""
     import logging
     logger = logging.getLogger(__name__)
     
@@ -546,12 +526,7 @@ def _weave_fact_source_context(category: str, tag: str, radius: int = 8) -> str:
 
 
 def weave_entities_with_context(limit: int = 5, seen_facts: set = None, max_tokens: int = None, radius: int = 8) -> list:
-    """织布机加工层：高信实体 + 场景上下文。
-
-    读 shadow_top_entities 结果，为每个实体关联其所在沙子行的附近上下文。
-    输出如 `  黑咖啡 (场景: 主人: 喜欢黑咖啡)`，体现实体与场景的关系，
-    而不是简单罗列实体名。
-    """
+    """织布机加工层：高信实体 + 场景上下文。 读 shadow_top_entities 结果，为每个实体关联其所在沙子行的附近上下文。 输出如 ` 黑咖啡 (场景: 主人: 喜欢黑咖啡)`，体现实体与场景的关系， 而不是简单罗列实体名。"""
     try:
         from shadow_sand import shadow_top_entities, _sandglass_lines
         rows = shadow_top_entities(limit=max(20, int(limit) * 4))
@@ -585,11 +560,7 @@ def weave_entities_with_context(limit: int = 5, seen_facts: set = None, max_toke
 
 
 def weave_fact_categories_with_context(limit: int = 5, seen_facts: set = None, max_tokens: int = None, radius: int = 8) -> list:
-    """织布机加工层：事实标签 + 来源上下文。
-
-    读 shadow_top_fact_categories 结果，为每条分类标签回找来源沙行，
-    输出 `  [偏好] 深色模式 (来源: 主人: 偏好深色模式)`。
-    """
+    """织布机加工层：事实标签 + 来源上下文。 读 shadow_top_fact_categories 结果，为每条分类标签回找来源沙行， 输出 ` [偏好] 深色模式 (来源: 主人: 偏好深色模式)`。"""
     try:
         from shadow_sand import shadow_top_fact_categories
         rows = shadow_top_fact_categories(limit=max(10, int(limit) * 2))
@@ -625,26 +596,3 @@ def weave_fact_categories_with_context(limit: int = 5, seen_facts: set = None, m
     except Exception:
         logger.warning("weave_fact_categories_with_context 失败", exc_info=True)
         return []
-
-
-def weave_search_filter(query: str = "") -> str:
-    """V2.9.5: 织布机 → 搜索滤镜 格式化输出。
-    返回 LLM 可注入的文本块。
-    """
-    w = weave_output(query)
-    lines = []
-    
-    if w["insight"]:
-        lines.append(f"状态: {w['insight'][:120]}")
-    if w["contradictions"]:
-        for c in w["contradictions"][:2]:
-            if isinstance(c, dict) and c.get("conflict"):
-                lines.append(f"矛盾: {c['conflict'][:100]}")
-    if w["offset_guide"]:
-        lines.append(w["offset_guide"])
-    if w["emotion_note"]:
-        lines.append(w["emotion_note"])
-    if w["scene_context"]:
-        lines.append(f"场景: {w['scene_context']}")
-    
-    return "\n".join(lines) if lines else ""

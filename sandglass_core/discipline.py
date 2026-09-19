@@ -1,8 +1,5 @@
-"""
-NexSandglass L3 — 铁律因子 (V2.9.6: 权重计数)
-从 sandglass_think.py 拆分。
-"""
-import os, json, re, tempfile, threading
+"""NexSandglass L3 — 铁律因子 (V2.9.6: 权重计数) 从 sandglass_think.py 拆分。"""
+import os, json, re, threading
 from datetime import datetime
 from collections import Counter
 import logging
@@ -10,9 +7,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 from sandglass_paths import _NB
+from sandglass_util import write_json_atomic
 _IRON_RULES = os.path.join(_NB, "iron_rules.txt")
 _RULE_COUNTS = os.path.join(_NB, "persona", "rule_counts.json")
-_RULE_COUNT_LOCK = threading.Lock()  # 只保护计数文件的读-改-写段
+_RULE_COUNT_LOCK = threading.Lock()  #只保护计数文件的读-改-写段
 _CANDIDATE_PREFIX = "[candidate] "
 _RED_PREFIX = "[red] "
 _NORMAL_PREFIX = "[normal] "
@@ -43,13 +41,7 @@ _RULE_TRIGGER_GROUPS = [
 
 
 def _load_counts() -> dict:
-    """加载规则计数；旧格式自动迁移为新多维结构。
-
-    旧格式：{"规则全文": 81}
-    新格式：{"规则全文": {"inject_count": 81, "remind_count": 0,
-                           "violation_count": 0, "last_source_line": null,
-                           "updated_at": "..."}}
-    """
+    """加载规则计数；旧格式自动迁移为新多维结构。 旧格式：{\"规则全文\": 81} 新格式：{\"规则全文\": {\"inject_count\": 81, \"remind_count\": 0, \"violation_count\": 0, \"last_source_line\": null, \"updated_at\": \"...\"}}"""
     if not os.path.exists(_RULE_COUNTS):
         return {}
     try:
@@ -76,18 +68,7 @@ def _load_counts() -> dict:
 
 def _save_counts(counts: dict):
     """保存规则计数"""
-    os.makedirs(os.path.dirname(_RULE_COUNTS), exist_ok=True)
-    # 原子写：先写同目录临时文件，避免崩溃截断正式文件。
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=os.path.dirname(_RULE_COUNTS), delete=False
-    )
-    try:
-        with tmp:
-            json.dump(counts, tmp, ensure_ascii=False)
-        os.replace(tmp.name, _RULE_COUNTS)
-    finally:
-        if os.path.exists(tmp.name):
-            os.unlink(tmp.name)
+    write_json_atomic(_RULE_COUNTS, counts, indent=None)
 
 
 def _now_iso() -> str:
@@ -97,15 +78,7 @@ def _now_iso() -> str:
 
 def _new_count_entry(inject_count=0, remind_count=0, violation_count=0,
                      last_source_line=None, updated_at=None):
-    """构造一条规则计数条目。
-
-    字段语义：
-    - inject_count：注入次数（历史保留，不再作为排序唯一依据）
-    - remind_count：主人/LLM 实际引用提醒该规则的次数（真实事件）
-    - violation_count：确认违规次数
-    - last_source_line：最近一次触发来源沙号（溯源）
-    - updated_at：最后更新时间
-    """
+    """构造一条规则计数条目。 字段语义： - inject_count：注入次数（历史保留，不再作为排序唯一依据） - remind_count：主人/LLM 实际引用提醒该规则的次数（真实事件） - violation_count：确认违规次数 - last_source_line：最近一次触发来源沙号（溯源） - updated_at：最后更新时间"""
     return {
         "inject_count": int(inject_count or 0),
         "remind_count": int(remind_count or 0),
@@ -144,11 +117,7 @@ def _count_int(entry: dict, field: str) -> int:
 
 
 def _rule_priority_score(entry: dict) -> int:
-    """排序分：inject_count 保留历史权重 1，remind_count 作为真实信号权重 3。
-
-    理由：remind/violation 是真实行为信号，应比历史注入假计数更快影响排序；
-    同时 inject_count=1 的权重让旧 81 条相对 0 分新规则仍稳定排前。
-    """
+    """排序分：inject_count 保留历史权重 1，remind_count 作为真实信号权重 3。 理由：remind/violation 是真实行为信号，应比历史注入假计数更快影响排序； 同时 inject_count=1 的权重让旧 81 条相对 0 分新规则仍稳定排前。"""
     if not entry:
         return 0
     return _count_int(entry, "inject_count") * 1 + _count_int(entry, "remind_count") * 3
@@ -173,13 +142,7 @@ def _normalize_candidate_text(value):
 
 
 def _parse_rule_line(line: str) -> dict:
-    """把 active 行解析为结构化规则。
-
-    支持三种写法（旧行自动视为 normal）：
-    - 无标记旧行：``规则正文``
-    - 前缀标记：``[red] 规则正文`` / ``[normal] 规则正文``
-    - 前缀 + JSON：``[red] {"text": "...", "trigger_words": ["镜像"]}``
-    """
+    """把 active 行解析为结构化规则。 支持三种写法（旧行自动视为 normal）： - 无标记旧行：``规则正文`` - 前缀标记：``[red] 规则正文`` / ``[normal] 规则正文`` - 前缀 + JSON：``[red] {\"text\": \"...\", \"trigger_words\": [\"镜像\"]}``"""
     raw = (line or "").strip()
     level_mark = None
     payload = raw
@@ -288,13 +251,7 @@ def _first_trigger_hit(trigger_words: list, context: str):
 
 
 def _estimate_tokens(text: str) -> int:
-    """零 LLM 纯本地 token 估算（用于预算截断，非精确 BPE）。
-
-    规则：
-    - CJK 单字 ≈ 1 token（中文 1 字≈1 token）；
-    - 拉丁字母/数字连续段 ≈ 1 token；
-    - 其余非空白符号每个 ≈ 1 token。
-    """
+    """零 LLM 纯本地 token 估算（用于预算截断，非精确 BPE）。 规则： - CJK 单字 ≈ 1 token（中文 1 字≈1 token）； - 拉丁字母/数字连续段 ≈ 1 token； - 其余非空白符号每个 ≈ 1 token。"""
     if not text:
         return 0
     text = str(text)
@@ -332,12 +289,7 @@ def _budget_slice(items: list, budget: int, estimate) -> tuple:
 
 
 def iron_rule_layers(context: str = "") -> dict:
-    """双层铁律注入选择器（零 LLM，纯本地）。
-
-    - 红牌池：手动 [red] 或 violation_count >= 2 自动升红；常驻注入。
-    - 普通池：只有 context 命中 trigger_words 才注入。
-    - 排序只在池内进行：红牌按 violation_count 降序，普通按 inject×1+remind×3 降序。
-    """
+    """双层铁律注入选择器（零 LLM，纯本地）。 - 红牌池：手动 [red] 或 violation_count >= 2 自动升红；常驻注入。 - 普通池：只有 context 命中 trigger_words 才注入。 - 排序只在池内进行：红牌按 violation_count 降序，普通按 inject×1+remind×3 降序。"""
     counts = _load_counts()
     red_items = []
     normal_items = []
@@ -408,10 +360,7 @@ def iron_rule_inject_texts(context: str = "") -> list:
 
 
 def iron_rules(limit: int = 3) -> list:
-    """旧接口兼容：返回按多维优先级排序的规则正文，最多 limit 条。
-
-    新注入逻辑请使用 iron_rule_layers()；本函数仅保留展示/兼容用途。
-    """
+    """旧接口兼容：返回按多维优先级排序的规则正文，最多 limit 条。 新注入逻辑请使用 iron_rule_layers()；本函数仅保留展示/兼容用途。"""
     if not os.path.exists(_IRON_RULES):
         return []
     infos = _active_rule_infos()
@@ -426,27 +375,8 @@ def iron_rules(limit: int = 3) -> list:
     return [info["text"] for info in scored[:limit]]
 
 
-def iron_rules_with_counts(limit: int = 3) -> list:
-    """旧接口兼容：读取铁律并带优先级分。
-
-    该读取路径只排序/展示，不做任何 bump；注入计数由调用方在真正写入
-    system prompt 后显式调用 iron_rule_inject_bump()。
-    """
-    rules = iron_rules(limit)
-    counts = _load_counts()
-    return [
-        (rule, _rule_priority_score(_entry_for_rule(counts, _parse_rule_line(rule))))
-        for rule in rules
-    ]
-
-
 def iron_rule_bump(rule_text: str, field: str = "remind_count", source_line=None):
-    """按真实事件 bump 铁律计数。
-
-    - field 默认 remind_count；允许 violation_count。
-    - source_line 非 None 时写入 last_source_line，用于溯源。
-    - 不触碰 inject_count，注入历史由 iron_rule_inject_bump() 单独维护。
-    """
+    """按真实事件 bump 铁律计数。 - field 默认 remind_count；允许 violation_count。 - source_line 非 None 时写入 last_source_line，用于溯源。 - 不触碰 inject_count，注入历史由 iron_rule_inject_bump() 单独维护。"""
     if field not in ("remind_count", "violation_count"):
         return
     if not os.path.exists(_IRON_RULES):
@@ -468,16 +398,12 @@ def iron_rule_bump(rule_text: str, field: str = "remind_count", source_line=None
             return
 
 
-# V2.9.9: 会话级去重——注入时每条规则每 session 只 bump 一次；
-# V2.20.x: 提供 session 结束重置入口，避免模块级 set 永久只增不删。
+# 会话级去重——注入时每条规则每 session 只 bump 一次；
+# .x: 提供 session 结束重置入口，避免模块级 set 永久只增不删。
 _injected_this_session = set()
 
 def iron_rule_inject_bump(rule_text: str):
-    """真实注入计数 +1，只碰 inject_count。
-
-    每条规则在一个会话内去重，重复调用不重复计数；会话结束调用
-    iron_rule_session_reset() 清空，下一会话可重新计数。
-    """
+    """真实注入计数 +1，只碰 inject_count。 每条规则在一个会话内去重，重复调用不重复计数；会话结束调用 iron_rule_session_reset() 清空，下一会话可重新计数。"""
     key = rule_text.strip().lower()
     if key in _injected_this_session:
         return
@@ -515,8 +441,6 @@ def iron_rules_set(rules: list) -> bool:
     return True
 
 
-# ── 断点1：铁律提取闭环（纯正则，候选不注入） ──────────────────
-
 _EXTRACT_PATTERNS = [
     # 该走X走X：该走镜像走镜像
     (re.compile(r"该走(.{1,20}?)走\1"), "该走X走X", True),
@@ -532,11 +456,7 @@ _EXTRACT_PATTERNS = [
 
 
 def iron_rule_extract_candidates(text, source_line=0, created_at=None):
-    """从主人句式正则提取候选铁律。
-
-    返回结构化候选列表：
-        text, source_line, level='candidate', created_at
-    """
+    """从主人句式正则提取候选铁律。 返回结构化候选列表： text, source_line, level='candidate', created_at"""
     if not text:
         return []
     text = text.replace("\r", " ").replace("\n", " ").strip()

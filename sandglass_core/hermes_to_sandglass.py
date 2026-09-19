@@ -1,14 +1,10 @@
-#!/usr/bin/env python3
-"""Hermes + Holographic → NexSandglass 一键迁移 (零依赖)
-
-V3.0.0 修复（2026-08-17 全面检查发现）：迁移逻辑包进 main()，
-import 本模块不再触发副作用（原实现 import 即执行迁移 5972 条，慢且可能意外触发）。
-用法：python hermes_to_sandglass.py
-"""
-import os, sys, sqlite3, glob
+#!/usr/bin/env python3/usr/bin/env python3
+"""Hermes + Holographic → NexSandglass 一键迁移 (零依赖) V3.0.0 修复（2026-08-17 全面检查发现）：迁移逻辑包进 main()， import 本模块不再触发副作用（原实现 import 即执行迁移 5972 条，慢且可能意外触发）。 用法：python hermes_to_sandglass.py"""
+import os, sys, glob
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sandglass_log import log_message
+from sandglass_util import db_connect
 import logging
 logger = logging.getLogger(__name__)
 
@@ -16,7 +12,6 @@ logger = logging.getLogger(__name__)
 def main():
     total = 0
 
-    # ═══ 1. Hermes 记忆 ═══
     HERMES_PATHS = [
         os.path.join(os.path.expanduser("~"), "AppData", "Local", "hermes", "state.db"),
         os.path.join(os.path.expanduser("~"), ".local", "share", "hermes", "state.db"),
@@ -24,7 +19,7 @@ def main():
     ]
     for db_path in HERMES_PATHS:
         if os.path.exists(db_path):
-            db = sqlite3.connect(db_path)
+            db = db_connect(db_path)
             rows = db.execute("SELECT role, content FROM messages WHERE role='user' AND content IS NOT NULL AND content != '' ORDER BY id").fetchall()
             db.close()
             for role, content in rows:
@@ -36,7 +31,6 @@ def main():
     else:
         print("⚠️ 未找到 Hermes state.db")
 
-    # ═══ 2. Holographic 记忆 ═══
     HOLO_PATHS = [
         os.path.join(os.path.expanduser("~"), "AppData", "Local", "hermes", "holographic.db"),
         os.path.join(os.path.expanduser("~"), ".local", "share", "hermes", "holographic.db"),
@@ -45,7 +39,7 @@ def main():
 
     for db_path in HOLO_PATHS:
         if os.path.exists(db_path):
-            db = sqlite3.connect(db_path)
+            db = db_connect(db_path)
             try:
                 rows = db.execute("SELECT role, content FROM memories WHERE content IS NOT NULL AND content != '' ORDER BY id").fetchall()
             except Exception:

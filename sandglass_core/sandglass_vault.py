@@ -1,30 +1,19 @@
-"""
-NexSandglass — 第二层：投石问路 + 解密读取
-===========================================
-import sandglass_vault
-results = sandglass_vault.search("关键词")
-latest = sandglass_vault.recent(5)
-"""
+"""NexSandglass — 第二层：投石问路 + 解密读取 =========================================== import sandglass_vault results = sandglass_vault.search(\"关键词\") latest = sandglass_vault.recent(5)"""
 
 import logging
-import mmap
 import os
 import re
 import threading
 from datetime import datetime
 
 from sandglass_paths import _NB
+from sandglass_util import _pipe_warn
 
 _SANDGLASS = os.path.join(_NB, "sandglass.txt")
 _IDX = os.path.join(_NB, "sandglass.idx")
 
 logger = logging.getLogger(__name__)
 
-
-def set_idx_path(path: str):
-    """重定向投石问路索引路径——基准测试用。"""
-    global _IDX
-    _IDX = path
 
 # ── idx 内存缓存（偷师 memory-os：O(1) 查 token）──
 _idx_cache: dict | None = None
@@ -33,7 +22,7 @@ _idx_mtime: float = 0
 # ── 并发安全：保护 _IDX 文件的读写，避免 Windows os.replace 冲突 ──
 _idx_lock = threading.RLock()
 
-# V2.9.9.9: 启动自检——发现坏行自动修复，保证老用户无痛自愈
+# 启动自检——发现坏行自动修复，保证老用户无痛自愈
 _HEAL_MARKER = os.path.join(_NB, ".sandglass_healed")
 _TS_RE = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \|')
 
@@ -76,9 +65,7 @@ def _startup_autoheal() -> dict:
         return {"action": "error", "error": str(e)}
 
 
-# ═══════════════════════════════════════════════
 # 投石问路
-# ═══════════════════════════════════════════════
 
 def _tokenize(text: str) -> set:
     """V2.9.9.4: 英文全词+中文2字词。去掉英文n-gram(碎片化,FTS5已覆盖子串)。"""
@@ -109,8 +96,7 @@ def _query_tokens(text: str) -> set:
 
 
 def _parse_line(line: str) -> tuple:
-    """返回 (ts, sender, text) 或 (None, None, None)。
-    V2.4.0: 明文存储，直接返回原文。"""
+    """返回 (ts, sender, text) 或 (None, None, None)。 V2.4.0: 明文存储，直接返回原文。"""
     if " | " not in line:
         return None, None, None
     parts = line.strip().split(" | ", 2)
@@ -138,7 +124,7 @@ def _write_idx(idx):
                 os.remove(_IDX)
                 os.replace(tmp, _IDX)
             except OSError:
-                pass  # 静默失败，下次 _sync_index 增量同步会重试
+                pass  #静默失败，下次 _sync_index 增量同步会重试
 
 
 def idx_search(query: str, limit: int = 100) -> list:
@@ -213,11 +199,11 @@ def _sync_index() -> dict:
             try:
                 cur_mtime = os.path.getmtime(_SANDGLASS)
                 if cur_mtime != _idx_mtime:
-                    _idx_cache = None  # 文件被修改过，清缓存
-                    return {}  # 返回空，让调用方重建
+                    _idx_cache = None  #文件被修改过，清缓存
+                    return {}  #返回空，让调用方重建
             except Exception:
                 logger.warning(f"_sync_index: 静默异常", exc_info=True)
-                pass  # mtime 不可用，沿用缓存
+                pass  #mtime 不可用，沿用缓存
             if _idx_cache is not None:
                 cached_max = 0
                 for lines in _idx_cache.values():
@@ -243,7 +229,7 @@ def _sync_index() -> dict:
 
         if idx_max and total > 0 and idx_max > total:
             logger.warning(f"sandglass: idx行号({idx_max})超过沙漏总行数({total})，可能是手动编辑了idx文件。自动重建中...")
-            return {}  # 返回空 → 触发 mmap 降级搜索。下次 rebuild_index() 会自动重建。
+            return {}  #返回空 → 触发 mmap 降级搜索。下次 rebuild_index() 会自动重建。
 
         if idx_max >= total:
             _idx_cache = idx
@@ -278,13 +264,10 @@ def _sync_index() -> dict:
         return _idx_cache if _idx_cache else {}
 
 
-# ═══════════════════════════════════════════════
 # 搜索 + 读取
-# ═══════════════════════════════════════════════
 
 def search(query: str, limit: int = 10, month: str = "") -> list:
-    """搜索沙漏。返回 [(行号, 时间, 明文), ...]。
-    V3: 涟漪感知。按设计定稿：调用方先分词，感知 search(word) 查单 token。带异常兜底。"""
+    """搜索沙漏。返回 [(行号, 时间, 明文), ...]。 V3: 涟漪感知。按设计定稿：调用方先分词，感知 search(word) 查单 token。带异常兜底。"""
     try:
         import sys, os
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "v3"))
@@ -326,7 +309,6 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
         return []
 
 
-
 def recent(n: int = 10) -> list:
     """最近 N 条。[(行号, 时间, 明文), ...]。V2.3.9: seek逆向流式，O(N)内存。"""
     try:
@@ -336,7 +318,7 @@ def recent(n: int = 10) -> list:
         # 逆向读取文件尾部——只加载最后几KB，不读全文件
         chunk_size = 4096
         with open(_SANDGLASS, "rb") as f:
-            f.seek(0, 2)  # 跳到文件末尾
+            f.seek(0, 2)  #跳到文件末尾
             file_size = f.tell()
             
             lines_found = []
@@ -359,7 +341,7 @@ def recent(n: int = 10) -> list:
             # 取最后n行非空行
             lines_found = [l for l in lines_found if l.strip()][-n:]
         
-        total = count()  # 用已有count()函数，不重复数文件
+        total = count()  #用已有count()函数，不重复数文件
         results = []
         for i, line in enumerate(lines_found):
             decoded = line.decode("utf-8", errors="ignore").strip()
@@ -385,46 +367,7 @@ def count() -> int:
         return 0
 
 
-def _mmap_search(query: str, limit: int, month: str, stage_filter: bool = False) -> list:
-    """三级降级：mmap 直接内存搜索。stage_filter=True 时只扫当前阶段+上一阶段。"""
-    results = []
-    try:
-        # 阶段过滤——缩小扫描范围
-        scan_months = [month]
-        if stage_filter:
-            try:
-                from sandglass_think import _current_stage, stage_list
-                current = _current_stage()
-                scan_months = [current]
-                stages = stage_list()
-                if len(stages) >= 2:
-                    scan_months.append(stages[-2].get("name", current))
-            except Exception:
-                logger.warning(f"_mmap_search: 静默异常", exc_info=True)
-                pass
-        with open(_SANDGLASS, "rb") as f:
-            with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-                line_start = 0; line_num = 0
-                while line_start < len(mm):
-                    line_end = mm.find(b"\n", line_start)
-                    if line_end == -1: line_end = len(mm)
-                    line_num += 1
-                    line = mm[line_start:line_end].decode("utf-8", errors="replace")
-                    ts, sender, text = _parse_line(line)
-                    if ts and query.lower() in text.lower():
-                        if not scan_months or any(ts.startswith(m) for m in scan_months):
-                            results.append((line_num, ts, text))
-                            if limit > 0 and len(results) >= limit: break
-                    line_start = line_end + 1
-    except Exception:
-        logger.warning(f"_mmap_search: 静默异常", exc_info=True)
-        pass
-    return results
-
-
-# ═══════════════════════════════════════════════
 # 时间回溯
-# ═══════════════════════════════════════════════
 
 def timeline(query: str) -> dict:
     """时间回溯——按年份分层返回关键词的演变轨迹。"""
@@ -454,19 +397,10 @@ def timeline(query: str) -> dict:
         logger.warning("sandglass: timeline(%r) failed", query, exc_info=True)
         return {}
 
-# ═══════════════════════════════════════════════
-# 沙漏导入/合并 —— V2.9.3-dev
-# ═══════════════════════════════════════════════
+# 沙漏导入/合并 —— -dev
 
 def sandglass_import(source_path: str, source_format: str = "sandglass") -> dict:
-    """导入外部对话记录到沙漏。支持格式:
-    - sandglass: 同格式沙漏导出 (时间戳 | 发送者 | 文本)
-    - chatgpt: ChatGPT JSON 导出
-    - claude: Claude 对话 JSON 导出
-    - plain: 纯文本，每行一条
-    
-    返回 {imported: N, skipped: N, total: N}
-    """
+    """导入外部对话记录到沙漏。支持格式: - sandglass: 同格式沙漏导出 (时间戳 | 发送者 | 文本) - chatgpt: ChatGPT JSON 导出 - claude: Claude 对话 JSON 导出 - plain: 纯文本，每行一条 返回 {imported: N, skipped: N, total: N}"""
     imported = 0
     skipped = 0
     
@@ -496,12 +430,8 @@ def sandglass_import(source_path: str, source_format: str = "sandglass") -> dict
         return {"error": str(e), "imported": imported, "skipped": skipped}
 
 
-
-
 def sandglass_export(output_path: str = None, limit: int = None, month: str = "") -> str:
-    """导出沙漏为可迁移文件。默认导出全部。
-    返回导出文件路径。
-    """
+    """导出沙漏为可迁移文件。默认导出全部。 返回导出文件路径。"""
     if output_path is None:
         output_path = os.path.join(_NB, "sandglass_export.txt")
     
@@ -540,7 +470,7 @@ def _import_sandglass(source_path: str) -> tuple:
     with open(source_path, "r", encoding="utf-8") as src:
         for line in src:
             line = line.strip()
-            if not line or not line.startswith("20"):  # 跳过非时间戳行
+            if not line or not line.startswith("20"):  #跳过非时间戳行
                 continue
             if " | " not in line:
                 continue
@@ -628,11 +558,9 @@ def _import_plain(source_path: str) -> tuple:
     return imported, skipped
 
 
-# ═══════════════════════════════════════════════
-# V2.9.9.9: 沙漏自动修复——老用户坏行自愈
-# ═══════════════════════════════════════════════
+# 沙漏自动修复——老用户坏行自愈
 
-# _TS_RE = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \|')  # V2.10.18: 重复定义已合并到L38
+# _TS_RE = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \|')  # 重复定义已合并到L38
 
 
 def _is_valid_sandglass_line(line: str) -> bool:
@@ -647,18 +575,7 @@ def _is_valid_sandglass_line(line: str) -> bool:
 
 def repair_sandglass(dry_run: bool = False) -> dict:
     _SHADOW_DB = os.path.join(_NB, "shadow_sand.db")
-    """扫描 sandglass.txt，将多行消息的孤儿行合并回父消息。
-    
-    原理：多行消息中的 \\n 导致后续行缺少时间戳成为"坏行"。
-    修复策略：遇到坏行时将其文本拼接到上一条有效消息末尾（空格分隔）。
-    空行直接丢弃。
-    
-    参数：
-        dry_run=True → 只统计，不修改文件
-        dry_run=False → 原子写入 + 全量重建索引
-    
-    返回：{valid, orphans, empty, repaired_count, dry_run}
-    """
+    """扫描 sandglass.txt，将多行消息的孤儿行合并回父消息。 原理：多行消息中的 \\n 导致后续行缺少时间戳成为\"坏行\"。 修复策略：遇到坏行时将其文本拼接到上一条有效消息末尾（空格分隔）。 空行直接丢弃。 参数： dry_run=True → 只统计，不修改文件 dry_run=False → 原子写入 + 全量重建索引 返回：{valid, orphans, empty, repaired_count, dry_run}"""
     path = _SANDGLASS
     if not os.path.exists(path):
         return {"valid": 0, "orphans": 0, "empty": 0, "repaired_count": 0, "dry_run": dry_run}
@@ -668,9 +585,9 @@ def repair_sandglass(dry_run: bool = False) -> dict:
         raw_lines = f.readlines()
     
     # 扫描并修复
-    repaired = []       # 修复后的行（每条 = 完整有效行）
+    repaired = []       #修复后的行（每条 = 完整有效行）
     stats = {"valid": 0, "orphans": 0, "empty": 0}
-    current = None      # 当前正在构建的有效行 (ts, sender, text_parts)
+    current = None      #当前正在构建的有效行 (ts, sender, text_parts)
     
     for raw in raw_lines:
         stripped = raw.strip()
@@ -757,8 +674,3 @@ def repair_sandglass(dry_run: bool = False) -> dict:
     return {**stats, "repaired_count": stats["orphans"],
             "repaired_lines": len(repaired), "original_lines": len(raw_lines),
             "backup": backup, "dry_run": False}
-
-
-# V2.10.22: 延迟自愈函数——由 memory_provider.initialize() 调用
-def init_autoheal():
-    threading.Timer(5.0, _startup_autoheal).start()
