@@ -238,7 +238,6 @@ def _close_conn():
                 c.close()
             except Exception:
                 logger.warning(f"_close_conn: 静默异常", exc_info=True)
-                pass
 
 def _db_inode() -> int:
     """当前磁盘上 shadow_sand.db 的 inode；文件不存在返回 0。"""
@@ -351,7 +350,6 @@ def shadow_top_tags(limit: int = 2000) -> list:
                             out.append(norm)
             except Exception:
                 logger.warning(f"shadow_top_tags: 静默异常", exc_info=True)
-                pass
             return out
         except Exception:
             return []
@@ -430,7 +428,6 @@ def shadow_index(text: str, category: str = "general", tags: str = "", line_num:
             if scene_mode() == 'exam': category = 'exam_' + category
         except Exception:
             logger.warning(f"shadow_index: 静默异常", exc_info=True)
-            pass
         db = _get_conn()
         # 行号由调用方传入，不自计数（防止与sandglass物理行号偏移）
 
@@ -493,7 +490,6 @@ def shadow_index_archive(text: str, category: str = "general") -> None:
             _maybe_commit()
         except Exception:
             logger.warning(f"shadow_index_archive: 静默异常", exc_info=True)
-            pass
 
 
 def shadow_feedback(line_num: int, helpful: bool) -> dict:

@@ -37,7 +37,6 @@ def _startup_autoheal() -> dict:
                 return {"action": "skip", "reason": "already healed"}
         except Exception:
             logger.warning(f"_startup_autoheal: 静默异常", exc_info=True)
-            pass
     orphan_count = 0
     with open(_SANDGLASS, "r", encoding="utf-8") as f:
         for line in f:
@@ -52,7 +51,6 @@ def _startup_autoheal() -> dict:
                 f.write(datetime.now().isoformat())
         except Exception:
             logger.warning(f"_startup_autoheal: 静默异常", exc_info=True)
-            pass
         return {"action": "skip", "reason": f"only {orphan_count} orphans"}
     try:
         result = repair_sandglass(dry_run=False)
@@ -203,7 +201,7 @@ def _sync_index() -> dict:
                     return {}  #返回空，让调用方重建
             except Exception:
                 logger.warning(f"_sync_index: 静默异常", exc_info=True)
-                pass  #mtime 不可用，沿用缓存
+                #mtime 不可用，沿用缓存
             if _idx_cache is not None:
                 cached_max = 0
                 for lines in _idx_cache.values():
@@ -305,7 +303,6 @@ def search(query: str, limit: int = 10, month: str = "") -> list:
                 return idx
         except Exception:
             logger.warning(f"search: 静默异常", exc_info=True)
-            pass
         return []
 
 
@@ -422,7 +419,6 @@ def sandglass_import(source_path: str, source_format: str = "sandglass") -> dict
             perc_sense()
         except Exception:
             logger.warning(f"sandglass_import: 静默异常", exc_info=True)
-            pass
 
         # 合并
     except Exception as e:
@@ -646,13 +642,11 @@ def repair_sandglass(dry_run: bool = False) -> dict:
         perc_sense()
     except Exception:
         logger.warning(f"repair_sandglass: 静默异常", exc_info=True)
-        pass
     try:
         from cognition_neuron import sense as cog_sense
         cog_sense()
     except Exception:
         logger.warning(f"repair_sandglass: 静默异常", exc_info=True)
-        pass
     # V3: 清涟漪索引缓存
     try:
         import sqlite3 as _sql
@@ -664,7 +658,6 @@ def repair_sandglass(dry_run: bool = False) -> dict:
                 _sql.connect(_dbp).execute("DELETE FROM triples")
     except Exception:
         logger.warning(f"repair_sandglass: 静默异常", exc_info=True)
-        pass
     
     # 清理索引缓存
     global _idx_cache, _idx_mtime

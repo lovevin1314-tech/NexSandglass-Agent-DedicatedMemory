@@ -146,7 +146,6 @@ def _data_driven_refresh(existing: str, first_line: int, last_line: int, total: 
         tops = [(t, c) for t, c in tags.most_common(5) if c >= 2]
     except Exception:
         logger.warning(f"_data_driven_refresh: 静默异常", exc_info=True)
-        pass
     
     # 2. 偏移率
     off = comprehensive_offset()
@@ -226,7 +225,6 @@ def _pipe_build(first_line: int, last_line: int, total: int) -> str:
                 tool_hints.append(tool_tags[t.lower()])
     except Exception:
         logger.warning(f"_pipe_build: 静默异常", exc_info=True)
-        pass
     
     # 2. 偏移率
     off = comprehensive_offset()
@@ -246,7 +244,6 @@ def _pipe_build(first_line: int, last_line: int, total: int) -> str:
                     dp_chain = last.split("→")[-1].strip()[:60]
     except Exception:
         logger.warning(f"_pipe_build: 静默异常", exc_info=True)
-        pass
     
     # 4. 场景
     scenes_text = ""
@@ -256,7 +253,6 @@ def _pipe_build(first_line: int, last_line: int, total: int) -> str:
         if sc: scenes_text = "、".join(sc[:3])
     except Exception:
         logger.warning(f"_pipe_build: 静默异常", exc_info=True)
-        pass
     
     # ── 组装 persona.md ──
     parts = []
@@ -363,7 +359,6 @@ def _sync_five_facets(first_line: int = 0, last_line: int = 0, total: int = 0):
             json.dump(ff, f, ensure_ascii=False, indent=2)
     except Exception:
         logger.warning(f"_sync_five_facets: 静默异常", exc_info=True)
-        pass
 
 
 def persona_freshness() -> dict:
@@ -505,7 +500,6 @@ def _local_persona_extract() -> str:
             f.write(metrics + "\n")
     except Exception:
         logger.warning(f"_local_persona_extract: 静默异常", exc_info=True)
-        pass
 
     return "\n".join(lines) if results else "数据不足"
 

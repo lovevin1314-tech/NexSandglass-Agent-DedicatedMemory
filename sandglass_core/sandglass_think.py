@@ -125,59 +125,60 @@ def _run_sanity_checks() -> dict:
             checks[name] = "❌"
     return checks
 
+
+def _sanity_l0():
+    import hermes_constants
+    return "✅ Hermes alive", True, {}
+
+
+def _sanity_l1():
+    from nightwatch import night_watch
+    nw = night_watch()
+    ok = "沙漏存在" in nw
+    return ("✅" if ok else "⚠️"), ok, {"L1_nightwatch": nw[:200]}
+
+
+def _sanity_l2():
+    from sandglass_vault import count, search
+    total = count()
+    hits = search("test", limit=3)
+    ok = total >= 0 and isinstance(hits, list)
+    return (f"✅ {total}条沙子, 搜索正常" if ok else "⚠️"), ok, {"L2_sands": total}
+
+
+def _sanity_l3():
+    from functools import lru_cache
+    # 只测不会产生副作用的读接口
+    checks = _run_sanity_checks()
+    ok = all("✅" in v for v in checks.values())
+    return ("✅ 全接口通过" if ok else "⚠️ 部分接口异常"), ok, {"L3_checks": checks}
+
+
+_LAYER_CHECKS = [
+    ("L0", _sanity_l0, "full_sanity: 局部导入失败: import hermes_constants", lambda _: "⚠️ Hermes not detected (standalone mode)"),
+    ("L1", _sanity_l1, "full_sanity: 局部导入失败: from nightwatch import night_watch", lambda e: f"❌ {e}"),
+    ("L2", _sanity_l2, "full_sanity: 局部导入失败: from sandglass_vault import count, search", lambda e: f"❌ {e}"),
+    ("L3", _sanity_l3, "full_sanity: 局部导入失败: from functools import lru_cache", lambda e: f"❌ {e}"),
+]
+
+
 def full_sanity() -> dict:
     """沙漏记忆系统全面体检----三层健康 + 全接口冒烟。 - L0（会话层）：Hermes alive check - L1（写层）：沙漏文件 + 明文 + 插件 - L2（读层）：FTS5/idx/mmap/search - L3（思层）：偏移率/画像/情绪熵/织布机/决策粒子/搜索 返回 {l0, l1, l2, l3, total, summary, details}"""
     report = {"ts": datetime.now().isoformat(), "layers": {}, "total": 0, "passed": 0, "details": {}}
 
-    # L0
-    try:
-        import hermes_constants
-        report["layers"]["L0"] = "✅ Hermes alive"
-        report["passed"] += 1
-    except Exception:
-        logger.warning(f"full_sanity: 局部导入失败: import hermes_constants", exc_info=True)
-        report["layers"]["L0"] = "⚠️ Hermes not detected (standalone mode)"
-    report["total"] += 1
-
-    # L1
-    try:
-        from nightwatch import night_watch
-        nw = night_watch()
-        report["layers"]["L1"] = "✅" if "沙漏存在" in nw else "⚠️"
-        report["details"]["L1_nightwatch"] = nw[:200]
-        if "沙漏存在" in nw: report["passed"] += 1
-    except Exception as e:
-        logger.warning(f"full_sanity: 局部导入失败: from nightwatch import night_watch", exc_info=True)
-        report["layers"]["L1"] = f"❌ {e}"
-    report["total"] += 1
-
-    # L2
-    try:
-        from sandglass_vault import count, search
-        total = count()
-        hits = search("test", limit=3)
-        l2_ok = total >= 0 and isinstance(hits, list)
-        report["layers"]["L2"] = f"✅ {total}条沙子, 搜索正常" if l2_ok else "⚠️"
-        report["details"]["L2_sands"] = total
-        if l2_ok: report["passed"] += 1
-    except Exception as e:
-        logger.warning(f"full_sanity: 局部导入失败: from sandglass_vault import count, search", exc_info=True)
-        report["layers"]["L2"] = f"❌ {e}"
-    report["total"] += 1
-
-    # L3 -- 全接口检查
-    try:
-        from functools import lru_cache
-        # 只测不会产生副作用的读接口
-        checks = _run_sanity_checks()
-        l3_ok = all("✅" in v for v in checks.values())
-        report["layers"]["L3"] = "✅ 全接口通过" if l3_ok else "⚠️ 部分接口异常"
-        report["details"]["L3_checks"] = checks
-        if l3_ok: report["passed"] += 1
-    except Exception as e:
-        logger.warning(f"full_sanity: 局部导入失败: from functools import lru_cache", exc_info=True)
-        report["layers"]["L3"] = f"❌ {e}"
-    report["total"] += 1
+    for layer, check, warning, failure in _LAYER_CHECKS:
+        try:
+            layer_status, layer_passed, details = check()
+        except Exception as e:
+            logger.warning(warning, exc_info=True)
+            layer_status = failure(e)
+            layer_passed = False
+            details = {}
+        report["layers"][layer] = layer_status
+        if layer_passed:
+            report["passed"] += 1
+        report["details"].update(details)
+        report["total"] += 1
 
     # 总结
     status = "🎉 全部通过" if report["passed"] == report["total"] else f"⚠️ {report['passed']}/{report['total']} 通过"
@@ -499,7 +500,6 @@ def search_semantic(query: str, limit: int = 10) -> list:
         expanded_query = " ".join(expanded[:8])
     except Exception:
         logger.warning(f"search_semantic: 静默异常", exc_info=True)
-        pass
 
     results = []
     try:
@@ -508,7 +508,6 @@ def search_semantic(query: str, limit: int = 10) -> list:
         results = router.search(expanded_query, limit)
     except Exception:
         logger.warning(f"search_semantic: 静默异常", exc_info=True)
-        pass
 
     if not results:
         try:
@@ -517,7 +516,6 @@ def search_semantic(query: str, limit: int = 10) -> list:
             results = _tfidf_search(query, limit)
         except Exception:
             logger.warning(f"search_semantic: 静默异常", exc_info=True)
-            pass
     if not results:
         try:
             from sandglass_vault import search as vs
@@ -610,7 +608,6 @@ def search_filter(query: str) -> dict:
             result["stage_context"] = cross["evolution"]
     except Exception:
         logger.warning(f"search_filter: 静默异常", exc_info=True)
-        pass
 
     # ── 决策粒子权重注入（主人说的：记忆库学得好→拿着决策粒子和偏移率去强化搜索滤镜）──
     try:
@@ -629,7 +626,6 @@ def search_filter(query: str) -> dict:
                 result["decision_bias"] = f"近期决策倾向：{'、'.join(top)}"
     except Exception:
         logger.warning(f"search_filter: 静默异常", exc_info=True)
-        pass
 
     # 偏移引导 — 根据画像自动偏置搜索方向
     try:
@@ -639,7 +635,6 @@ def search_filter(query: str) -> dict:
             result["decision_bias"] = prefix + result.get("decision_bias", "")
     except Exception:
         logger.warning(f"search_filter: 静默异常", exc_info=True)
-        pass
 
     # ── 影子沙注入（脱口而出层的实体标签 → 搜索权重）──
     try:
@@ -683,7 +678,6 @@ def search_filter(query: str) -> dict:
                 result["shadow_context"] = f"影子沙命中{len(sh)}条, 实体{len(entities)}个"
     except Exception:
         logger.warning(f"search_filter: 静默异常", exc_info=True)
-        pass
 
     # ── 决策粒子全量数据扩展（吃决策历史推断搜索意图）──
     dp_path = os.path.join(_VAULT, "decision_particles.txt")
@@ -696,7 +690,6 @@ def search_filter(query: str) -> dict:
                 dp_context = "## 近期决策\n" + "".join(lines)
         except Exception:
             logger.warning(f"search_filter: 静默异常", exc_info=True)
-            pass
 
     # ── 时间范围感知 ──
     time_hint = _parse_time_range(query)
@@ -715,7 +708,6 @@ def search_filter(query: str) -> dict:
             offset_dir = comp["direction"]
     except Exception:
         logger.warning(f"search_filter: 静默异常", exc_info=True)
-        pass
 
     # ── 四维扩展（有 API Key 时）──
     expanded = _infer_expand_with_context(query, 
@@ -931,7 +923,6 @@ def stage_brief() -> str:
             lines.append(f"\n📊 偏移率: {comp['offset']:+d}%（{d}），{comp['sample']}次决策")
     except Exception:
         logger.warning(f"stage_brief: 静默异常", exc_info=True)
-        pass
 
     # 场景-阶段矩阵热力图摘要
     try:
@@ -941,7 +932,6 @@ def stage_brief() -> str:
             lines.append(f"   {ssm['insight']}")
     except Exception:
         logger.warning(f"stage_brief: 静默异常", exc_info=True)
-        pass
 
     # 高权重标签
     try:
@@ -953,7 +943,6 @@ def stage_brief() -> str:
                 lines.append(f"\n🔑 高权重标签: {', '.join(top)}")
     except Exception:
         logger.warning(f"stage_brief: 静默异常", exc_info=True)
-        pass
 
     # 最近 3 条决策
     try:
@@ -969,7 +958,6 @@ def stage_brief() -> str:
                         lines.append(f"  {parts[0][:10]} {parts[1][:30]} → {parts[2][:30]} ({parts[3]})")
     except Exception:
         logger.warning(f"stage_brief: 静默异常", exc_info=True)
-        pass
 
     lines.append(f"\n沙漏: {total}条")
 
@@ -978,7 +966,6 @@ def stage_brief() -> str:
         lines.append(f"\n{entropy_chart()}")
     except Exception:
         logger.warning(f"stage_brief: 静默异常", exc_info=True)
-        pass
 
     # 新场景发现 → 频率巩固触发器
     try:
@@ -997,7 +984,6 @@ def stage_brief() -> str:
                     lines.append(f"\n🔍 阶段验证: {f.get('stage','?')}需细化")
     except Exception:
         logger.warning(f"stage_brief: 静默异常", exc_info=True)
-        pass
 
     # 自动蒸馏----每50条新沙子触发一次
     try:
@@ -1011,12 +997,10 @@ def stage_brief() -> str:
             try: lines.append(local_distill("daily"))
             except Exception:
                 logger.warning(f"stage_brief: 静默异常", exc_info=True)
-                pass
             with open(last_distill, "w") as f:
                 f.write(str(total))
     except Exception:
         logger.warning(f"stage_brief: 静默异常", exc_info=True)
-        pass
 
 
     return "\n".join(lines)
@@ -1123,7 +1107,6 @@ def _should_synthesize() -> tuple[bool, str]:
             current_stage_name = log[-1].get("stage", "")
     except Exception:
         logger.warning(f"_should_synthesize: 静默异常", exc_info=True)
-        pass
     if current_stage_name and current_stage_name != last.get("stage", ""):
         return True, f"stage_switch:{last.get('stage','?')}→{current_stage_name}"
 
@@ -1134,7 +1117,6 @@ def _should_synthesize() -> tuple[bool, str]:
             return True, f"offset_threshold:{comp['offset']:+.0f}%"
     except Exception:
         logger.warning(f"_should_synthesize: 静默异常", exc_info=True)
-        pass
 
     # ③ 沙子 +100
     last_count = last.get("sand_count", 0)
@@ -1156,7 +1138,6 @@ def _save_annotation(data: dict, trigger: str) -> None:
                 current_stage = log[-1].get("stage", "?")
         except Exception:
             logger.warning(f"_save_annotation: 静默异常", exc_info=True)
-            pass
 
         annotation = {
             "stage": current_stage,
@@ -1176,7 +1157,6 @@ def _save_annotation(data: dict, trigger: str) -> None:
             f.write(json.dumps(annotation, ensure_ascii=False) + "\n")
     except Exception:
         logger.warning(f"_save_annotation: 静默异常", exc_info=True)
-        pass
 
 def _latest_annotation() -> dict:
     """读最新一条阶段注解。无注解返回空 dict。"""

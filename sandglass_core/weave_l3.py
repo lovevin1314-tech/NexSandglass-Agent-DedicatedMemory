@@ -65,7 +65,6 @@ def weave_insight(topic: str) -> dict:
                 result["thread_view"] = thread["summary"]
     except Exception:
         logger.warning(f"weave_insight: 静默异常", exc_info=True)
-        pass
 
     # 织：四条线合成
     synthesis = []
@@ -393,7 +392,6 @@ def weave_output(query: str = "", limit: int = 5) -> dict:
             result["keywords"].extend(scenes[:3])
     except Exception:
         logger.warning(f"weave_output: 静默异常", exc_info=True)
-        pass
     
     # 4. 偏移率方向
     try:
@@ -409,7 +407,6 @@ def weave_output(query: str = "", limit: int = 5) -> dict:
             result["offset_guide"] = f"放弃倾向({offset_val:+d}%) — 可能厌倦或想换方向"
     except Exception:
         logger.warning(f"weave_output: 静默异常", exc_info=True)
-        pass
     
     # 5. 情绪温度
     try:
@@ -423,7 +420,6 @@ def weave_output(query: str = "", limit: int = 5) -> dict:
             result["emotion_note"] = "高熵期 — 情绪波动大，谨慎建议"
     except Exception:
         logger.warning(f"weave_output: 静默异常", exc_info=True)
-        pass
     
     # 去重关键词
     result["keywords"] = list(dict.fromkeys(result["keywords"][:10]))
