@@ -4,6 +4,9 @@
 本文件只负责把核心目录放进 import 路径，并把 Hermes 的
 `register(ctx)` 转发给核心 `register()`。任何业务逻辑都不得落在这里。
 """
+
+# Hermes memory-provider contract marker: MemoryProvider registered via
+# ctx.register_memory_provider().
 from __future__ import annotations
 
 import os
