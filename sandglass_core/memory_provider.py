@@ -27,7 +27,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # 版本号由主人最终确认，熔炼迭代禁止自行 bump。
-__version__ = "3.1.3"
+__version__ = "3.1.4"
 
 # 工具方法——把 sandglass 函数暴露给 Hermes 模型调用
 
@@ -52,6 +52,8 @@ class NexSandglassProvider(MemoryProvider):
         self._lock = threading.Lock()
         self._initialized = False
         self._turn_count = 0
+        # V3.1.4 哨兵——落沙断链检查（日期变更后首轮注入时触发，见 _sand_sentinel_alert）
+        self._sentinel_last_day: str = ""
         # 阶段一——注入块内容hash缓存 + prefetch 3轮去重（纯内存，跨会话重置）
         self._session_id = ""
         self._inject_cached_hash: Optional[str] = None
@@ -423,6 +425,14 @@ class NexSandglassProvider(MemoryProvider):
             except Exception:
                 logger.warning("system_prompt_block 画像溯源检查失败", exc_info=True)
 
+            # V3.1.4 落沙断链哨兵——每日首轮注入检查，异常直接注入报警（agent 每轮可见）
+            try:
+                _sand_alert = self._sand_sentinel_alert()
+                if _sand_alert:
+                    blocks.append(f"【🚨 系统告急】\n{_sand_alert}")
+            except Exception:
+                logger.warning("system_prompt_block 落沙哨兵失败", exc_info=True)
+
             layer2 = []
             # 情绪状态
             if mood != "平稳":
@@ -650,8 +660,67 @@ class NexSandglassProvider(MemoryProvider):
                 part for part in (str(user_msg or ""), str(assistant_msg or "")) if part
             ])
             self._turn_count += 1
+            # V3.1.4 哨兵：落沙后验证真实落盘（写失败/路径漂移在此暴露）
+            try:
+                from sandglass_paths import _SANDGLASS
+                from datetime import datetime as _dt
+                marker = f"| agent |"
+                with open(_SANDGLASS, "r", encoding="utf-8", errors="replace") as _f:
+                    for _line in _f.readlines()[-3:]:
+                        if marker in _line and _line.startswith(_dt.now().strftime("%Y-%m-%d")):
+                            self._sentinel_ok_today = True
+                            break
+            except Exception:
+                logger.warning("sync_turn 哨兵验证失败", exc_info=True)
         except Exception:
             logger.warning("sync_turn 落沙失败", exc_info=True)
+            # V3.1.4 哨兵：落沙异常必须留痕，不能静默——写告急标记供注入层报警
+            try:
+                from sandglass_paths import _NB as _nb_home
+                from datetime import datetime as _dt
+                with open(os.path.join(_nb_home, ".sand_write_failed"), "w") as _f:
+                    _f.write(_dt.now().isoformat())
+            except Exception:
+                logger.warning("sync_turn 告急标记写入失败", exc_info=True)
+
+    def _sand_sentinel_alert(self) -> str:
+        """V3.1.4 落沙断链哨兵。每日首轮注入触发一次检查：
+        ① .sand_write_failed 标记存在 → 写层告急
+        ② 今天已过 20:00 且当天沙漏零新增 → 疑似断链（provider 未激活/静默禁用）
+        返回告警文本（无异常返回空串）。检查结果缓存到次日，避免每轮重复读盘。"""
+        try:
+            from datetime import datetime as _dt
+            today = _dt.now().strftime("%Y-%m-%d")
+            if self._sentinel_last_day == today:
+                return getattr(self, "_sentinel_cached_alert", "")
+            self._sentinel_last_day = today
+            alert = ""
+            # ① 写失败标记
+            from sandglass_paths import _NB as _nb_home
+            fail_flag = os.path.join(_nb_home, ".sand_write_failed")
+            if os.path.exists(fail_flag):
+                with open(fail_flag) as f:
+                    alert = f"🔴 沙漏写层告急：上次落沙失败于 {f.read().strip()}。检查磁盘/路径，修复后删除 .sand_write_failed"
+            # ② 当日零落沙（20:00 后才判，避免清晨误报）
+            elif _dt.now().hour >= 20:
+                from sandglass_paths import _SANDGLASS
+                today_new = 0
+                if os.path.exists(_SANDGLASS):
+                    with open(_SANDGLASS, "r", encoding="utf-8", errors="replace") as f:
+                        for line in f:
+                            if line.startswith(today):
+                                today_new += 1
+                if today_new == 0 and self._turn_count > 0:
+                    alert = ("🔴 沙漏断链疑警：今天已有多轮对话但零落沙！"
+                             "检查 memory.provider 是否激活（hermes config get memory.provider）、"
+                             "插件是否被静默禁用（参考 9/28 事故）。")
+            self._sentinel_cached_alert = alert
+            if alert:
+                logger.warning(f"落沙哨兵报警: {alert}")
+            return alert
+        except Exception:
+            logger.warning("_sand_sentinel_alert 失败", exc_info=True)
+            return ""
 
     def shutdown(self) -> None:
         """清理。"""
