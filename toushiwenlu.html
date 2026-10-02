@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>投石问路 — 五维权重 → 沙子</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#c9d1d9;font:14px/1.8 'Segoe UI',system-ui,sans-serif;padding:30px}
+h1{color:#58a6ff;font-size:22px;text-align:center;margin-bottom:30px}
+.flow{display:flex;flex-direction:column;align-items:center;gap:0}
+.box{background:#161b22;border:2px solid #30363d;border-radius:8px;padding:12px 20px;text-align:center;min-width:200px}
+.dim{display:flex;gap:10px;margin:20px 0}
+.dim .item{flex:1;background:#0d419d;border-radius:6px;padding:10px;text-align:center;font-size:12px}
+.dim .item strong{display:block;color:#7ee787;font-size:14px;margin-bottom:4px}
+.arrow{color:#f0883e;font-size:28px;text-align:center;margin:5px 0}
+.stone{background:#8957e5;color:#fff;font-size:18px;padding:15px 40px;border-radius:12px;border:3px solid #a371f7}
+.grain{background:#da3633;color:#fff;font-size:16px;padding:10px 30px;border-radius:6px;border:2px solid #f85149}
+.note{color:#8b949e;font-size:11px;text-align:center;margin-top:10px}
+.side{display:flex;gap:30px;margin:20px 0}
+.sidebox{flex:1;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:15px}
+.sidebox h3{color:#f0883e;margin-bottom:8px}
+.sidebox code{color:#7ee787;display:block;margin:3px 0}
+</style></head>
+<body>
+<h1>投石问路 — 五维权重 → 精准定位沙子</h1>
+
+<div class="side">
+  <div class="sidebox">
+    <h3>🔍 用户搜索</h3>
+    <code>"加密方案"</code>
+  </div>
+  <div class="sidebox">
+    <h3>⚖️ search_filter() 五维权重计算</h3>
+    <div class="dim">
+      <div class="item"><strong>场景 ×1.5</strong>当前场景匹配</div>
+      <div class="item"><strong>画像 ×1.3</strong>主人偏好增强</div>
+      <div class="item"><strong>阶段 ×0.7</strong>历史阶段偏置</div>
+      <div class="item"><strong>粒子 ×1.2</strong>决策粒子助推</div>
+      <div class="item"><strong>偏移 ×1.3</strong>省钱→开源/花钱→付费</div>
+    </div>
+    <code style="color:#7ee787">weights = {"加密":1.3, "DPAPI":1.95, "开源":1.56, ...}</code>
+  </div>
+</div>
+
+<div class="flow">
+  <div class="arrow">↓ 五条线汇聚 ↓</div>
+  <div class="stone">🪨 投石问路（第二层）<br><small>search() → idx 倒排查表 → 候选行号</small></div>
+  <code style="color:#7ee787;margin:8px">token:"加密" → idx["加密"] → [278,651,660,...]<br>token:"DPAPI" → idx["DPAPI"] → [278,651,...]</code>
+  <div class="arrow">↓ 五维权重排序 ↓</div>
+  <code style="color:#f0883e">scored = Σ weight(token)×偏移方向 × 行号命中数<br>L278: DPAPI(1.95)+加密(1.3)+开源(1.56)=4.81 🥇<br>L651: DPAPI(1.95)+加密(1.3)=3.25 🥈<br>L660: 加密(1.3)=1.3 🥉</code>
+  <div class="arrow">↓ 石头落下 ↓</div>
+  <div class="grain">📜 沙子 L278<br>"Code review the NeuroBase sandglass memory system. Two files [DPAPI]"</div>
+  <div class="note">五条线汇聚成一块石头 → 石头精准砸中那颗沙子</div>
+</div>
+</body></html>

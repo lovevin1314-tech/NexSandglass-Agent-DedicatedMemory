@@ -1,2 +1,0 @@
-[console_scripts]
-nexsandglass = sandglass_vault:main
