@@ -323,15 +323,32 @@ def _pipe_build(first_line: int, last_line: int, total: int) -> str:
 
 
 def _sync_five_facets(first_line: int = 0, last_line: int = 0, total: int = 0):
-    """V2.9.24: 管道自动生成 five-facets.json — 用户零操作。 从 persona.md + iron_rules.txt + offset + fact_tags 聚合。"""
+    """V3.1.5: 管道自动生成 five-facets.json — 合并模式，保留手动条目。
+    从 persona.md + iron_rules.txt 聚合，与现有数据合并：
+    - source != 'pipe' 的手工条目永久保留（human 优先于 auto）
+    - pipe 条目按 title 去重后追加
+    - preference 全保留（pipe 不生成）
+    设计原案: PR #33 by delphi1979 (2026-06-17) — 本版按 V3.1.4 代码基重写并采纳。
+    """
     import json
     ff_path = os.path.join(_NB, "profile", "five-facets.json")
     now = datetime.now().strftime("%Y-%m-%d")
-    
-    ff = {"_schema": "five-facet-profile-v1", "_updated": now, "_source": "pipe-auto"}
-    
-    # fact: 从 persona.md 提取
-    ff["fact"] = []
+
+    # 加载现有数据（合并模式——不丢手工条目）
+    existing: dict = {}
+    if os.path.exists(ff_path):
+        try:
+            with open(ff_path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                existing = loaded
+        except Exception:
+            logger.warning("_sync_five_facets: 现有 five-facets.json 解析失败，按空处理", exc_info=True)
+
+    ff = {"_schema": "five-facet-profile-v1", "_updated": now, "_source": "pipe-auto+manual"}
+
+    # fact: 从 persona.md 提取 pipe 条目，与现有手工条目合并
+    pipe_facts = []
     if os.path.exists(_PERSONA):
         with open(_PERSONA, "r", encoding="utf-8", errors="replace") as f:
             persona_text = f.read()
@@ -339,20 +356,37 @@ def _sync_five_facets(first_line: int = 0, last_line: int = 0, total: int = 0):
             line = line.strip()
             if line.startswith("- **") and "：" in line:
                 key, val = line.replace("- **", "").split("：", 1)
-                ff["fact"].append({"title": key.strip(), "content": val.strip()[:80],
+                key = key.strip().rstrip("*").strip()   # V3.1.5: 剥残留 **，否则去重 key 不一致
+                pipe_facts.append({"title": key, "content": val.strip()[:120],
                                    "importance": 0.8, "confidence": 0.9, "source": "pipe", "updated": now})
-    
-    # restriction: 从 iron_rules.txt
-    ff["restriction"] = []
+    seen_titles: set = set()
+    ff["fact"] = []
+    for item in existing.get("fact", []):
+        if isinstance(item, dict) and item.get("source") != "pipe":
+            ff["fact"].append(item)          # 手工条目永久保留
+            seen_titles.add(item.get("title", ""))
+    for item in pipe_facts:
+        if item["title"] not in seen_titles:
+            ff["fact"].append(item)          # pipe 新条目按 title 去重追加
+            seen_titles.add(item["title"])
+
+    # preference: 全保留（pipe 不生成 preference）
+    ff["preference"] = [i for i in existing.get("preference", []) if isinstance(i, dict)]
+
+    # restriction: 从 iron_rules.txt 重建 pipe 侧，保留手工条目
+    pipe_restrictions = []
     ir_path = os.path.join(_NB, "iron_rules.txt")
     if os.path.exists(ir_path):
         with open(ir_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line:
-                    ff["restriction"].append({"title": line[:30], "content": line,
+                    pipe_restrictions.append({"title": line[:30], "content": line,
                                               "importance": 1.0, "confidence": 1.0, "source": "iron_rules", "updated": now})
-    
+    manual_restrictions = [i for i in existing.get("restriction", []) if isinstance(i, dict) and i.get("source") not in ("iron_rules", "pipe")]
+    seen_rt: set = {i.get("content", "") for i in pipe_restrictions}
+    ff["restriction"] = manual_restrictions + [i for i in pipe_restrictions if i["content"] not in seen_rt or True]
+
     try:
         os.makedirs(os.path.dirname(ff_path), exist_ok=True)
         with open(ff_path, "w", encoding="utf-8") as f:
