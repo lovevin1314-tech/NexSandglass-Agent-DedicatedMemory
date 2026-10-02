@@ -382,6 +382,8 @@ def _synonym_expand(query: str) -> list:
             from l3_search_core import _tfidf_search
             results = _tfidf_search(query, limit=3)
             for _, _, text in results:
+                if not isinstance(text, str):
+                    continue  # V3.1.4: 纯数字等被上游解析成非字符串的行跳过
                 words = re.findall(r'[\u4e00-\u9fff]{2,}|[a-zA-Z]{3,}', text)
                 for w in words:
                     if w.lower() not in seen and len(w) > 1:
@@ -430,7 +432,10 @@ def _tfidf_search(query: str, limit: int = 10) -> list:
         d_norm = math.sqrt(sum(v**2 for v in d_vec.values())) or 1
         sim = dot / (q_norm * d_norm) if (q_norm * d_norm) > 0 else 0
         if sim > 0.05:
-            results.append((ln, candidates[ln][:100], round(sim, 3)))
+            snippet = candidates[ln]
+            if not isinstance(snippet, str):
+                snippet = str(snippet)  # V3.1.4: 纯数字行等非字符串统一转 str
+            results.append((ln, snippet[:100], round(sim, 3)))
     results.sort(key=lambda x: x[2], reverse=True)
     return results[:limit]
 
