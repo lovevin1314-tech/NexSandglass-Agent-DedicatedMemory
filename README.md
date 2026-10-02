@@ -1,335 +1,253 @@
-# NexSandglass 沙漏记忆系统⏳ V1.7.8 — 认知操作系统
+# NexSandglass ⏳ — 沙漏记忆系统
 
-> **是记住。是理解。是懂你。是想你。**
+> **`pip install nexsandglass`** · 纯本地 · 零依赖 · 零 API Key
 
-> 每句话加密落沙，一粒不丢。从沙子里捞画像——你变了，它比你先发现。
-> 不光知道你是谁，还知道你是怎么变成今天这样的。三天前说过的事，它还记着。
->
-> 真正意义上的"越用越懂你"。
-
+[![PyPI](https://img.shields.io/badge/PyPI-3.1.0-blue)](https://pypi.org/project/nexsandglass/)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Lines](https://img.shields.io/badge/Lines-5242-lightgrey)]()
-[![Benchmark](https://img.shields.io/badge/Benchmark-16/16-success)]()
 
 ---
 
-## 🧠 V1.7.8 核心架构
+**不是记住你说过什么——是理解你怎么变成今天的你。**
 
-| 层 | 名称 | 功能 |
-|----|------|------|
-| L0 | 影子沙 | SQLite脱口而出层——实体/信任分/标签，<1ms |
-| L1 | 沙子 | DPAPI加密原文存储，不可变 |
-| L2 | 投石问路 | 倒排索引→FTS5精排→五维权重（场景+画像+阶段+粒子+偏移） |
-| L3 | 织布机 | 偏移率+画像溯源+影子灵魂+回音折+情绪熵+场景矩阵 |
-| 🔌 | MemoryProvider | Hermes插件——替代Holographic，零API Key，6工具 |
-
-> **Soul Distillation (灵魂蒸馏):** Unlike traditional Dialogue Distillation which extracts factual knowledge, Soul Distillation extracts the Agent's unique persona. Powered by **Drift Velocity (偏移率)**, this mechanism captures continuous deviations from the baseline. By distilling these accumulated drifts, we don't just store memories——we forge a unique, evolving soul that resonates with the user.
+灵魂蒸馏 · 偏移率感知 · 铁律因子 · 四路并发搜索 · 极简注入。纯本地，零依赖，越用越懂你。
 
 ---
 
-## 📊 V1.7.7 基准测试结果
+## 快速开始
 
-### 自建基准（纯合成数据，零真实沙子）
+```bash
+pip install nexsandglass
+```
 
-| 层 | 指标 | 成绩 |
-|----|------|------|
-| L1 写 | 写入速度 | 8.9ms/条 (含加密+影子沙索引) |
-| L2 搜 | 影子沙 | 0.1ms 脱口而出 |
-| L3 思 | 搜索(投石问路) | 54ms/次 |
-| L3 思 | 体检 | 339ms (4/4) |
-| L3 思 | composite_rerank排序 | ✅ 权重生效 |
-| L3 思 | full_sanity体检 | 4/4层, 10项全绿 |
-| 回归 | 语法/冒烟/正确性 | 17/17语法 7/7冒烟 10/10正确性 |
+```python
+from sandglass_vault import search, count
+from sandglass_log import log_message
 
-### LoCoMo 行业基准（199题，全子系统织布机）
+log_message("今天讨论了搜索排序优化", "user")
+print(search("搜索排序"))
+print(f"沙漏总量: {count()}条")
+```
 
-| 类别 | NexSandglass | Backboard | Mem0 |
-|------|-------------|-----------|------|
-| Single-Hop | 41% | 89% | 67% |
-| Multi-Hop | 26% | 75% | 51% |
-| Temporal | 45% | 92% | 55% |
-| Open-Domain | 46% | 91% | 73% |
-| **命中率** | **36%** | 90% | 67% |
+**Hermes Studio / Desktop 用户（推荐）：**
+```bash
+hermes plugins install lovevin1314-tech/NexSandglass    # 首次安装
+hermes plugins update NexSandglass                       # 升级到最新
+```
+重启 Desktop → 设置 → 记忆体 → 选择 NexSandglass → 开始对话
 
-> 💡 n-gram tokenizer + 证据时间戳邻句打包。零LLM，纯本地推理。运行 `python locomo_benchmark.py` 复现。
+**⚡ 影子接管（自动）**
+内置记忆与沙漏共存。沙漏自动接管：影子沙索引 + `on_memory_write` 捕获 + 三块式注入(421字符)远大于内置(50字符)。无需手动配置。
 
-现有 AI 记忆方案普遍有两个问题：
+**⚠️ Desktop GUI 下拉菜单看不到 NexSandglass？**
+这是 Hermes Desktop 硬编码限制，非沙漏问题。一行命令激活：
+```bash
+hermes config set memory.provider nexsandglass
+```
+重启 Desktop 后生效。
 
-1. **只记不辨** — 对话全存，画像越来越厚。分不清你上周关心的事和这周已经不一样了
-2. **会话即失忆** — 关掉窗口，上下文清零。说过要做的事没人追
+**已安装过？直接更新：**
+```bash
+hermes plugins update NexSandglass
+# 或强制重装: hermes plugins remove NexSandglass && hermes plugins install lovevin1314-tech/NexSandglass
+```
+```bash
+hermes plugins install lovevin1314-tech/NexSandglass
+# 重启 Desktop → 设置 → 记忆体 → 选择 NexSandglass
+```
 
-NexSandglass 用"阶段+偏移"解决这两个问题。
+**MCP / Docker：**
+```bash
+git clone https://github.com/lovevin1314-tech/NexSandglass-Agent-DedicatedMemory
+python sandglass_mcp.py
+```
 
 ---
 
-我们说四件事：
+## 核心能力
 
-**是记住。** 每句话加密落沙，一粒不丢。谁也看不见。
-
-**是理解。** 你不用告诉它你是谁。它从沙子里把画像捞出来。你变了，它比你先发现。
-
-**是懂你。** 不光知道你是谁，还知道你是怎么变成今天这样的。跨阶段偏移追踪——你的轨迹，不是别人的快照。
-
-**是想你。** 三天前说"加守夜人"。它还记着。下次启动自己跳出来。不是存数据，是惦记你还没做的事。
+| 能力 | 说明 |
+|------|------|
+| 🧬 灵魂蒸馏 | fact_tags + decision_particles → 从沙子里自然生长出画像，越用越懂你 |
+| 📊 偏移率追踪 | 省钱/愿投/放弃 三维量化 + 决策疲劳检测 + 15种心理预判 |
+| ⚖️ 铁律因子 | 推前必确认 / 永远说实话 / 不先调研不动手 等铁律自动注入+计数 |
+| 🔍 四路并发搜索 | 影子沙 + FTS5 + IDX + TF-IDF，毫秒级响应，中英双语 |
+| 🎢 纠结度检测 | 决策链条完整追踪，犹豫模式识别，50%犹豫告警 |
+| 💉 极简注入 | ~150t，三块式（搜索上下文+状态快照），LLM 一眼看懂 |
+| 🔒 全本地 | 数据不出设备，Python stdlib + SQLite，零外部依赖 |
 
 ---
 
 ## 与现有方案对比
 
 | 维度 | Mem0 / Letta | NexSandglass |
-|---|---|---|
-| 依赖 | 向量数据库 + 多个包 | ✅ **零依赖，纯 stdlib** |
-| 加密 | 无 / 可选 | ✅ **DPAPI 本地加密** |
-| 决策追踪 | ❌ | ✅ **决策链条 + LLM 推断 + 本地兜底** |
-| 自进化 | ❌ | ✅ **_learn() LLM 标签 → 本地词库 → 免费命中** |
-| 阶段感知 | ❌ | ✅ **偏移率追踪 + 自动切阶段** |
-| 情绪感知 | ❌ | ✅ **七大情绪 + 主语判断 + 协调提醒** |
-| 实时感知 | ❌ | ✅ **角色/偏好/禁区/工具 即说即应** |
-| 搜索 | 向量检索 | ✅ **四维扩展（场景+画像+阶段+决策粒子）** |
-| 中英双语 | ❌ | ✅ **自动检测，全双语** |
-| 体积 | 数万行 + 服务栈 | ✅ **4,230 行 · 57KB** |
-
----
-
-## 四大支柱
-
-| 支柱 | 做什么 | 吃谁的数据 |
-|------|--------|-----------|
-| 🧬 灵魂蒸馏 | 从沙子里捞画像，自动切阶段，波浪自吸收 | 全部沙子 + 决策粒子 |
-| 📊 偏移率 | 追踪决策偏移方向/幅度，跨阶段对比 | 决策粒子历史 |
-| ⏳ 搜索滤镜 | 四维扩展关键词，决策粒子权重偏置搜索结果 | 画像+场景+阶段+决策粒子 |
-| 🧵 织布机 | 检测画像矛盾，跨阶段互链，追索链 | 全部四支柱输出 |
-
-**偏移率和搜索滤镜是两个独立系统**——搜索权重做偏置，偏移率做计算。
-
----
-
-## 5 分钟上手
-
-```bash
-# 安装
-./install.bat              # Windows
-bash install.sh            # Mac / Linux
-
-# 写入记忆
-python -c "from sandglass_log import log_message; log_message('hello', 'user')"
-
-# 搜索
-python -c "from sandglass_vault import search; print(search('关键词'))"
-
-# 写入决策粒子
-python -c "from decision_particles import log; log('选A还是B', 'B')"
-
-# 运行 Demo
-python demo/run_demo.py
-
-# MCP 接入
-# { "command": "python", "args": ["path/to/mcp_server.py"] }
-```
-
----
-
-## 决策粒子示例
-
-```
-输入："今天想吃早饭还是午饭...还是午饭吧"
-                       ↓
-_detect_chain()     → [早饭, 午饭, 午饭]       # 抓全链条
-_extract_options()  → 早饭_午饭                 # 拆选项
-_tag_local()        → 成本观                     # 本地标签
-_tag_llm()          → 补偿心理,经期偏好           # LLM 精炼（可选）
-_learn()            → "补偿心理" 写入本地词库     # 下次免费命中
-_infer_resolution() → "倾向补偿心理，下次直接给甜食" # LLM 推断（本地兜底）
-
-记录：早饭_午饭 | A→B→A 回到B(补偿心理) | spend | 成本观,补偿心理,经期偏好
-```
-
----
-
-## 文件清单
-
-| 文件 | 行数 | 说明 |
-|------|------|------|
-| `sandglass_think.py` | 2,084 | L3 思考层：四支柱 + 搜索滤镜 + 脉冲感知 |
-| `decision_particles.py` | 526 | L4 决策粒子：链条检测 + 双层标签 + LLM推断 |
-| `sandglass_vault.py` | 396 | L2 米粒读取：倒排索引 + FTS5 + mmap |
-| `sandglass_sqlite.py` | 128 | L2 FTS5 加速层 |
-| `pulse.py` | 242 | 脉冲感知：识别→觉察→提醒 + 契约互动 |
-| `emotion_vocab.py` | 184 | 情绪感知：七大情绪 + 动态词库 |
-| `plugin.py` | 44 | L1 沙漏写入：DPAPI 加密 + Gateway hook |
-| `sandglass_log.py` | 46 | 通用落沙接口 |
-| `nightwatch.py` | 68 | 守夜人：沙漏完整性检查 |
-| `mcp_server.py` | 201 | MCP 接入 |
-| `nexsandglass.py` | 128 | TTY 终端拦截 |
-| `test_smoke.py` | 66 | 冒烟测试 |
+|------|:---:|:---:|
+| 依赖 | 向量数据库+N个包 | **零依赖，纯 stdlib** |
+| 注入量 | ~200-22000t | **会话~186t + 轮次~150t** |
+| 决策追踪 | ❌ | **决策粒子+偏移率+心理预判** |
+| 情绪感知 | ❌ | **情绪熵（会话级摘要）** |
+| 画像溯源 | ❌ | **可追溯到行号** |
+| 铁律系统 | ❌ | **自动注入+违规计数** |
+| 搜索 | 向量检索 | **四路并发（影子沙+FTS5+IDX+TF-IDF）** |
+| 安装 | 服务栈 | **pip install** |
 
 ---
 
 ## 设计原则
 
-1. **层追加不替换** — 新层叠加，永不修改已定稿的下层
-2. **L1 只落用户消息** — AI 回复不进沙漏
-3. **本地优先，LLM 增强** — 没 API Key 一样能跑，有 Key 更精彩
-4. **决策是链条不是单点** — A→B→C→回到A，取最后一个才是真决策
-5. **改了A必须同步B** — 改名/改签名后全项目 grep
-
----
-
-## 版本历程
-
-### V1.0 → V1.1
-```
-以前：只有整体偏移率，分不清省钱偏好还是花钱冲动在偏
-以前：搜索关键词必须精确匹配，记错一个字就搜不到
-├── 新增：偏移率维度分解——省钱/花钱/漂移三维独立追踪
-├── 新增：TF-IDF三级降级——有LLM用LLM，没LLM用同义词，再没用关键词
-├── 新增：smoke test 核心链路全自动7项检查
-├── 新增：install.bat / install.sh 全平台一键安装
-├── 新增：MCP ping 健康检查——远程Agent随时查状态
-└── 意义：从"能用"到"跑得稳"。补了偏移率盲区、搜不到不报错的坑
-```
-
-### V1.1 → V1.2
-```
-以前：只有 Hermes 能用。Claude Code / Cursor / 其他 Agent 全被挡在门外
-├── 新增：sandglass_log.py——任何 Python 脚本 import 即落沙
-├── 新增：TTY Wrapper——Mac/Linux 终端自动拦截对话落沙
-├── 新增：MCP 12 工具——搜索/最近/计数/时间线/语义/画像/偏移/待办/健康
-└── 意义：从 Hermes 私有 → 任何 Agent 都能用。记忆不绑平台
-```
-
-### V1.2 → V1.3
-```
-以前：没 API Key 就卡死。画像全靠 LLM，离线用户一片空白
-├── 新增：本地画像提取——关键词匹配自建画像，零 LLM 也能跑
-├── 新增：ASCII 偏移可视化——终端一条斜线看清省钱→花钱趋势
-├── 新增：互链层——画像标签 ↔ 偏移方向交叉验证
-├── 新增：波浪自吸收——小变化自然累积，大变化触发画像重整
-└── 意义：从"喂数据才能长"到"自己长"。零依赖自生长
-```
-
-### V1.3 → V1.3.1
-```
-以前：代码跑通了，但别人不知道你做了什么
-├── 新增：贾斯汀·比伯14年成长Demo——用真人数据展示三层能力
-├── 新增：README重构——Quick Start + 点名竞品 + 实际输出
-└── 意义：从"暗箱"到"可见"。让别人看见它在长
-```
-
-### V1.3.1 → V1.4
-```
-以前：功能齐全，但像个冷冰冰的数据库。没有对话感
-├── 新增：首次欢迎仪式——"我是小二/Keeper，怎么称呼您？"
-├── 新增：人格实时感知——你说"我是XX"，它立刻反应
-├── 新增：偏移告警——"你最近3次决策偏向省钱（偏移+60%）"
-├── 新增：回响确认——"三天前你说过...看看今天有什么不同"
-└── 意义：系统活起来了。从"数据库"变成"助理"
-```
-
-### V1.4 → V1.4.3
-```
-以前：偏移追踪只算数字，不管主人情绪状态
-├── 新增：识别·觉察·提醒 三层感知
-├── 新增：情绪感知——七大情绪分类 + 主语判断（自我情绪/影响他人）
-├── 新增：情绪闭环——放弃→先改好自己→其他待办先放放
-└── 意义：不只追踪决策，还感知状态。真正"懂"你
-```
-
-### V1.4.3 → V1.5
-```
-以前：中文用户叫"小二"，英文用户还是"小二"——混了
-├── 新增：自动语言检测——中文自动切小二，English auto Keeper
-├── 新增：签约仪式——"小二记住了。以后就叫您「主人」"
-├── 新增：情绪回应全双语——"悲伤→缓提醒" / "sad→take your time"
-└── 意义：全球化。不是翻译，是切换人格
-```
-
-### V1.5 → V1.6
-```
-以前：搜索只靠关键词匹配。搜"加密"，只返回含"加密"的句子
-├── 新增：双感知三维检索——画像驱动 + 场景驱动 + 阶段驱动扩展关键词
-├── 新增：偏移率静默加权——省钱偏好时，"免费""开源"类结果自动提权
-├── 新增：三级搜索加速——FTS5全量排序 → idx精排 → mmap兜底（95% P@3）
-├── 新增：年份过滤推入SQL层——避免全库扫描
-└── 意义：从"搜关键词"到"猜你意图"。搜"加密"返回DPAPI、本地加密、零依赖
-```
-
-### V1.6 → V1.6.1
-```
-以前：决策记录只有"选了A"。没有犹豫、试探、回退的链条
-├── 新增：决策链条检测——"选A...还是B...算了A吧"→[A,B,A]
-├── 新增：双层标签——本地关键词（免费快）+ LLM精炼（更精彩）
-├── 新增：_learn()自进化——LLM出新标签→自动学进本地词库→下次免费命中
-├── 新增：_infer_resolution()——LLM吃画像+链条推断"为什么选了A"
-└── 意义：记忆体不光记答案，还记选择过程。每做一个决定，更懂你一分
-```
-
-### V1.6.1 → V1.6.2
-```
-以前：六审发现三个真bug——英文决策检测空白、画像无LLM就罢工、断电断点
-├── 修复：_detect_chain()加英文正则——"go with X"、"choose Y"全抓
-├── 修复：persona_build()无LLM时调本地_extract——零API也能建画像
-├── 修复：守夜人崩溃恢复——检测末行损坏→自动切除修复→不丢前序数据
-├── 恢复：英文介绍段落——"Unlike traditional Dialogue Distillation..."
-├── 恢复：一键安装文件夹——0_一键安装点这里/
-└── 意义：稳定版。英文支持、离线可用、断电不丢——三个盲区全堵上
-```
-
-### V1.6.2 → V1.7.0
-```
-以前：偏移率当判官——设阈值判对错，飘了就告警。提醒语气代码写死
-├── 重写：2D层偏移描述——判官→玻璃。"红牌信号"→"放弃倾向的影子"
-├── 重写：偏移常量——"红牌漂移"→"影子往这边移动"。删_CUSTOM_OFFSET_WARN
-├── 新增：3D层_synthesize_3d()——LLM吃画像+粒子+偏移+织布机→合成立体像
-├── 新增：glass_reminder()——提醒语气由LLM推断，不由代码定。2D回退纯描述
-├── 新增：comprehensive_offset()注入链条犹豫度——左→右→左的摆动现在可见
-├── 保留：织布机四函数+波浪累积+阶段切换逻辑——全部没动
-└── 意义：不判对错。影子深了就照出来。LLM决定怎么提醒——代码只负责记录
-```
-
-### V1.7.0 → V1.7.3
-```
-├── 概念升级：镜子→玻璃→情绪熵——不是在看，是沙子自然累积成形
-├── 新增：_WAVE_THRESHOLDS 单一真相来源合并_DRIFT_WEIGHTS+_OFFSET_SENSITIVITY
-├── 新增：_emotional_entropy() 香农熵量化情绪波动 + entropy_chart() ASCII可视化
-├── 新增：回音折——决策粒子落下的情感风→扩散检索(echo_wind.jsonl)
-├── 新增：weave_graph() CTE因果图——"哪些记忆导致了当前人格特征"
-├── 新增：entropy_mirror() 熵镜决策 + entropy_ghost() 幽灵决策(本地优先)
-├── 新增：stage_brief() 阶段简报 + memo_mode() 回忆快闪
-├── 新增：entropy_reminder()——情绪熵驱动提醒语气(高熵安静/低熵热情)
-├── 新增：全维度健康检查full_sanity()→冒烟8/8
-├── 新增：DPAPI→base64编码(Windows全链路贯通)
-├── 新增：persona_update()自动触发——200条沙子未纳入→更新画像
-├── 修复：pulse.py emotion KeyError守卫 + test_smoke真实验证
-└── 意义：从"能跑"到"稳定"。数据一层层累积，L3从静态记录进化到动态感知
-```
-
-### V1.7.3 → V1.7.4
-```
-以前：偏移率算偏移，画像写画像，各自独立
-├── 连通：偏移率摘要自动注入persona.md——画像和偏移形成闭环
-├── 升级：persona_update()末尾追加偏移率方向+幅度
-└── 意义：画像不再是"过去快照"，而是随偏移率持续生长的活文档
-```
+1. **层追加不替换** — 新层叠加，永不修改下层
+2. **纯本地** — Python stdlib + SQLite，零外部依赖
+3. **双向注入** — 会话~186t(四层问答) + 轮次~150t(三块式)
+4. **越用越懂你** — 管道数据随沙子自然积累
 
 ---
 
 ## 性能基准
 
-| 层 | 操作 | 耗时 |
-|----|------|------|
-| **L1 写** | 单次落沙（append+DPAPI加密） | **1.3ms** |
-| | 批量10条 | 10.4ms (1.0ms/条) |
-| **L2 搜** | FTS5搜索 | **1.2ms** |
-| | idx精排 | 2.2ms |
-| | 时间轴 | 2.9ms |
-| | 最近5条 | 0.5ms |
-| **L3 思** | 综合偏移率 | **0.5ms** |
-| | 语义搜索 | 0.6ms |
-| | 织布机 | 1.5ms |
-| | 决策链条检测 | 2.8ms |
-| | 情绪感知 | 0.5ms |
+| 层 | 操作 | median | p99 |
+|----|------|--------|------|
+| **L1 写** | 单次落沙 | **4.3ms** | 19.5ms |
+| **L2 搜** | FTS5搜索 | **1.6ms** | 5.4ms |
+| | 影子沙 | **0.7ms** | 1.2ms |
+| | 四路并发 | 79.4ms | — |
+| **L3 思** | 偏移率 | **<0.1ms** | — |
+| | 情绪熵(会话级) | 6.5ms | — |
+| | 心理预判 | 7.0ms | — |
+| | 铁律因子 | **<0.1ms** | — |
 
-> 测试环境：931条沙子 · Windows 10 · i5-8265U · Python 3.11 · 零污染（L1写入使用临时沙漏副本）
-> 基准脚本：`benchmark.py` — `python benchmark.py`
+> 测试：5900条 · Windows 10 · i5-8265U · Python 3.11 · 完全隔离
+
+---
+
+
+---
+
+## 模型织印象（可选，默认回落纯规则）
+
+织布机新增 `weave_llm.py`：模型可用时，`weave_insight` 额外返回 `impression` / `impression_engine` / `synthesis_enhanced`；模型不可用或加载失败时，自动回落纯规则，原 `synthesis` 字段保持不变。
+
+**架构红线**：模型产出只进入印象层，永不写回 `sandglass.txt` / L0 原始沙。
+
+| 环境变量 | 说明 | 默认 |
+|---|---|---|
+| `NEXSANDBASE_LLM_ENABLED` | `auto` / `1` / `0`。`auto` 表示有可用后端才启用 | `auto` |
+| `NEXSANDBASE_LLM_GGUF` | 本地 GGUF 路径，自动使用 `llama_cpp` | 空 |
+| `NEXSANDBASE_LLM_ENDPOINT` | OpenAI 兼容本地端点，例如 `http://127.0.0.1:8080/v1` | 空 |
+| `NEXSANDBASE_LLM_MODEL` | 端点模型名 | `qwen2.5-0.5b-instruct` |
+| `NEXSANDBASE_LLM_OLLAMA_MODEL` | Ollama 原生模型名 | 空 |
+| `NEXSANDBASE_LLM_TIMEOUT` | 模型调用超时秒 | `30` |
+
+推荐模型：`Qwen/Qwen2.5-0.5B-Instruct-GGUF` 的 `qwen2.5-0.5b-instruct-q4_0.gguf`（约 409MB）。
+
+```bash
+# 下载（hf-mirror.com）
+export HF_ENDPOINT=https://hf-mirror.com
+hf download Qwen/Qwen2.5-0.5B-Instruct-GGUF qwen2.5-0.5b-instruct-q4_0.gguf \
+  --local-dir ~/.nexsandglass/models
+
+# llama.cpp server 启动（推荐，OpenAI 兼容）
+llama-server -m ~/.nexsandglass/models/qwen2.5-0.5b-instruct-q4_0.gguf \
+  --host 127.0.0.1 --port 8080 -c 4096 -ngl -1
+export NEXSANDBASE_LLM_ENDPOINT=http://127.0.0.1:8080/v1
+export NEXSANDBASE_LLM_MODEL=qwen2.5-0.5b-instruct
+```
+
+验收/对比：`python scripts/weave_llm_acceptance.py`，报告写入 `reports/20260816_织布机0.5B对比报告.md`。
+
+## 教程
+
+### 安装
+
+```bash
+# Hermes Studio / Desktop（推荐—小白用户首选）
+hermes plugins install lovevin1314-tech/NexSandglass
+# 重启 → 设置 → 记忆体 → 选择 NexSandglass → 开始对话
+
+# 升级到最新版
+hermes plugins update NexSandglass
+
+# 开发者—任何 Python 项目
+pip install nexsandglass
+```
+
+### 实用范例
+
+```python
+from sandglass_vault import search, count, recent
+from sandglass_log import log_message
+
+# 写入记忆（自动落沙）
+log_message("今天讨论了搜索排序优化", "user")
+
+# 搜索记忆（毫秒级）
+for ln, ts, text in search("搜索排序", limit=3):
+    print(f"[{ts}] {text[:80]}")
+
+# 最近记忆
+for ln, ts, text in recent(5):
+    print(f"[{ts}] {text[:60]}")
+
+print(f"沙漏总量: {count()}条")
+```
+
+### Agent 子代理隔离
+
+用 `NEXSANDBASE_HOME` 给不同 Agent 分配独立沙漏，记忆不串：
+
+```bash
+# Claude Code 专用
+NEXSANDBASE_HOME=~/.neurobase-claude python sandglass_mcp.py
+# Codex 专用
+NEXSANDBASE_HOME=~/.neurobase-codex python sandglass_mcp.py
+# 主 Agent
+export NEXSANDBASE_HOME=~/.neurobase
+```
+
+### 一键搬家
+
+```bash
+python -c "from sandglass_think import memory_migrate; print(memory_migrate())"
+# 解压 tar.gz 到新电脑即刻恢复全部记忆
+```
+
+### 从 Hermes 迁移
+
+```bash
+python hermes_to_sandglass.py  # 一行命令导入 Hermes 历史记忆
+```
+
+## 版本历程
+
+### V3.1.0 (2026-08-17) · 补回立体像合成 + 织线补漏
+- `_synthesize_3d` 复用 `weave_llm` 本地小模型：模型可用时语义化画像、四选一提醒语气、贴合场景提醒示例；失败自动回落原 22 行本地聚合
+- 新增 `weave_missing_triples`：从沙子检索结果补织正则漏掉的关系三元组，经实体原文校验后通过 `wthread_add` 写 L2 织线表，宁缺毋滥
+- 新增 `weave_l3.weave_thread_fill` 程序化入口，测试/外部任务可直接触发织线补漏
+- 架构红线保持：模型产出不写 L0、模型不可用自动回落、原合成/正则织线逻辑保留
+- 版本号统一对齐 3.1.0
+
+### V3.0.0 (2026-08-17) · 织布机接入本地小模型（织印象）
+- 新增 `weave_llm.py`：可插拔模型织印象模块——支持 GGUF（llama.cpp）/ OpenAI 兼容端点 / Ollama 三种后端
+- 织布机 `weave_insight` 新增 `impression_*` / `synthesis_enhanced`，模型可用时优先织印象，失败自动回落纯规则
+- 模型选型：Qwen2.5-0.5B-Instruct Q4_0（409MB），纯本地零 API
+- 调优（实测）：prompt 极简化（不要求 JSON）、JSON 失败降级为文本、资料人类可读化——10 话题实测信息密度 +767%、模板机械度 -100%
+- 架构红线：模型产出永不写回 L0 原始沙（sandglass.txt 哈希实测未变）、可插拔回落
+- 版本号统一：plugin.yaml / pyproject.toml / setup.py / sandglass_paths.py / install.py / agent_bootstrap.py / memory_provider.py / pulse.py / v3/sandglass_paths.py / plugin.py / ARCHITECTURE.md / README 全部对齐 3.0.0
+### V2.20.x (2026-08) · Mac 魔改 + 铁律因子熔炼
+- V2.20.1: V3 架构里程碑——版本号统一升级，涟漪架构落地
+- V2.20.5: sync_turn 消费 messages + 缓存重置修复 + 全量脱敏（移除 persona 残留）+ build/dist 移出跟踪
+- V2.20.6: 铁律因子修复熔炼——核心下沉 sandglass_core 唯一 Provider、双层铁律注入（红牌常驻+普通触发）、token 预算纯本地估算（中文1字≈1token）、实体/标签注入（显式记忆/高信实体/事实标签三块）、单5 静默失效清理 128 处、生产红牌标记
+
+### V2.10 (2026-06) · PyPI 发布 + 双向注入
+PyPI 发布 `pip install nexsandglass`。三块式轮次注入(150t)+四层问答式会话注入(186t)，DB 自省增量启动，沙子自愈，Porter Stemmer，psychology_hint 15种模式，local_distill 管道蒸馏，enrich_choice 模板引擎。
+
+### V2.9.28-42 (2026-06)
+极简注入优化(132→58t)，sim_bonus 线性化修复，`_llm` 全链路根除，停用词过滤(中38+英52)，shadow_index 实体提取修复，fact_tags 空标签回填，`_write_idx` RLock 并发安全，SimHash 跨会话持久化，five-facets.json 管道自动生成，首次画像管道化(`_pipe_build`)。
+
+### V2.9.11-27 (2026-06)
+数据点自生长(画像 LLM→数据点驱动)，搜索密度回归 ratio，C组语义扩展(决策粒子注入 7.5x)，管道洞察接入 LLM，铁律因子统一命名，函数名/变量名 LLM 残留全清。
+
+### V2.9 极简注入
+四路并发搜索，织线知识图谱，四层问答式注入(~60t)，管道聚合画像，偏移率·纠结度·scene_l3。
+
+### V1.x 奠基
+偏移率·情绪感知·决策粒子·影子沙·织布机·场景系统·回音折

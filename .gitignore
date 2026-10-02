@@ -4,13 +4,26 @@ __pycache__/
 *.rej
 *.orig
 *.zip
-sandglass.txt
-sandglass.idx
-decision_particles.txt
-decision_particles_backup.txt
-*.db
-*.sqlite
-.env
+*.bak
+*.bak-*
 
-.aider*
-node_modules/
+# 禁止上传真实数据
+sandglass.txt
+sandglass.backup
+sandglass.db
+sandglass.idx
+shadow_sand.db
+persona/persona.md
+persona/persona.*.md
+persona/decision-log.jsonl
+persona/scene-timeline.jsonl
+persona/scenes.json
+decision_particles.txt
+echo_wind.jsonl
+*.env
+*.key
+
+# 构建与打包产物
+build/
+dist/
+*.egg-info/

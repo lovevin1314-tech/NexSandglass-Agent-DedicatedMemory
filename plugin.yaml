@@ -1,0 +1,11 @@
+name: nexsandglass
+version: 3.1.1
+kind: exclusive
+description: "NexSandglass memory — 投石问路倒排索引 + 五维权重排序 + 偏移率感知 + 回音折 + 影子灵魂。零API Key，纯本地。"
+setup: |
+  CLI:  hermes config set memory.provider nexsandglass
+  GUI:  设置 → 记忆体 → NexSandglass（如不显示请用CLI命令）
+hooks:
+  - on_session_end
+  - on_memory_write
+  - on_pre_compress
