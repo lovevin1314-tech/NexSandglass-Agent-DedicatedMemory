@@ -6,7 +6,7 @@ from sandglass_util import read_json, write_json_atomic
 
 logger = logging.getLogger(__name__)
 
-VERSION = "3.1.1"
+VERSION = "3.1.5"
 
 # 每个 label 可有多个 path（备选），按优先级排列
 AGENT_GROUPS = [

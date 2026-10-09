@@ -1,4 +1,4 @@
-"""NexSandglass V3.1.1 — 感知深度 ================================= 识别 → 觉察(含情绪感知) → 提醒 三层独立函数 + pulse() 编排。 每次对话前 pulse() 自动选择最深的一层回应。"""
+"""NexSandglass V3.1.5 — 感知深度 ================================= 识别 → 觉察(含情绪感知) → 提醒 三层独立函数 + pulse() 编排。 每次对话前 pulse() 自动选择最深的一层回应。"""
 
 import os, re, random, logging
 from datetime import datetime
